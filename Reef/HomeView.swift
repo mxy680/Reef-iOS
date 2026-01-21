@@ -18,6 +18,7 @@ class Course {
 }
 
 enum CourseSection: String, CaseIterable, Identifiable {
+    case dashboard = "Dashboard"
     case notes = "Notes"
     case quizzes = "Quizzes"
     case exams = "Exams"
@@ -26,6 +27,7 @@ enum CourseSection: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .dashboard: return "square.grid.2x2"
         case .notes: return "note.text"
         case .quizzes: return "list.bullet.clipboard"
         case .exams: return "doc.text.magnifyingglass"
@@ -57,6 +59,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 
 struct HomeView: View {
     @ObservedObject var authManager: AuthenticationManager
+    @StateObject private var themeManager = ThemeManager.shared
     @Environment(\.modelContext) private var modelContext
     @Query private var courses: [Course]
     @State private var selectedItem: SidebarItem?
@@ -66,14 +69,12 @@ struct HomeView: View {
     @State private var isAddingCourse = false
     @State private var newCourseName = ""
 
+    private var effectiveColorScheme: ColorScheme {
+        themeManager.isDarkMode ? .dark : .light
+    }
+
     init(authManager: AuthenticationManager) {
         _authManager = ObservedObject(wrappedValue: authManager)
-        let appearance = UINavigationBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(Color.sageMist)
-        appearance.shadowColor = .clear
-        UINavigationBar.appearance().standardAppearance = appearance
-        UINavigationBar.appearance().scrollEdgeAppearance = appearance
     }
 
     private var userInitials: String {
@@ -110,11 +111,11 @@ struct HomeView: View {
                         HStack {
                             Label(SidebarItem.courses.rawValue, systemImage: SidebarItem.courses.icon)
                                 .font(.nunito(16, weight: .medium))
-                                .foregroundColor(.inkBlack)
+                                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                             Spacer()
                             Image(systemName: isCoursesExpanded ? "chevron.down" : "chevron.right")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.inkBlack)
+                                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                         }
                     }
                     .buttonStyle(.plain)
@@ -136,11 +137,11 @@ struct HomeView: View {
                                 HStack {
                                     Label(course.name, systemImage: "folder.fill")
                                         .font(.nunito(16, weight: .medium))
-                                        .foregroundColor(.inkBlack)
+                                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                                     Spacer()
                                     Image(systemName: selectedCourse?.id == course.id ? "chevron.down" : "chevron.right")
                                         .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(.inkBlack)
+                                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                                 }
                             }
                             .buttonStyle(.plain)
@@ -156,7 +157,7 @@ struct HomeView: View {
                                         HStack {
                                             Label(section.rawValue, systemImage: section.icon)
                                                 .font(.nunito(16, weight: .medium))
-                                                .foregroundColor(selectedSection == section ? .oceanMid : .inkBlack)
+                                                .foregroundColor(selectedSection == section ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
                                             Spacer()
                                         }
                                         .contentShape(Rectangle())
@@ -173,7 +174,7 @@ struct HomeView: View {
                         } label: {
                             Label("Add Course", systemImage: "plus.circle.fill")
                                 .font(.nunito(16, weight: .medium))
-                                .foregroundColor(.inkBlack)
+                                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                         }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top: 8, leading: 32, bottom: 8, trailing: 16))
@@ -187,7 +188,7 @@ struct HomeView: View {
                         HStack {
                             Label(SidebarItem.myReef.rawValue, systemImage: SidebarItem.myReef.icon)
                                 .font(.nunito(16, weight: .medium))
-                                .foregroundColor(selectedItem == .myReef ? .oceanMid : .inkBlack)
+                                .foregroundColor(selectedItem == .myReef ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
                             Spacer()
                         }
                         .contentShape(Rectangle())
@@ -201,7 +202,7 @@ struct HomeView: View {
                         HStack {
                             Label(SidebarItem.analytics.rawValue, systemImage: SidebarItem.analytics.icon)
                                 .font(.nunito(16, weight: .medium))
-                                .foregroundColor(selectedItem == .analytics ? .oceanMid : .inkBlack)
+                                .foregroundColor(selectedItem == .analytics ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
                             Spacer()
                         }
                         .contentShape(Rectangle())
@@ -215,7 +216,7 @@ struct HomeView: View {
                         HStack {
                             Label(SidebarItem.tutors.rawValue, systemImage: SidebarItem.tutors.icon)
                                 .font(.nunito(16, weight: .medium))
-                                .foregroundColor(selectedItem == .tutors ? .oceanMid : .inkBlack)
+                                .foregroundColor(selectedItem == .tutors ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
                             Spacer()
                         }
                         .contentShape(Rectangle())
@@ -229,7 +230,7 @@ struct HomeView: View {
                         HStack {
                             Label(SidebarItem.profile.rawValue, systemImage: SidebarItem.profile.icon)
                                 .font(.nunito(16, weight: .medium))
-                                .foregroundColor(selectedItem == .profile ? .oceanMid : .inkBlack)
+                                .foregroundColor(selectedItem == .profile ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
                             Spacer()
                         }
                         .contentShape(Rectangle())
@@ -243,7 +244,7 @@ struct HomeView: View {
                         HStack {
                             Label(SidebarItem.settings.rawValue, systemImage: SidebarItem.settings.icon)
                                 .font(.nunito(16, weight: .medium))
-                                .foregroundColor(selectedItem == .settings ? .oceanMid : .inkBlack)
+                                .foregroundColor(selectedItem == .settings ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
                             Spacer()
                         }
                         .contentShape(Rectangle())
@@ -251,20 +252,21 @@ struct HomeView: View {
                     .buttonStyle(.plain)
                 }
                 .listStyle(.sidebar)
-                .tint(.inkBlack)
+                .tint(Color.adaptiveText(for: effectiveColorScheme))
                 .environment(\.symbolRenderingMode, .monochrome)
                 .scrollContentBackground(.hidden)
+                .padding(.top, 12)
 
                 Spacer()
 
                 // Separator
                 Divider()
-                    .background(Color.oceanMid.opacity(0.3))
+                    .background(Color.adaptiveSecondary(for: effectiveColorScheme).opacity(0.3))
 
                 // User footer
                 HStack(spacing: 12) {
                     Circle()
-                        .fill(Color.vibrantTeal)
+                        .fill(Color.adaptivePrimary(for: effectiveColorScheme))
                         .frame(width: 44, height: 44)
                         .overlay(
                             Text(userInitials)
@@ -275,12 +277,12 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(authManager.userName ?? "User")
                             .font(.nunito(14, weight: .semiBold))
-                            .foregroundColor(.inkBlack)
+                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
 
                         if let email = authManager.userEmail {
                             Text(email)
                                 .font(.nunito(12, weight: .regular))
-                                .foregroundColor(.oceanMid)
+                                .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
                                 .lineLimit(1)
                         }
                     }
@@ -292,7 +294,7 @@ struct HomeView: View {
                     } label: {
                         Image(systemName: "rectangle.portrait.and.arrow.right")
                             .font(.system(size: 20))
-                            .foregroundColor(.inkBlack)
+                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                     }
                     .buttonStyle(.plain)
                 }
@@ -300,7 +302,7 @@ struct HomeView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 4)
             }
-            .background(Color.sageMist)
+            .background(Color.adaptiveBackground(for: effectiveColorScheme))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -313,34 +315,34 @@ struct HomeView: View {
 
                         Text("Reef")
                             .font(.nunito(28, weight: .bold))
-                            .foregroundColor(.inkBlack)
+                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                     }
                 }
             }
-            .toolbarBackground(Color.sageMist, for: .navigationBar)
+            .toolbarBackground(Color.adaptiveBackground(for: effectiveColorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         } detail: {
             // Main content area
             NavigationStack {
-                Color.sageMist
+                Color.adaptiveBackground(for: effectiveColorScheme)
                     .ignoresSafeArea()
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
-                        ToolbarItem(placement: .principal) {
+                        ToolbarItem(placement: .topBarLeading) {
                             Text(detailTitle)
                                 .font(.nunito(20, weight: .semiBold))
-                                .foregroundColor(.inkBlack)
+                                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                         }
 
                         ToolbarItem(placement: .topBarTrailing) {
                             HStack(spacing: 20) {
                                 // Dark mode toggle
                                 Button {
-                                    // TODO: Implement dark mode toggle
+                                    themeManager.toggle()
                                 } label: {
-                                    Image(systemName: "moon.fill")
+                                    Image(systemName: themeManager.isDarkMode ? "sun.max.fill" : "moon.fill")
                                         .font(.system(size: 18))
-                                        .foregroundColor(.inkBlack)
+                                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                                 }
 
                                 // Notifications
@@ -349,7 +351,7 @@ struct HomeView: View {
                                 } label: {
                                     Image(systemName: "bell.fill")
                                         .font(.system(size: 18))
-                                        .foregroundColor(.inkBlack)
+                                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                                 }
 
                                 // Settings
@@ -358,17 +360,18 @@ struct HomeView: View {
                                 } label: {
                                     Image(systemName: "gearshape.fill")
                                         .font(.system(size: 18))
-                                        .foregroundColor(.inkBlack)
+                                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                                 }
                             }
                         }
                     }
-                    .toolbarBackground(Color.sageMist, for: .navigationBar)
+                    .toolbarBackground(Color.adaptiveBackground(for: effectiveColorScheme), for: .navigationBar)
                     .toolbarBackground(.visible, for: .navigationBar)
             }
         }
         .navigationSplitViewStyle(.balanced)
-        .tint(.inkBlack)
+        .tint(Color.adaptiveText(for: effectiveColorScheme))
+        .preferredColorScheme(effectiveColorScheme)
         .alert("New Course", isPresented: $isAddingCourse) {
             TextField("Course name", text: $newCourseName)
             Button("Cancel", role: .cancel) {

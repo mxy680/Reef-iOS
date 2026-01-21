@@ -7,6 +7,21 @@
 
 import SwiftUI
 
+// MARK: - Theme Manager
+class ThemeManager: ObservableObject {
+    static let shared = ThemeManager()
+
+    @AppStorage("isDarkMode") var isDarkMode: Bool = false
+
+    var colorScheme: ColorScheme {
+        isDarkMode ? .dark : .light
+    }
+
+    func toggle() {
+        isDarkMode.toggle()
+    }
+}
+
 // MARK: - Hex Color Initializer
 extension Color {
     init(hex: String) {
@@ -63,6 +78,47 @@ extension Color {
     static let reefAccent = deepSea
     static let reefText = inkBlack
     static let reefBackground = sageMist
+
+    // MARK: - Dark Mode Colors
+
+    /// Dark mode background - deep ocean darkness
+    static let deepOcean = Color(hex: "0A1628")
+
+    /// Dark mode text - pearl white for readability
+    static let pearlWhite = Color(hex: "F0F2F5")
+
+    /// Dark mode secondary - slightly brighter teal
+    static let brightTeal = Color(hex: "14B8C4")
+
+    /// Dark mode accent - lighter teal for dark backgrounds
+    static let lightTeal = Color(hex: "1A7A8A")
+
+    // MARK: - Adaptive Colors
+
+    /// Adaptive background color
+    static func adaptiveBackground(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? deepOcean : sageMist
+    }
+
+    /// Adaptive text color
+    static func adaptiveText(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? pearlWhite : inkBlack
+    }
+
+    /// Adaptive primary color (unchanged across themes)
+    static func adaptivePrimary(for scheme: ColorScheme) -> Color {
+        vibrantTeal
+    }
+
+    /// Adaptive secondary color
+    static func adaptiveSecondary(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? brightTeal : oceanMid
+    }
+
+    /// Adaptive accent color
+    static func adaptiveAccent(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? lightTeal : deepSea
+    }
 }
 
 // MARK: - Reef Gradients
@@ -88,4 +144,21 @@ extension LinearGradient {
         startPoint: .leading,
         endPoint: .trailing
     )
+
+    /// Adaptive vertical gradient for PreAuth screen
+    static func preAuthGradient(for scheme: ColorScheme) -> LinearGradient {
+        if scheme == .dark {
+            return LinearGradient(
+                colors: [.lightTeal, .deepOcean],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        } else {
+            return LinearGradient(
+                colors: [.oceanMid, .deepSea],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+    }
 }
