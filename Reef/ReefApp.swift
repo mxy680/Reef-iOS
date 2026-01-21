@@ -6,12 +6,20 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct ReefApp: App {
+    @StateObject private var authManager = AuthenticationManager()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if authManager.isAuthenticated {
+                HomeView(authManager: authManager)
+            } else {
+                PreAuthView(authManager: authManager)
+            }
         }
+        .modelContainer(for: Course.self)
     }
 }
