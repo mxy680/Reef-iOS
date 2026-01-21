@@ -36,6 +36,9 @@ enum CourseSection: String, CaseIterable, Identifiable {
 enum SidebarItem: String, CaseIterable, Identifiable {
     case courses = "Courses"
     case myReef = "My Reef"
+    case analytics = "Analytics"
+    case tutors = "Tutors"
+    case profile = "Profile"
     case settings = "Settings"
 
     var id: String { rawValue }
@@ -44,6 +47,9 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .courses: return "book.closed.fill"
         case .myReef: return "fish.fill"
+        case .analytics: return "chart.line.uptrend.xyaxis"
+        case .tutors: return "figure.surfing"
+        case .profile: return "person.crop.circle.fill"
         case .settings: return "gearshape.fill"
         }
     }
@@ -79,6 +85,15 @@ struct HomeView: View {
             return String(first.prefix(2)).uppercased()
         }
         return "?"
+    }
+
+    private var detailTitle: String {
+        if let section = selectedSection, let course = selectedCourse {
+            return "\(course.name) - \(section.rawValue)"
+        } else if let item = selectedItem {
+            return item.rawValue
+        }
+        return "Welcome"
     }
 
     var body: some View {
@@ -120,7 +135,7 @@ struct HomeView: View {
                             } label: {
                                 HStack {
                                     Label(course.name, systemImage: "folder.fill")
-                                        .font(.nunito(15, weight: .medium))
+                                        .font(.nunito(16, weight: .medium))
                                         .foregroundColor(.inkBlack)
                                     Spacer()
                                     Image(systemName: selectedCourse?.id == course.id ? "chevron.down" : "chevron.right")
@@ -140,7 +155,7 @@ struct HomeView: View {
                                     } label: {
                                         HStack {
                                             Label(section.rawValue, systemImage: section.icon)
-                                                .font(.nunito(14, weight: .regular))
+                                                .font(.nunito(16, weight: .medium))
                                                 .foregroundColor(selectedSection == section ? .oceanMid : .inkBlack)
                                             Spacer()
                                         }
@@ -157,14 +172,14 @@ struct HomeView: View {
                             isAddingCourse = true
                         } label: {
                             Label("Add Course", systemImage: "plus.circle.fill")
-                                .font(.nunito(15, weight: .medium))
+                                .font(.nunito(16, weight: .medium))
                                 .foregroundColor(.inkBlack)
                         }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top: 8, leading: 32, bottom: 8, trailing: 16))
                     }
 
-                    // My Reef and Settings (selectable)
+                    // My Reef, Tutors, Profile, and Settings (selectable)
                     Button {
                         selectedItem = .myReef
                         selectedSection = nil
@@ -173,6 +188,48 @@ struct HomeView: View {
                             Label(SidebarItem.myReef.rawValue, systemImage: SidebarItem.myReef.icon)
                                 .font(.nunito(16, weight: .medium))
                                 .foregroundColor(selectedItem == .myReef ? .oceanMid : .inkBlack)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        selectedItem = .analytics
+                        selectedSection = nil
+                    } label: {
+                        HStack {
+                            Label(SidebarItem.analytics.rawValue, systemImage: SidebarItem.analytics.icon)
+                                .font(.nunito(16, weight: .medium))
+                                .foregroundColor(selectedItem == .analytics ? .oceanMid : .inkBlack)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        selectedItem = .tutors
+                        selectedSection = nil
+                    } label: {
+                        HStack {
+                            Label(SidebarItem.tutors.rawValue, systemImage: SidebarItem.tutors.icon)
+                                .font(.nunito(16, weight: .medium))
+                                .foregroundColor(selectedItem == .tutors ? .oceanMid : .inkBlack)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        selectedItem = .profile
+                        selectedSection = nil
+                    } label: {
+                        HStack {
+                            Label(SidebarItem.profile.rawValue, systemImage: SidebarItem.profile.icon)
+                                .font(.nunito(16, weight: .medium))
+                                .foregroundColor(selectedItem == .profile ? .oceanMid : .inkBlack)
                             Spacer()
                         }
                         .contentShape(Rectangle())
@@ -194,6 +251,8 @@ struct HomeView: View {
                     .buttonStyle(.plain)
                 }
                 .listStyle(.sidebar)
+                .tint(.inkBlack)
+                .environment(\.symbolRenderingMode, .monochrome)
                 .scrollContentBackground(.hidden)
 
                 Spacer()
@@ -262,11 +321,54 @@ struct HomeView: View {
             .toolbarBackground(.visible, for: .navigationBar)
         } detail: {
             // Main content area
-            Color.sageMist
-                .ignoresSafeArea()
+            NavigationStack {
+                Color.sageMist
+                    .ignoresSafeArea()
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .principal) {
+                            Text(detailTitle)
+                                .font(.nunito(20, weight: .semiBold))
+                                .foregroundColor(.inkBlack)
+                        }
+
+                        ToolbarItem(placement: .topBarTrailing) {
+                            HStack(spacing: 20) {
+                                // Dark mode toggle
+                                Button {
+                                    // TODO: Implement dark mode toggle
+                                } label: {
+                                    Image(systemName: "moon.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(.inkBlack)
+                                }
+
+                                // Notifications
+                                Button {
+                                    // TODO: Implement notifications
+                                } label: {
+                                    Image(systemName: "bell.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(.inkBlack)
+                                }
+
+                                // Settings
+                                Button {
+                                    // TODO: Implement settings
+                                } label: {
+                                    Image(systemName: "gearshape.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(.inkBlack)
+                                }
+                            }
+                        }
+                    }
+                    .toolbarBackground(Color.sageMist, for: .navigationBar)
+                    .toolbarBackground(.visible, for: .navigationBar)
+            }
         }
         .navigationSplitViewStyle(.balanced)
-        .tint(.oceanMid)
+        .tint(.inkBlack)
         .alert("New Course", isPresented: $isAddingCourse) {
             TextField("Course name", text: $newCourseName)
             Button("Cancel", role: .cancel) {
