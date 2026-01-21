@@ -11,6 +11,10 @@ import SwiftData
 @Model
 class Course {
     var name: String
+    @Relationship(deleteRule: .cascade, inverse: \Material.course)
+    var materials: [Material] = []
+    @Relationship(deleteRule: .cascade, inverse: \Assignment.course)
+    var assignments: [Assignment] = []
 
     init(name: String) {
         self.name = name
@@ -18,8 +22,8 @@ class Course {
 }
 
 enum CourseSection: String, CaseIterable, Identifiable {
-    case dashboard = "Dashboard"
-    case notes = "Notes"
+    case materials = "Materials"
+    case assignments = "Assignments"
     case quizzes = "Quizzes"
     case exams = "Exams"
 
@@ -27,8 +31,8 @@ enum CourseSection: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .dashboard: return "square.grid.2x2"
-        case .notes: return "note.text"
+        case .materials: return "folder"
+        case .assignments: return "pencil.and.list.clipboard"
         case .quizzes: return "list.bullet.clipboard"
         case .exams: return "doc.text.magnifyingglass"
         }
@@ -68,6 +72,10 @@ struct HomeView: View {
     @State private var selectedSection: CourseSection?
     @State private var isAddingCourse = false
     @State private var newCourseName = ""
+    @State private var isShowingDocumentPicker = false
+    @State private var isShowingAssignmentPicker = false
+    @State private var isShowingGenerateExam = false
+    @State private var isShowingQuizGeneration = false
 
     private var effectiveColorScheme: ColorScheme {
         themeManager.isDarkMode ? .dark : .light
@@ -97,11 +105,49 @@ struct HomeView: View {
         return "Welcome"
     }
 
+    @ViewBuilder
+    private var detailContent: some View {
+        if let section = selectedSection, let course = selectedCourse {
+            switch section {
+            case .materials:
+                MaterialsView(course: course, onAddMaterial: { isShowingDocumentPicker = true })
+            case .quizzes:
+                QuizzesView(course: course, onGenerateQuiz: { isShowingQuizGeneration = true })
+            case .exams:
+                ExamsView(course: course, onGenerateExam: { isShowingGenerateExam = true })
+            case .assignments:
+                AssignmentsView(course: course, onAddAssignment: { isShowingAssignmentPicker = true })
+            }
+        } else {
+            // Default welcome/placeholder view
+            Color.adaptiveBackground(for: effectiveColorScheme)
+                .ignoresSafeArea()
+        }
+    }
+
     var body: some View {
         NavigationSplitView {
             // Sidebar - Sage Mist background
-            VStack(spacing: 0) {
-                List {
+            ZStack(alignment: .trailing) {
+                VStack(spacing: 0) {
+                    // Custom header (replaces toolbar)
+                    HStack(spacing: 4) {
+                        Image("ReefLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 32)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                        Text("Reef")
+                            .font(.nunito(28, weight: .bold))
+                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+
+                    List {
                     // Courses tab (not selectable, toggles expansion)
                     Button {
                         withAnimation(.easeInOut(duration: 0.25)) {
@@ -301,31 +347,20 @@ struct HomeView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
                 .padding(.bottom, 4)
-            }
-            .background(Color.adaptiveBackground(for: effectiveColorScheme))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: 4) {
-                        Image("ReefLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 32)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                        Text("Reef")
-                            .font(.nunito(28, weight: .bold))
-                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
-                    }
                 }
+                .background(Color.adaptiveBackground(for: effectiveColorScheme))
+
+                // Right edge separator
+                Rectangle()
+                    .fill(Color.adaptiveText(for: effectiveColorScheme).opacity(0.15))
+                    .frame(width: 1)
+                    .ignoresSafeArea()
             }
-            .toolbarBackground(Color.adaptiveBackground(for: effectiveColorScheme), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar(.hidden, for: .navigationBar)
         } detail: {
             // Main content area
             NavigationStack {
-                Color.adaptiveBackground(for: effectiveColorScheme)
-                    .ignoresSafeArea()
+                detailContent
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
@@ -336,6 +371,41 @@ struct HomeView: View {
 
                         ToolbarItem(placement: .topBarTrailing) {
                             HStack(spacing: 20) {
+                                // Add button (shown on Materials, Assignments, or Quizzes section)
+                                if selectedSection == .materials {
+                                    Button {
+                                        isShowingDocumentPicker = true
+                                    } label: {
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 18, weight: .medium))
+                                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                                    }
+                                } else if selectedSection == .assignments {
+                                    Button {
+                                        isShowingAssignmentPicker = true
+                                    } label: {
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 18, weight: .medium))
+                                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                                    }
+                                } else if selectedSection == .quizzes {
+                                    Button {
+                                        isShowingQuizGeneration = true
+                                    } label: {
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 18, weight: .medium))
+                                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                                    }
+                                } else if selectedSection == .exams {
+                                    Button {
+                                        isShowingGenerateExam = true
+                                    } label: {
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 18, weight: .medium))
+                                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                                    }
+                                }
+
                                 // Dark mode toggle
                                 Button {
                                     themeManager.toggle()
@@ -386,6 +456,82 @@ struct HomeView: View {
             }
         } message: {
             Text("Enter the name for your new course")
+        }
+        .sheet(isPresented: $isShowingDocumentPicker) {
+            DocumentPicker { urls in
+                addMaterials(from: urls)
+            }
+        }
+        .sheet(isPresented: $isShowingAssignmentPicker) {
+            DocumentPicker { urls in
+                addAssignments(from: urls)
+            }
+        }
+        .sheet(isPresented: $isShowingQuizGeneration) {
+            if let course = selectedCourse {
+                QuizGenerationView(course: course)
+            }
+        }
+        .sheet(isPresented: $isShowingGenerateExam) {
+            if let course = selectedCourse {
+                GenerateExamSheet(course: course)
+            }
+        }
+    }
+
+    private func addMaterials(from urls: [URL]) {
+        guard let course = selectedCourse else { return }
+
+        for url in urls {
+            let fileName = url.lastPathComponent
+            let fileExtension = url.pathExtension
+            let name = url.deletingPathExtension().lastPathComponent
+
+            let material = Material(
+                name: name,
+                fileName: fileName,
+                fileExtension: fileExtension,
+                course: course
+            )
+
+            do {
+                _ = try FileStorageService.shared.copyFile(
+                    from: url,
+                    materialID: material.id,
+                    fileExtension: fileExtension
+                )
+                modelContext.insert(material)
+            } catch {
+                print("Failed to copy file: \(error)")
+            }
+        }
+    }
+
+    private func addAssignments(from urls: [URL]) {
+        guard let course = selectedCourse else { return }
+
+        for url in urls {
+            let fileName = url.lastPathComponent
+            let fileExtension = url.pathExtension
+            let name = url.deletingPathExtension().lastPathComponent
+
+            let assignment = Assignment(
+                name: name,
+                fileName: fileName,
+                fileExtension: fileExtension,
+                course: course
+            )
+
+            do {
+                _ = try FileStorageService.shared.copyFile(
+                    from: url,
+                    materialID: assignment.id,
+                    fileExtension: fileExtension
+                )
+                modelContext.insert(assignment)
+            } catch {
+                print("Failed to copy file: \(error)")
+            }
         }
     }
 }

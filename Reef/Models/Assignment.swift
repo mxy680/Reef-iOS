@@ -1,0 +1,44 @@
+//
+//  Assignment.swift
+//  Reef
+//
+
+import Foundation
+import SwiftData
+
+@Model
+class Assignment {
+    var id: UUID = UUID()
+    var name: String              // User-editable display name
+    var fileName: String          // Original file name with extension
+    var fileExtension: String     // Extension for type detection
+    var dateAdded: Date = Date()
+    var course: Course?           // Relationship to parent course
+
+    var fileType: FileType {
+        switch fileExtension.lowercased() {
+        case "pdf": return .pdf
+        case "jpg", "jpeg", "png", "heic": return .image
+        default: return .document
+        }
+    }
+
+    var fileTypeIcon: String {
+        switch fileType {
+        case .pdf: return "doc.fill"
+        case .image: return "photo.fill"
+        case .document: return "doc.text.fill"
+        }
+    }
+
+    enum FileType: String, Codable {
+        case pdf, image, document
+    }
+
+    init(name: String, fileName: String, fileExtension: String, course: Course? = nil) {
+        self.name = name
+        self.fileName = fileName
+        self.fileExtension = fileExtension
+        self.course = course
+    }
+}
