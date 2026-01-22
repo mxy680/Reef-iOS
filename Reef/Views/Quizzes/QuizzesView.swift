@@ -97,24 +97,75 @@ struct QuizGenerationView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                Text("Quiz generation coming soon")
-                    .font(.quicksand(18, weight: .medium))
-                    .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    headerSection
+
+                    // Form fields will go here
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 100) // Space for fixed button
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.adaptiveBackground(for: effectiveColorScheme))
-            .navigationTitle("New Quiz")
+            .overlay(alignment: .bottom) {
+                generateButton
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .font(.quicksand(16, weight: .medium))
                     .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
                 }
             }
         }
         .preferredColorScheme(effectiveColorScheme)
+    }
+
+    // MARK: - Header
+
+    private var headerSection: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 48))
+                .foregroundColor(Color.vibrantTeal)
+
+            Text("Generate Quiz")
+                .font(.quicksand(24, weight: .bold))
+                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+
+            Text("AI will create questions based on your course materials")
+                .font(.quicksand(14, weight: .regular))
+                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.7))
+                .multilineTextAlignment(.center)
+        }
+        .padding(.top, 24)
+    }
+
+    // MARK: - Generate Button
+
+    private var generateButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 16, weight: .semibold))
+                Text("Generate Quiz")
+                    .font(.quicksand(16, weight: .semiBold))
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(canGenerate ? Color.vibrantTeal : Color.vibrantTeal.opacity(0.5))
+            .cornerRadius(12)
+        }
+        .disabled(!canGenerate)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 32)
+        .background(Color.adaptiveBackground(for: effectiveColorScheme))
     }
 }
