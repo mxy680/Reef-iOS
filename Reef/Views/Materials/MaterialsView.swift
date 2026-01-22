@@ -189,6 +189,13 @@ struct MaterialsView: View {
             materialID: material.id,
             fileExtension: material.fileExtension
         )
+
+        // Remove from vector index
+        let materialId = material.id
+        Task {
+            try? await RAGService.shared.deleteDocument(documentId: materialId)
+        }
+
         modelContext.delete(material)
     }
 }

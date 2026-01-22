@@ -10,6 +10,7 @@ import SwiftData
 
 @Model
 class Course {
+    var id: UUID = UUID()
     var name: String
     var icon: String = "folder.fill"
     @Relationship(deleteRule: .cascade, inverse: \Material.course)
@@ -496,6 +497,12 @@ struct HomeView: View {
                         isShowingCourseMenu = false
                     },
                     onDelete: {
+                        // Remove course from vector index
+                        let courseId = course.id
+                        Task {
+                            try? await RAGService.shared.deleteCourse(courseId: courseId)
+                        }
+
                         modelContext.delete(course)
                         selectedCourse = nil
                         selectedSection = nil
@@ -505,6 +512,12 @@ struct HomeView: View {
                         isShowingCourseMenu = false
                     }
                 )
+            }
+        }
+        .onAppear {
+            // Trigger vector index migration for existing documents
+            Task.detached(priority: .background) {
+                await VectorMigrationService().migrateIfNeeded(courses: courses)
             }
         }
     }
@@ -535,6 +548,7 @@ struct HomeView: View {
                 // Extract text using OCR and embedded extraction
                 material.extractionStatus = .extracting
                 let materialID = material.id
+                let courseID = course.id
                 Task.detached {
                     let fileURL = FileStorageService.shared.getFileURL(
                         for: materialID,
@@ -547,6 +561,23 @@ struct HomeView: View {
                         material.ocrConfidence = result.confidence
                         material.extractionStatus = result.text != nil ? .completed : .failed
                         material.isTextExtracted = true
+                    }
+
+                    // Index for RAG if text extraction succeeded
+                    if let text = result.text {
+                        do {
+                            try await RAGService.shared.indexDocument(
+                                documentId: materialID,
+                                documentType: .material,
+                                courseId: courseID,
+                                text: text
+                            )
+                            await MainActor.run {
+                                material.isVectorIndexed = true
+                            }
+                        } catch {
+                            print("Failed to index material for RAG: \(error)")
+                        }
                     }
                 }
             } catch {
@@ -586,6 +617,7 @@ struct HomeView: View {
                 // Extract text using OCR and embedded extraction
                 assignment.extractionStatus = .extracting
                 let assignmentID = assignment.id
+                let courseID = course.id
                 Task.detached {
                     let fileURL = FileStorageService.shared.getFileURL(
                         for: assignmentID,
@@ -598,6 +630,23 @@ struct HomeView: View {
                         assignment.ocrConfidence = result.confidence
                         assignment.extractionStatus = result.text != nil ? .completed : .failed
                         assignment.isTextExtracted = true
+                    }
+
+                    // Index for RAG if text extraction succeeded
+                    if let text = result.text {
+                        do {
+                            try await RAGService.shared.indexDocument(
+                                documentId: assignmentID,
+                                documentType: .assignment,
+                                courseId: courseID,
+                                text: text
+                            )
+                            await MainActor.run {
+                                assignment.isVectorIndexed = true
+                            }
+                        } catch {
+                            print("Failed to index assignment for RAG: \(error)")
+                        }
                     }
                 }
             } catch {

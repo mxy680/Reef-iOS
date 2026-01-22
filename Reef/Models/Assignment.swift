@@ -20,6 +20,7 @@ class Assignment {
     var extractionStatusRaw: String = ExtractionStatus.pending.rawValue
     var extractionMethodRaw: String?
     var ocrConfidence: Double?
+    var isVectorIndexed: Bool = false
 
     var extractionStatus: ExtractionStatus {
         get { ExtractionStatus(rawValue: extractionStatusRaw) ?? .pending }
