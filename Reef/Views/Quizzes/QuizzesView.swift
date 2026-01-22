@@ -108,6 +108,8 @@ struct QuizGenerationView: View {
                     difficultySelector
 
                     questionTypesSelector
+
+                    notesField
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 100) // Space for fixed button
@@ -265,6 +267,28 @@ struct QuizGenerationView: View {
             }
         } else {
             selectedQuestionTypes.insert(type)
+        }
+    }
+
+    // MARK: - Additional Notes Field
+
+    private var notesField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Additional Notes")
+                .font(.quicksand(14, weight: .semiBold))
+                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+
+            TextField("Any specific focus areas or instructions for the AI...", text: $additionalNotes, axis: .vertical)
+                .font(.quicksand(16, weight: .regular))
+                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                .lineLimit(3...6)
+                .padding(12)
+                .background(Color.adaptiveText(for: effectiveColorScheme).opacity(0.05))
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.oceanMid.opacity(0.3), lineWidth: 1)
+                )
         }
     }
 }
