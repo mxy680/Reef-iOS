@@ -29,11 +29,11 @@ struct QuizzesView: View {
 
             VStack(spacing: 8) {
                 Text("No quizzes yet")
-                    .font(.nunito(20, weight: .semiBold))
+                    .font(.quicksand(20, weight: .semiBold))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
 
                 Text("Generate your first quiz to start practicing")
-                    .font(.nunito(16, weight: .regular))
+                    .font(.quicksand(16, weight: .regular))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.7))
             }
 
@@ -44,18 +44,34 @@ struct QuizzesView: View {
                     Image(systemName: "plus")
                         .font(.system(size: 16, weight: .semibold))
                     Text("Generate Quiz")
-                        .font(.nunito(16, weight: .semiBold))
+                        .font(.quicksand(16, weight: .semiBold))
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
                 .background(Color.vibrantTeal)
                 .cornerRadius(12)
+                .shadow(color: Color.vibrantTeal.opacity(0.4), radius: 8, x: 0, y: 4)
             }
+            .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.adaptiveBackground(for: effectiveColorScheme))
     }
+}
+
+// MARK: - Quiz Configuration Enums
+
+enum QuizDifficulty: String, CaseIterable {
+    case easy = "Easy"
+    case medium = "Medium"
+    case hard = "Hard"
+}
+
+enum QuizQuestionType: String, CaseIterable {
+    case multipleChoice = "Multiple Choice"
+    case fillInBlank = "Fill in the Blank"
+    case openEnded = "Open Ended"
 }
 
 // MARK: - Quiz Generation View (Placeholder)
@@ -73,7 +89,7 @@ struct QuizGenerationView: View {
         NavigationStack {
             VStack(spacing: 24) {
                 Text("Quiz generation coming soon")
-                    .font(.nunito(18, weight: .medium))
+                    .font(.quicksand(18, weight: .medium))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
