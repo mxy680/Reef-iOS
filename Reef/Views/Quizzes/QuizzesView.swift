@@ -69,9 +69,9 @@ enum QuizDifficulty: String, CaseIterable {
 }
 
 enum QuizQuestionType: String, CaseIterable {
+    case openEnded = "Open Ended"
     case multipleChoice = "Multiple Choice"
     case fillInBlank = "Fill in the Blank"
-    case openEnded = "Open Ended"
 }
 
 // MARK: - Quiz Generation View
@@ -88,37 +88,54 @@ struct QuizGenerationView: View {
     // Form state
     @State private var topic: String = ""
     @State private var difficulty: QuizDifficulty = .medium
-    @State private var selectedQuestionTypes: Set<QuizQuestionType> = Set(QuizQuestionType.allCases)
+    @State private var numberOfQuestions: Double = 5
+    @State private var selectedQuestionTypes: Set<QuizQuestionType> = [.openEnded]
+    @State private var selectedMaterialIds: Set<UUID> = []
+    @State private var isMaterialsExpanded: Bool = true
     @State private var additionalNotes: String = ""
 
     private var canGenerate: Bool {
-        !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !selectedQuestionTypes.isEmpty
+        !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !selectedQuestionTypes.isEmpty && !selectedMaterialIds.isEmpty
+    }
+
+    // Combined notes and assignments for source selection
+    private var allSourceMaterials: [(id: UUID, name: String, icon: String, type: String)] {
+        let notes = course.materials.map { (id: $0.id, name: $0.name, icon: $0.fileTypeIcon, type: "Notes") }
+        let assignments = course.assignments.map { (id: $0.id, name: $0.name, icon: $0.fileTypeIcon, type: "Assignment") }
+        return notes + assignments
+    }
+
+    private var selectedCount: Int {
+        selectedMaterialIds.count
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
-                    // Header
-                    headerSection
-
-                    // Form fields
+                VStack(alignment: .leading, spacing: 24) {
                     topicField
 
                     difficultySelector
 
+                    numberOfQuestionsSelector
+
                     questionTypesSelector
+
+                    sourceMaterialsSelector
 
                     notesField
                 }
                 .padding(.horizontal, 24)
-                .padding(.bottom, 100) // Space for fixed button
+                .padding(.top, 16)
+                .padding(.bottom, 120) // Space for fixed button
             }
             .background(Color.adaptiveBackground(for: effectiveColorScheme))
             .overlay(alignment: .bottom) {
                 generateButton
             }
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.adaptiveBackground(for: effectiveColorScheme), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {
@@ -127,29 +144,18 @@ struct QuizGenerationView: View {
                     .font(.quicksand(16, weight: .medium))
                     .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
                 }
+                ToolbarItem(placement: .principal) {
+                    Text("Generate Quiz")
+                        .font(.quicksand(18, weight: .semiBold))
+                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                }
             }
         }
         .preferredColorScheme(effectiveColorScheme)
-    }
-
-    // MARK: - Header
-
-    private var headerSection: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 48))
-                .foregroundColor(Color.vibrantTeal)
-
-            Text("Generate Quiz")
-                .font(.quicksand(24, weight: .bold))
-                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
-
-            Text("AI will create questions based on your course materials")
-                .font(.quicksand(14, weight: .regular))
-                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.7))
-                .multilineTextAlignment(.center)
+        .onAppear {
+            // Pre-select all materials by default
+            selectedMaterialIds = Set(allSourceMaterials.map { $0.id })
         }
-        .padding(.top, 24)
     }
 
     // MARK: - Generate Button
@@ -228,6 +234,27 @@ struct QuizGenerationView: View {
         }
     }
 
+    // MARK: - Number of Questions Selector
+
+    private var numberOfQuestionsSelector: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Number of Questions")
+                    .font(.quicksand(14, weight: .semiBold))
+                    .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+
+                Spacer()
+
+                Text("\(Int(numberOfQuestions))")
+                    .font(.quicksand(16, weight: .semiBold))
+                    .foregroundColor(Color.vibrantTeal)
+            }
+
+            Slider(value: $numberOfQuestions, in: 1...10, step: 1)
+                .tint(Color.vibrantTeal)
+        }
+    }
+
     // MARK: - Question Types Selector
 
     private var questionTypesSelector: some View {
@@ -267,6 +294,119 @@ struct QuizGenerationView: View {
             }
         } else {
             selectedQuestionTypes.insert(type)
+        }
+    }
+
+    // MARK: - Source Selector
+
+    private var sourceMaterialsSelector: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Header with expand/collapse and select all
+            HStack {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isMaterialsExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: isMaterialsExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Source (\(selectedCount) selected)")
+                            .font(.quicksand(14, weight: .semiBold))
+                    }
+                    .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Button {
+                    toggleSelectAll()
+                } label: {
+                    Text(selectedMaterialIds.count == allSourceMaterials.count ? "Deselect All" : "Select All")
+                        .font(.quicksand(12, weight: .medium))
+                        .foregroundColor(Color.vibrantTeal)
+                }
+                .buttonStyle(.plain)
+            }
+
+            // Materials list
+            if isMaterialsExpanded {
+                VStack(spacing: 0) {
+                    if allSourceMaterials.isEmpty {
+                        HStack {
+                            Text("No notes or assignments in this course")
+                                .font(.quicksand(14, weight: .regular))
+                                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.6))
+                                .padding(.vertical, 12)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 12)
+                    } else {
+                        ForEach(allSourceMaterials, id: \.id) { material in
+                            Button {
+                                toggleMaterial(material.id)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: selectedMaterialIds.contains(material.id) ? "checkmark.square.fill" : "square")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(selectedMaterialIds.contains(material.id) ? Color.vibrantTeal : Color.adaptiveText(for: effectiveColorScheme).opacity(0.4))
+
+                                    Image(systemName: material.icon)
+                                        .font(.system(size: 16))
+                                        .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
+                                        .frame(width: 24)
+
+                                    Text(material.name)
+                                        .font(.quicksand(14, weight: .regular))
+                                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                                        .lineLimit(1)
+
+                                    Spacer()
+
+                                    Text(material.type)
+                                        .font(.quicksand(10, weight: .medium))
+                                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.5))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.adaptiveText(for: effectiveColorScheme).opacity(0.08))
+                                        .cornerRadius(4)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                            }
+                            .buttonStyle(.plain)
+
+                            if material.id != allSourceMaterials.last?.id {
+                                Divider()
+                                    .background(Color.adaptiveText(for: effectiveColorScheme).opacity(0.1))
+                            }
+                        }
+                    }
+                }
+                .background(Color.adaptiveText(for: effectiveColorScheme).opacity(0.05))
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.oceanMid.opacity(0.3), lineWidth: 1)
+                )
+            }
+        }
+    }
+
+    private func toggleMaterial(_ id: UUID) {
+        if selectedMaterialIds.contains(id) {
+            selectedMaterialIds.remove(id)
+        } else {
+            selectedMaterialIds.insert(id)
+        }
+    }
+
+    private func toggleSelectAll() {
+        if selectedMaterialIds.count == allSourceMaterials.count {
+            selectedMaterialIds.removeAll()
+        } else {
+            selectedMaterialIds = Set(allSourceMaterials.map { $0.id })
         }
     }
 

@@ -5,49 +5,101 @@
 
 import UIKit
 import PDFKit
+import CoreImage
+import CoreImage.CIFilterBuiltins
 
 struct PDFThumbnailGenerator {
 
-    /// Sage Mist background color (#D7D9CE) for themed thumbnails
+    /// Sage Mist background color (#D7D9CE) for light mode thumbnails
     private static let sageMistColor = UIColor(red: 215/255, green: 217/255, blue: 206/255, alpha: 1)
 
-    /// Generates a thumbnail image from the first page of a PDF
+    /// Deep Ocean background color (#0A1628) for dark mode thumbnails
+    private static let deepOceanColor = UIColor(red: 10/255, green: 22/255, blue: 40/255, alpha: 1)
+
+    /// Generates a thumbnail image from the first page of a PDF at a fixed canvas size
     /// - Parameters:
     ///   - url: URL to the PDF file
-    ///   - size: Target size for the thumbnail
-    ///   - backgroundColor: Background color for the thumbnail (defaults to Sage Mist)
+    ///   - size: Fixed canvas size for the thumbnail (content is scaled to fit and centered)
+    ///   - isDarkMode: Whether to generate a dark mode thumbnail
     /// - Returns: UIImage thumbnail or nil if generation fails
     static func generateThumbnail(
         from url: URL,
-        size: CGSize = CGSize(width: 200, height: 280),
-        backgroundColor: UIColor? = nil
+        size: CGSize = CGSize(width: 180, height: 200),  // 9:10 ratio matching card aspect
+        isDarkMode: Bool = false
     ) -> UIImage? {
         guard let document = PDFDocument(url: url),
               let page = document.page(at: 0) else {
             return nil
         }
 
+        if isDarkMode {
+            return generateDarkModeThumbnail(page: page, size: size)
+        } else {
+            return generateLightModeThumbnail(page: page, size: size)
+        }
+    }
+
+    /// Generates a light mode thumbnail with Sage Mist background
+    private static func generateLightModeThumbnail(page: PDFPage, size: CGSize) -> UIImage {
         let pageRect = page.bounds(for: .mediaBox)
-        let scale = min(size.width / pageRect.width, size.height / pageRect.height)
-        let scaledSize = CGSize(width: pageRect.width * scale, height: pageRect.height * scale)
+        let scale = size.width / pageRect.width  // Scale to fill width
+        let xOffset: CGFloat = 0  // No horizontal offset needed
+        let yOffset: CGFloat = 0  // Align to top
 
-        let renderer = UIGraphicsImageRenderer(size: scaledSize)
-        let image = renderer.image { context in
-            // Fill background with target color
-            (backgroundColor ?? sageMistColor).setFill()
-            context.fill(CGRect(origin: .zero, size: scaledSize))
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { context in
+            // Fill with Sage Mist background
+            sageMistColor.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
 
-            // Set multiply blend mode before drawing PDF
-            // This transforms: white → background color, black → stays black
+            // Multiply blend: white → sage mist, black → black
             context.cgContext.setBlendMode(.multiply)
 
-            context.cgContext.translateBy(x: 0, y: scaledSize.height)
+            context.cgContext.translateBy(x: xOffset, y: size.height - yOffset)
+            context.cgContext.scaleBy(x: scale, y: -scale)
+
+            page.draw(with: .mediaBox, to: context.cgContext)
+        }
+    }
+
+    /// Generates a dark mode thumbnail with Deep Ocean background and light content
+    private static func generateDarkModeThumbnail(page: PDFPage, size: CGSize) -> UIImage? {
+        let pageRect = page.bounds(for: .mediaBox)
+        let scale = size.width / pageRect.width  // Scale to fill width
+        let xOffset: CGFloat = 0  // No horizontal offset needed
+        let yOffset: CGFloat = 0  // Align to top
+
+        // First render the PDF normally (white background, black content)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let normalImage = renderer.image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+
+            context.cgContext.translateBy(x: xOffset, y: size.height - yOffset)
             context.cgContext.scaleBy(x: scale, y: -scale)
 
             page.draw(with: .mediaBox, to: context.cgContext)
         }
 
-        return image
+        // Apply false color filter to map grayscale to specific colors
+        // This provides precise color mapping: black → white (text), white → Deep Ocean (background)
+        guard let ciImage = CIImage(image: normalImage) else { return normalImage }
+
+        let falseColor = CIFilter.falseColor()
+        falseColor.inputImage = ciImage
+        // color0: Black pixels (text) → White for readability
+        falseColor.color0 = CIColor(red: 1, green: 1, blue: 1)
+        // color1: White pixels (background) → Deep Ocean (#0A1628)
+        falseColor.color1 = CIColor(red: 10/255, green: 22/255, blue: 40/255)
+
+        guard let tintedImage = falseColor.outputImage else { return normalImage }
+
+        let ciContext = CIContext()
+        guard let cgImage = ciContext.createCGImage(tintedImage, from: tintedImage.extent) else {
+            return normalImage
+        }
+
+        return UIImage(cgImage: cgImage)
     }
 
     /// Generates thumbnail data from a PDF URL

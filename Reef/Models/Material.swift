@@ -20,6 +20,7 @@ class Material {
     var extractionMethodRaw: String?
     var ocrConfidence: Double?
     var isVectorIndexed: Bool = false
+    var isBlankCanvas: Bool = false  // True for blank canvases created in-app
 
     var extractionStatus: ExtractionStatus {
         get { ExtractionStatus(rawValue: extractionStatusRaw) ?? .pending }
@@ -56,5 +57,19 @@ class Material {
         self.fileName = fileName
         self.fileExtension = fileExtension
         self.course = course
+    }
+
+    /// Creates a blank canvas material
+    static func createBlankCanvas(name: String, course: Course?) -> Material {
+        let material = Material(
+            name: name,
+            fileName: "blank_canvas",
+            fileExtension: "pdf",
+            course: course
+        )
+        material.isBlankCanvas = true
+        material.extractionStatus = .completed  // No text to extract
+        material.isTextExtracted = true
+        return material
     }
 }

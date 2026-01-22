@@ -50,6 +50,10 @@ struct MaterialsView: View {
     @State private var searchTask: Task<Void, Never>?
     @State private var sortNewestFirst: Bool = true
 
+    // Canvas navigation
+    @State private var selectedMaterial: Material?
+    @State private var isShowingCanvas: Bool = false
+
     private var effectiveColorScheme: ColorScheme {
         themeManager.isDarkMode ? .dark : .light
     }
@@ -97,6 +101,11 @@ struct MaterialsView: View {
                 }
             }
         }
+        .fullScreenCover(isPresented: $isShowingCanvas) {
+            if let material = selectedMaterial {
+                CanvasView(material: material)
+            }
+        }
     }
 
     // MARK: - Empty State
@@ -108,11 +117,11 @@ struct MaterialsView: View {
                 .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme).opacity(0.6))
 
             VStack(spacing: 8) {
-                Text("No materials yet")
+                Text("No notes yet")
                     .font(.quicksand(20, weight: .semiBold))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
 
-                Text("Add your first material to get started")
+                Text("Add your first note to get started")
                     .font(.quicksand(16, weight: .regular))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.7))
             }
@@ -123,7 +132,7 @@ struct MaterialsView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "plus")
                         .font(.system(size: 16, weight: .semibold))
-                    Text("Add Material")
+                    Text("Add Notes")
                         .font(.quicksand(16, weight: .semiBold))
                 }
                 .foregroundColor(.white)
@@ -151,7 +160,15 @@ struct MaterialsView: View {
                 } else {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: 3), spacing: 24) {
                         ForEach(filteredMaterials) { material in
-                            DocumentGridItem(document: material, onDelete: { deleteMaterial(material) }, itemType: "Material")
+                            DocumentGridItem(
+                                document: material,
+                                onDelete: { deleteMaterial(material) },
+                                onTap: {
+                                    selectedMaterial = material
+                                    isShowingCanvas = true
+                                },
+                                itemType: "Notes"
+                            )
                         }
                     }
                     .padding(32)
@@ -169,7 +186,7 @@ struct MaterialsView: View {
                 .font(.system(size: 48))
                 .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme).opacity(0.4))
 
-            Text("No materials found")
+            Text("No notes found")
                 .font(.quicksand(18, weight: .semiBold))
                 .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
 

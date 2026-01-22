@@ -43,11 +43,11 @@ struct ExamsView: View {
 
             VStack(spacing: 8) {
                 Text("No exams yet")
-                    .font(.nunito(20, weight: .semiBold))
+                    .font(.quicksand(20, weight: .semiBold))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
 
                 Text("Generate your first practice exam to test your knowledge")
-                    .font(.nunito(16, weight: .regular))
+                    .font(.quicksand(16, weight: .regular))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.7))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
@@ -60,14 +60,16 @@ struct ExamsView: View {
                     Image(systemName: "sparkles")
                         .font(.system(size: 16, weight: .semibold))
                     Text("Generate Exam")
-                        .font(.nunito(16, weight: .semiBold))
+                        .font(.quicksand(16, weight: .semiBold))
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
                 .background(Color.vibrantTeal)
                 .cornerRadius(12)
+                .shadow(color: Color.vibrantTeal.opacity(0.4), radius: 8, x: 0, y: 4)
             }
+            .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.adaptiveBackground(for: effectiveColorScheme))
@@ -118,28 +120,28 @@ struct ExamListItem: View {
             // Info
             VStack(alignment: .leading, spacing: 4) {
                 Text(exam.dateTaken.formatted(date: .abbreviated, time: .shortened))
-                    .font(.nunito(16, weight: .medium))
+                    .font(.quicksand(16, weight: .medium))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
 
                 if let score = exam.scoreAchieved {
                     HStack(spacing: 8) {
                         Text("\(score)%")
-                            .font(.nunito(14, weight: .semiBold))
+                            .font(.quicksand(14, weight: .semiBold))
                             .foregroundColor(statusColor)
 
                         if let species = exam.speciesUnlocked {
                             Text("• \(species) unlocked")
-                                .font(.nunito(12, weight: .regular))
+                                .font(.quicksand(12, weight: .regular))
                                 .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
                         } else if exam.passed == false {
                             Text("• Not passed")
-                                .font(.nunito(12, weight: .regular))
+                                .font(.quicksand(12, weight: .regular))
                                 .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.6))
                         }
                     }
                 } else {
                     Text("In progress")
-                        .font(.nunito(12, weight: .regular))
+                        .font(.quicksand(12, weight: .regular))
                         .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.6))
                 }
             }
@@ -174,8 +176,13 @@ struct GenerateExamSheet: View {
     @Environment(\.modelContext) private var modelContext
     @StateObject private var themeManager = ThemeManager.shared
 
+    @State private var topic: String = ""
     @State private var selectedTimeLimit = 30
     @State private var selectedPassingScore = 70
+    @State private var numberOfQuestions: Double = 5
+    @State private var selectedMaterialIds: Set<UUID> = []
+    @State private var isMaterialsExpanded: Bool = true
+    @State private var additionalNotes: String = ""
 
     private let timeLimitOptions = [15, 30, 45, 60]
     private let passingScoreOptions = [60, 70, 80, 90]
@@ -184,33 +191,47 @@ struct GenerateExamSheet: View {
         themeManager.isDarkMode ? .dark : .light
     }
 
+    private var canGenerate: Bool {
+        !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !selectedMaterialIds.isEmpty
+    }
+
+    // Combined notes and assignments for source selection
+    private var allSourceMaterials: [(id: UUID, name: String, icon: String, type: String)] {
+        let notes = course.materials.map { (id: $0.id, name: $0.name, icon: $0.fileTypeIcon, type: "Notes") }
+        let assignments = course.assignments.map { (id: $0.id, name: $0.name, icon: $0.fileTypeIcon, type: "Assignment") }
+        return notes + assignments
+    }
+
+    private var selectedCount: Int {
+        selectedMaterialIds.count
+    }
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 32) {
-                // Header
-                VStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 48))
-                        .foregroundColor(Color.vibrantTeal)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    // Topic Field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Topic")
+                            .font(.quicksand(14, weight: .semiBold))
+                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
 
-                    Text("Generate Practice Exam")
-                        .font(.nunito(24, weight: .bold))
-                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                        TextField("e.g., Chapters 1-5, Midterm review...", text: $topic)
+                            .font(.quicksand(16, weight: .regular))
+                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                            .padding(12)
+                            .background(Color.adaptiveText(for: effectiveColorScheme).opacity(0.05))
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.oceanMid.opacity(0.3), lineWidth: 1)
+                            )
+                    }
 
-                    Text("AI will create a customized exam based on your course materials")
-                        .font(.nunito(14, weight: .regular))
-                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.7))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-                }
-                .padding(.top, 24)
-
-                // Configuration
-                VStack(spacing: 20) {
                     // Time Limit
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Time Limit")
-                            .font(.nunito(14, weight: .semiBold))
+                            .font(.quicksand(14, weight: .semiBold))
                             .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
 
                         HStack(spacing: 12) {
@@ -219,7 +240,7 @@ struct GenerateExamSheet: View {
                                     selectedTimeLimit = minutes
                                 } label: {
                                     Text("\(minutes) min")
-                                        .font(.nunito(14, weight: .medium))
+                                        .font(.quicksand(14, weight: .medium))
                                         .foregroundColor(selectedTimeLimit == minutes ? .white : Color.adaptiveText(for: effectiveColorScheme))
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 10)
@@ -237,7 +258,7 @@ struct GenerateExamSheet: View {
                     // Passing Score
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Passing Score")
-                            .font(.nunito(14, weight: .semiBold))
+                            .font(.quicksand(14, weight: .semiBold))
                             .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
 
                         HStack(spacing: 12) {
@@ -246,7 +267,7 @@ struct GenerateExamSheet: View {
                                     selectedPassingScore = score
                                 } label: {
                                     Text("\(score)%")
-                                        .font(.nunito(14, weight: .medium))
+                                        .font(.quicksand(14, weight: .medium))
                                         .foregroundColor(selectedPassingScore == score ? .white : Color.adaptiveText(for: effectiveColorScheme))
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 10)
@@ -260,11 +281,53 @@ struct GenerateExamSheet: View {
                             }
                         }
                     }
+
+                    // Number of Questions
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Number of Questions")
+                                .font(.quicksand(14, weight: .semiBold))
+                                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+
+                            Spacer()
+
+                            Text("\(Int(numberOfQuestions))")
+                                .font(.quicksand(16, weight: .semiBold))
+                                .foregroundColor(Color.vibrantTeal)
+                        }
+
+                        Slider(value: $numberOfQuestions, in: 1...10, step: 1)
+                            .tint(Color.vibrantTeal)
+                    }
+
+                    // Source
+                    sourceMaterialsSelector
+
+                    // Additional Notes Field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Additional Notes")
+                            .font(.quicksand(14, weight: .semiBold))
+                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+
+                        TextField("Any specific focus areas or instructions for the AI...", text: $additionalNotes, axis: .vertical)
+                            .font(.quicksand(16, weight: .regular))
+                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                            .lineLimit(3...6)
+                            .padding(12)
+                            .background(Color.adaptiveText(for: effectiveColorScheme).opacity(0.05))
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.oceanMid.opacity(0.3), lineWidth: 1)
+                            )
+                    }
                 }
                 .padding(.horizontal, 24)
-
-                Spacer()
-
+                .padding(.top, 16)
+                .padding(.bottom, 120)
+            }
+            .background(Color.adaptiveBackground(for: effectiveColorScheme))
+            .overlay(alignment: .bottom) {
                 // Generate Button
                 Button {
                     generateExam()
@@ -273,30 +336,42 @@ struct GenerateExamSheet: View {
                         Image(systemName: "sparkles")
                             .font(.system(size: 16, weight: .semibold))
                         Text("Generate Exam")
-                            .font(.nunito(16, weight: .semiBold))
+                            .font(.quicksand(16, weight: .semiBold))
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Color.vibrantTeal)
+                    .background(canGenerate ? Color.vibrantTeal : Color.vibrantTeal.opacity(0.5))
                     .cornerRadius(12)
                 }
+                .disabled(!canGenerate)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 32)
+                .background(Color.adaptiveBackground(for: effectiveColorScheme))
             }
-            .background(Color.adaptiveBackground(for: effectiveColorScheme))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.adaptiveBackground(for: effectiveColorScheme), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .font(.nunito(16, weight: .medium))
+                    .font(.quicksand(16, weight: .medium))
                     .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
+                }
+                ToolbarItem(placement: .principal) {
+                    Text("Generate Exam")
+                        .font(.quicksand(18, weight: .semiBold))
+                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                 }
             }
         }
         .preferredColorScheme(effectiveColorScheme)
+        .onAppear {
+            // Pre-select all materials by default
+            selectedMaterialIds = Set(allSourceMaterials.map { $0.id })
+        }
     }
 
     private func generateExam() {
@@ -337,5 +412,118 @@ struct GenerateExamSheet: View {
                 topic: "Theory"
             )
         ]
+    }
+
+    // MARK: - Source Selector
+
+    private var sourceMaterialsSelector: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Header with expand/collapse and select all
+            HStack {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isMaterialsExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: isMaterialsExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Source (\(selectedCount) selected)")
+                            .font(.quicksand(14, weight: .semiBold))
+                    }
+                    .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Button {
+                    toggleSelectAll()
+                } label: {
+                    Text(selectedMaterialIds.count == allSourceMaterials.count ? "Deselect All" : "Select All")
+                        .font(.quicksand(12, weight: .medium))
+                        .foregroundColor(Color.vibrantTeal)
+                }
+                .buttonStyle(.plain)
+            }
+
+            // Materials list
+            if isMaterialsExpanded {
+                VStack(spacing: 0) {
+                    if allSourceMaterials.isEmpty {
+                        HStack {
+                            Text("No notes or assignments in this course")
+                                .font(.quicksand(14, weight: .regular))
+                                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.6))
+                                .padding(.vertical, 12)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 12)
+                    } else {
+                        ForEach(allSourceMaterials, id: \.id) { material in
+                            Button {
+                                toggleMaterial(material.id)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: selectedMaterialIds.contains(material.id) ? "checkmark.square.fill" : "square")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(selectedMaterialIds.contains(material.id) ? Color.vibrantTeal : Color.adaptiveText(for: effectiveColorScheme).opacity(0.4))
+
+                                    Image(systemName: material.icon)
+                                        .font(.system(size: 16))
+                                        .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
+                                        .frame(width: 24)
+
+                                    Text(material.name)
+                                        .font(.quicksand(14, weight: .regular))
+                                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                                        .lineLimit(1)
+
+                                    Spacer()
+
+                                    Text(material.type)
+                                        .font(.quicksand(10, weight: .medium))
+                                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.5))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.adaptiveText(for: effectiveColorScheme).opacity(0.08))
+                                        .cornerRadius(4)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                            }
+                            .buttonStyle(.plain)
+
+                            if material.id != allSourceMaterials.last?.id {
+                                Divider()
+                                    .background(Color.adaptiveText(for: effectiveColorScheme).opacity(0.1))
+                            }
+                        }
+                    }
+                }
+                .background(Color.adaptiveText(for: effectiveColorScheme).opacity(0.05))
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.oceanMid.opacity(0.3), lineWidth: 1)
+                )
+            }
+        }
+    }
+
+    private func toggleMaterial(_ id: UUID) {
+        if selectedMaterialIds.contains(id) {
+            selectedMaterialIds.remove(id)
+        } else {
+            selectedMaterialIds.insert(id)
+        }
+    }
+
+    private func toggleSelectAll() {
+        if selectedMaterialIds.count == allSourceMaterials.count {
+            selectedMaterialIds.removeAll()
+        } else {
+            selectedMaterialIds = Set(allSourceMaterials.map { $0.id })
+        }
     }
 }

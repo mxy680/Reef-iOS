@@ -124,6 +124,8 @@ struct HomeView: View {
             case .assignments:
                 AssignmentsView(course: course, onAddAssignment: { isShowingAssignmentPicker = true })
             }
+        } else if selectedItem == .settings {
+            SettingsView(authManager: authManager)
         } else {
             // Default welcome/placeholder view
             Color.adaptiveBackground(for: effectiveColorScheme)
@@ -379,8 +381,18 @@ struct HomeView: View {
                             HStack(spacing: 20) {
                                 // Add button (shown on Notes, Assignments, or Quizzes section)
                                 if selectedSection == .notes {
-                                    Button {
-                                        isShowingDocumentPicker = true
+                                    Menu {
+                                        Button {
+                                            isShowingDocumentPicker = true
+                                        } label: {
+                                            Label("Upload Notes", systemImage: "doc.badge.plus")
+                                        }
+
+                                        Button {
+                                            createBlankCanvas()
+                                        } label: {
+                                            Label("New Blank Canvas", systemImage: "rectangle.on.rectangle")
+                                        }
                                     } label: {
                                         Image(systemName: "plus")
                                             .font(.system(size: 18, weight: .medium))
@@ -583,6 +595,31 @@ struct HomeView: View {
             } catch {
                 print("Failed to copy file: \(error)")
             }
+        }
+    }
+
+    private func createBlankCanvas() {
+        guard let course = selectedCourse else { return }
+
+        // Generate a name with timestamp
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        let name = "Blank Canvas - \(formatter.string(from: Date()))"
+
+        let material = Material.createBlankCanvas(name: name, course: course)
+
+        // Create the blank PDF file
+        let fileURL = FileStorageService.shared.getFileURL(
+            for: material.id,
+            fileExtension: material.fileExtension
+        )
+
+        if let _ = DocumentConverter.shared.createBlankPDF(
+            size: DocumentConverter.defaultCanvasSize,
+            destinationURL: fileURL
+        ) {
+            modelContext.insert(material)
         }
     }
 
@@ -955,7 +992,7 @@ struct CourseOptionsPopup: View {
             .background(Color.deleteRed)
 
             VStack(spacing: 20) {
-                Text("This action cannot be undone. All materials, assignments, quizzes, and exams will be permanently deleted.")
+                Text("This action cannot be undone. All notes, assignments, quizzes, and exams will be permanently deleted.")
                     .font(.quicksand(15, weight: .regular))
                     .foregroundColor(Color.inkBlack)
                     .multilineTextAlignment(.center)
