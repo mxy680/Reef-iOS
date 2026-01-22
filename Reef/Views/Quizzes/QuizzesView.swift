@@ -102,7 +102,8 @@ struct QuizGenerationView: View {
                     // Header
                     headerSection
 
-                    // Form fields will go here
+                    // Form fields
+                    topicField
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 100) // Space for fixed button
@@ -167,5 +168,26 @@ struct QuizGenerationView: View {
         .padding(.horizontal, 24)
         .padding(.bottom, 32)
         .background(Color.adaptiveBackground(for: effectiveColorScheme))
+    }
+
+    // MARK: - Topic Field
+
+    private var topicField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Topic")
+                .font(.quicksand(14, weight: .semiBold))
+                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+
+            TextField("e.g., Chapter 3: Derivatives, Organic Chemistry reactions...", text: $topic)
+                .font(.quicksand(16, weight: .regular))
+                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                .padding(12)
+                .background(Color.adaptiveText(for: effectiveColorScheme).opacity(0.05))
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.oceanMid.opacity(0.3), lineWidth: 1)
+                )
+        }
     }
 }
