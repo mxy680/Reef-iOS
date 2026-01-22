@@ -104,6 +104,8 @@ struct QuizGenerationView: View {
 
                     // Form fields
                     topicField
+
+                    difficultySelector
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 100) // Space for fixed button
@@ -188,6 +190,37 @@ struct QuizGenerationView: View {
                     RoundedRectangle(cornerRadius: 10)
                         .stroke(Color.oceanMid.opacity(0.3), lineWidth: 1)
                 )
+        }
+    }
+
+    // MARK: - Difficulty Selector
+
+    private var difficultySelector: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Difficulty")
+                .font(.quicksand(14, weight: .semiBold))
+                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+
+            HStack(spacing: 12) {
+                ForEach(QuizDifficulty.allCases, id: \.self) { level in
+                    Button {
+                        difficulty = level
+                    } label: {
+                        Text(level.rawValue)
+                            .font(.quicksand(14, weight: .medium))
+                            .foregroundColor(difficulty == level ? .white : Color.adaptiveText(for: effectiveColorScheme))
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                difficulty == level
+                                    ? Color.vibrantTeal
+                                    : Color.adaptiveText(for: effectiveColorScheme).opacity(0.1)
+                            )
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 }
