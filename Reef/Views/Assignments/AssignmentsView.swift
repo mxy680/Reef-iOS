@@ -19,6 +19,8 @@ struct AssignmentsView: View {
     @State private var debouncedSearchText: String = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var sortNewestFirst: Bool = true
+    @State private var hybridSearchResults: [UUID]? = nil
+    @State private var isSearching: Bool = false
 
     private var effectiveColorScheme: ColorScheme {
         themeManager.isDarkMode ? .dark : .light
@@ -29,18 +31,24 @@ struct AssignmentsView: View {
     }
 
     private var filteredAssignments: [Assignment] {
-        var result = course.assignments
-
-        // Filter by search text (searches name and PDF content)
-        if !debouncedSearchText.isEmpty {
-            result = result.filter { assignment in
-                assignment.name.localizedCaseInsensitiveContains(debouncedSearchText) ||
-                (assignment.extractedText?.localizedCaseInsensitiveContains(debouncedSearchText) ?? false)
+        // If no search query, return all assignments sorted by date
+        if debouncedSearchText.isEmpty {
+            return course.assignments.sorted {
+                sortNewestFirst ? $0.dateAdded > $1.dateAdded : $0.dateAdded < $1.dateAdded
             }
         }
 
-        // Sort by date
-        return result.sorted {
+        // If hybrid search results are available, use them (already ranked by relevance)
+        if let searchResults = hybridSearchResults {
+            let assignmentMap = Dictionary(uniqueKeysWithValues: course.assignments.map { ($0.id, $0) })
+            return searchResults.compactMap { assignmentMap[$0] }
+        }
+
+        // Fallback: simple keyword filter while hybrid search is running
+        return course.assignments.filter { assignment in
+            assignment.name.localizedCaseInsensitiveContains(debouncedSearchText) ||
+            (assignment.extractedText?.localizedCaseInsensitiveContains(debouncedSearchText) ?? false)
+        }.sorted {
             sortNewestFirst ? $0.dateAdded > $1.dateAdded : $0.dateAdded < $1.dateAdded
         }
     }
@@ -63,9 +71,36 @@ struct AssignmentsView: View {
             searchTask = Task {
                 try? await Task.sleep(nanoseconds: 300_000_000) // 300ms debounce
                 if !Task.isCancelled {
-                    debouncedSearchText = newValue
+                    await performHybridSearch(query: newValue)
                 }
             }
+        }
+    }
+
+    // MARK: - Search
+
+    @MainActor
+    private func performHybridSearch(query: String) async {
+        debouncedSearchText = query
+
+        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            hybridSearchResults = nil
+            isSearching = false
+            return
+        }
+
+        isSearching = true
+
+        let results = await HybridSearchService.shared.searchAssignments(
+            query: query,
+            assignments: Array(course.assignments),
+            courseId: course.id
+        )
+
+        // Only update if this is still the current search
+        if debouncedSearchText == query {
+            hybridSearchResults = results.isEmpty ? nil : results
+            isSearching = false
         }
     }
 

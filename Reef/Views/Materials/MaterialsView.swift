@@ -49,6 +49,8 @@ struct MaterialsView: View {
     @State private var debouncedSearchText: String = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var sortNewestFirst: Bool = true
+    @State private var hybridSearchResults: [UUID]? = nil
+    @State private var isSearching: Bool = false
 
     private var effectiveColorScheme: ColorScheme {
         themeManager.isDarkMode ? .dark : .light
@@ -59,18 +61,24 @@ struct MaterialsView: View {
     }
 
     private var filteredMaterials: [Material] {
-        var result = course.materials
-
-        // Filter by search text (searches name and PDF content)
-        if !debouncedSearchText.isEmpty {
-            result = result.filter { material in
-                material.name.localizedCaseInsensitiveContains(debouncedSearchText) ||
-                (material.extractedText?.localizedCaseInsensitiveContains(debouncedSearchText) ?? false)
+        // If no search query, return all materials sorted by date
+        if debouncedSearchText.isEmpty {
+            return course.materials.sorted {
+                sortNewestFirst ? $0.dateAdded > $1.dateAdded : $0.dateAdded < $1.dateAdded
             }
         }
 
-        // Sort by date
-        return result.sorted {
+        // If hybrid search results are available, use them (already ranked by relevance)
+        if let searchResults = hybridSearchResults {
+            let materialMap = Dictionary(uniqueKeysWithValues: course.materials.map { ($0.id, $0) })
+            return searchResults.compactMap { materialMap[$0] }
+        }
+
+        // Fallback: simple keyword filter while hybrid search is running
+        return course.materials.filter { material in
+            material.name.localizedCaseInsensitiveContains(debouncedSearchText) ||
+            (material.extractedText?.localizedCaseInsensitiveContains(debouncedSearchText) ?? false)
+        }.sorted {
             sortNewestFirst ? $0.dateAdded > $1.dateAdded : $0.dateAdded < $1.dateAdded
         }
     }
@@ -93,7 +101,7 @@ struct MaterialsView: View {
             searchTask = Task {
                 try? await Task.sleep(nanoseconds: 300_000_000) // 300ms debounce
                 if !Task.isCancelled {
-                    debouncedSearchText = newValue
+                    await performHybridSearch(query: newValue)
                 }
             }
         }
@@ -179,6 +187,33 @@ struct MaterialsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, 100)
+    }
+
+    // MARK: - Search
+
+    @MainActor
+    private func performHybridSearch(query: String) async {
+        debouncedSearchText = query
+
+        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            hybridSearchResults = nil
+            isSearching = false
+            return
+        }
+
+        isSearching = true
+
+        let results = await HybridSearchService.shared.searchMaterials(
+            query: query,
+            materials: Array(course.materials),
+            courseId: course.id
+        )
+
+        // Only update if this is still the current search
+        if debouncedSearchText == query {
+            hybridSearchResults = results.isEmpty ? nil : results
+            isSearching = false
+        }
     }
 
     // MARK: - Actions

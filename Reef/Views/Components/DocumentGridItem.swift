@@ -235,6 +235,7 @@ struct DocumentGridItem<T: DocumentItem>: View {
         let documentId = document.id
         let fileExtension = document.fileExtension
         let fileType = document.documentFileType
+        let loadImageThumbnail = Self.loadImageThumbnail
 
         // Generate thumbnail on background thread
         Task.detached(priority: .userInitiated) {
@@ -247,7 +248,7 @@ struct DocumentGridItem<T: DocumentItem>: View {
 
             switch fileType {
             case .image:
-                generatedThumbnail = Self.loadImageThumbnail(from: fileURL, isDarkMode: isDarkMode)
+                generatedThumbnail = loadImageThumbnail(fileURL, isDarkMode)
             case .pdf:
                 generatedThumbnail = PDFThumbnailGenerator.generateThumbnail(from: fileURL, isDarkMode: isDarkMode)
             case .document:

@@ -2,97 +2,141 @@
 //  EmbeddingService.swift
 //  Reef
 //
-//  Provides sentence embeddings using Apple's NaturalLanguage framework
-//  for on-device semantic search without external model dependencies.
+//  Facade for text embeddings. Tries MiniLM-L6-v2 (384-dim) first for better
+//  quality, falls back to Apple's NLEmbedding (512-dim) if MiniLM unavailable.
 //
 
 import Foundation
 import NaturalLanguage
+
+/// The embedding provider being used
+enum EmbeddingProvider: String {
+    case miniLM = "MiniLM-L6-v2"
+    case nlEmbedding = "NLEmbedding"
+}
 
 /// Errors that can occur during embedding generation
 enum EmbeddingError: Error, LocalizedError {
     case embeddingNotAvailable
     case emptyInput
     case embeddingFailed(String)
+    case notInitialized
 
     var errorDescription: String? {
         switch self {
         case .embeddingNotAvailable:
-            return "Sentence embedding model is not available on this device"
+            return "No embedding model is available on this device"
         case .emptyInput:
             return "Cannot generate embedding for empty text"
         case .embeddingFailed(let reason):
             return "Failed to generate embedding: \(reason)"
+        case .notInitialized:
+            return "Embedding service not initialized"
         }
     }
 }
 
-/// Service for generating text embeddings using Apple's NaturalLanguage framework
+/// Facade service for generating text embeddings
+/// Routes to MiniLM-L6-v2 (preferred) or NLEmbedding (fallback)
 actor EmbeddingService {
     static let shared = EmbeddingService()
 
-    /// Embedding dimension (Apple's sentence embedding produces 512-dimensional vectors)
-    static let embeddingDimension = 512
+    /// Current embedding dimension (depends on active provider)
+    private(set) var embeddingDimension: Int = 384
 
-    /// The sentence embedding model (lazy loaded)
-    private var embedding: NLEmbedding?
+    /// Active embedding provider
+    private(set) var activeProvider: EmbeddingProvider?
+
+    /// Apple's NLEmbedding (fallback)
+    private var nlEmbedding: NLEmbedding?
+
+    /// Whether the service has been initialized
+    private var isInitialized = false
 
     private init() {}
+
+    // MARK: - Initialization
+
+    /// Initialize the embedding service
+    /// Tries MiniLM first, falls back to NLEmbedding
+    func initialize() async {
+        guard !isInitialized else { return }
+
+        // Try MiniLM first
+        do {
+            try await MiniLMEmbeddingService.shared.initialize()
+            if await MiniLMEmbeddingService.shared.isAvailable() {
+                activeProvider = .miniLM
+                embeddingDimension = MiniLMEmbeddingService.embeddingDimension
+                isInitialized = true
+                print("[Embedding] Using MiniLM-L6-v2 (384 dimensions)")
+                return
+            }
+        } catch {
+            print("[Embedding] MiniLM initialization failed: \(error). Trying fallback...")
+        }
+
+        // Fall back to NLEmbedding
+        if let embedding = NLEmbedding.sentenceEmbedding(for: .english) {
+            nlEmbedding = embedding
+            activeProvider = .nlEmbedding
+            embeddingDimension = 512
+            isInitialized = true
+            print("[Embedding] Using NLEmbedding fallback (512 dimensions)")
+        } else {
+            print("[Embedding] WARNING: No embedding provider available!")
+        }
+    }
 
     // MARK: - Public API
 
     /// Check if embedding is available on this device
     func isAvailable() -> Bool {
-        return NLEmbedding.sentenceEmbedding(for: .english) != nil
+        return activeProvider != nil
+    }
+
+    /// Get the current embedding dimension
+    func currentDimension() -> Int {
+        return embeddingDimension
     }
 
     /// Generate an embedding for a single text
     /// - Parameter text: The text to embed
-    /// - Returns: A 512-dimensional normalized vector
+    /// - Returns: A normalized embedding vector
     func embed(_ text: String) async throws -> [Float] {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             throw EmbeddingError.emptyInput
         }
 
-        let embedding = try getEmbedding()
-
-        guard let vector = embedding.vector(for: trimmed) else {
-            throw EmbeddingError.embeddingFailed("Could not generate vector for text")
+        guard let provider = activeProvider else {
+            throw EmbeddingError.notInitialized
         }
 
-        // Convert to Float array and normalize
-        let floatVector = vector.map { Float($0) }
-        return normalize(floatVector)
+        switch provider {
+        case .miniLM:
+            return try await MiniLMEmbeddingService.shared.embed(trimmed)
+
+        case .nlEmbedding:
+            return try embedWithNL(trimmed)
+        }
     }
 
     /// Generate embeddings for multiple texts (batch processing)
     /// - Parameter texts: Array of texts to embed
-    /// - Returns: Array of 512-dimensional normalized vectors
+    /// - Returns: Array of normalized embedding vectors
     func embedBatch(_ texts: [String]) async throws -> [[Float]] {
-        let embedding = try getEmbedding()
-
-        var results: [[Float]] = []
-        results.reserveCapacity(texts.count)
-
-        for text in texts {
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty {
-                // Return zero vector for empty text
-                results.append(Array(repeating: 0.0, count: Self.embeddingDimension))
-                continue
-            }
-
-            if let vector = embedding.vector(for: trimmed) {
-                let floatVector = vector.map { Float($0) }
-                results.append(normalize(floatVector))
-            } else {
-                // Return zero vector if embedding fails
-                results.append(Array(repeating: 0.0, count: Self.embeddingDimension))
-            }
+        guard let provider = activeProvider else {
+            throw EmbeddingError.notInitialized
         }
 
-        return results
+        switch provider {
+        case .miniLM:
+            return try await MiniLMEmbeddingService.shared.embedBatch(texts)
+
+        case .nlEmbedding:
+            return try embedBatchWithNL(texts)
+        }
     }
 
     /// Calculate cosine similarity between two vectors
@@ -119,20 +163,47 @@ actor EmbeddingService {
         return dotProduct / denominator
     }
 
-    // MARK: - Private Helpers
+    // MARK: - NLEmbedding Fallback
 
-    /// Get or create the embedding model
-    private func getEmbedding() throws -> NLEmbedding {
-        if let existing = embedding {
-            return existing
-        }
-
-        guard let newEmbedding = NLEmbedding.sentenceEmbedding(for: .english) else {
+    /// Embed using NLEmbedding
+    private func embedWithNL(_ text: String) throws -> [Float] {
+        guard let embedding = nlEmbedding else {
             throw EmbeddingError.embeddingNotAvailable
         }
 
-        self.embedding = newEmbedding
-        return newEmbedding
+        guard let vector = embedding.vector(for: text) else {
+            throw EmbeddingError.embeddingFailed("Could not generate vector for text")
+        }
+
+        let floatVector = vector.map { Float($0) }
+        return normalize(floatVector)
+    }
+
+    /// Batch embed using NLEmbedding
+    private func embedBatchWithNL(_ texts: [String]) throws -> [[Float]] {
+        guard let embedding = nlEmbedding else {
+            throw EmbeddingError.embeddingNotAvailable
+        }
+
+        var results: [[Float]] = []
+        results.reserveCapacity(texts.count)
+
+        for text in texts {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                results.append(Array(repeating: 0.0, count: embeddingDimension))
+                continue
+            }
+
+            if let vector = embedding.vector(for: trimmed) {
+                let floatVector = vector.map { Float($0) }
+                results.append(normalize(floatVector))
+            } else {
+                results.append(Array(repeating: 0.0, count: embeddingDimension))
+            }
+        }
+
+        return results
     }
 
     /// L2 normalize a vector

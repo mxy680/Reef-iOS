@@ -179,7 +179,7 @@ actor VectorStore {
             let embeddingData = embedding.withUnsafeBufferPointer { buffer in
                 Data(buffer: buffer)
             }
-            embeddingData.withUnsafeBytes { bytes in
+            _ = embeddingData.withUnsafeBytes { bytes in
                 sqlite3_bind_blob(statement, 9, bytes.baseAddress, Int32(embeddingData.count), SQLITE_TRANSIENT)
             }
 
@@ -340,6 +340,77 @@ actor VectorStore {
         }
 
         return 0
+    }
+
+    // MARK: - Migration Support
+
+    /// Get the embedding dimension of stored vectors (from first available vector)
+    /// Returns nil if no vectors are stored
+    func getStoredEmbeddingDimension() throws -> Int? {
+        guard let db = db else {
+            throw VectorStoreError.databaseError("Database not initialized")
+        }
+
+        let selectSQL = "SELECT embedding FROM chunks LIMIT 1"
+        var statement: OpaquePointer?
+
+        guard sqlite3_prepare_v2(db, selectSQL, -1, &statement, nil) == SQLITE_OK else {
+            throw VectorStoreError.databaseError("Failed to prepare select statement")
+        }
+        defer { sqlite3_finalize(statement) }
+
+        if sqlite3_step(statement) == SQLITE_ROW {
+            let blobSize = Int(sqlite3_column_bytes(statement, 0))
+            let floatCount = blobSize / MemoryLayout<Float>.size
+            return floatCount > 0 ? floatCount : nil
+        }
+
+        return nil
+    }
+
+    /// Clear all vectors from the database
+    func clearAllVectors() throws {
+        guard let db = db else {
+            throw VectorStoreError.databaseError("Database not initialized")
+        }
+
+        let deleteSQL = "DELETE FROM chunks"
+        var errorMessage: UnsafeMutablePointer<CChar>?
+        let result = sqlite3_execute(db, deleteSQL, nil, nil, &errorMessage)
+
+        if result != SQLITE_OK {
+            let error = errorMessage.map { String(cString: $0) } ?? "Unknown error"
+            sqlite3_free(errorMessage)
+            throw VectorStoreError.databaseError("Failed to clear vectors: \(error)")
+        }
+
+        print("[VectorStore] Cleared all vectors from database")
+    }
+
+    /// Get all unique course IDs that have stored vectors
+    func getAllCourseIds() throws -> [UUID] {
+        guard let db = db else {
+            throw VectorStoreError.databaseError("Database not initialized")
+        }
+
+        let selectSQL = "SELECT DISTINCT course_id FROM chunks"
+        var statement: OpaquePointer?
+
+        guard sqlite3_prepare_v2(db, selectSQL, -1, &statement, nil) == SQLITE_OK else {
+            throw VectorStoreError.databaseError("Failed to prepare select statement")
+        }
+        defer { sqlite3_finalize(statement) }
+
+        var courseIds: [UUID] = []
+
+        while sqlite3_step(statement) == SQLITE_ROW {
+            if let cStr = sqlite3_column_text(statement, 0),
+               let uuid = UUID(uuidString: String(cString: cStr)) {
+                courseIds.append(uuid)
+            }
+        }
+
+        return courseIds
     }
 
     // MARK: - Cleanup

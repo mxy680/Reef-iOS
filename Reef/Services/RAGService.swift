@@ -60,7 +60,44 @@ actor RAGService {
 
     /// Initialize the RAG system (call on app launch)
     func initialize() async throws {
+        // Initialize vector store
         try await VectorStore.shared.initialize()
+
+        // Initialize embedding service
+        await EmbeddingService.shared.initialize()
+
+        // Check for embedding dimension mismatch (migration needed)
+        try await checkAndMigrateIfNeeded()
+    }
+
+    /// Check if stored embeddings have different dimension than current provider
+    /// If so, clear all vectors to force re-indexing
+    private func checkAndMigrateIfNeeded() async throws {
+        guard await EmbeddingService.shared.isAvailable() else {
+            print("[RAG] Embedding service not available, skipping migration check")
+            return
+        }
+
+        let currentDimension = await EmbeddingService.shared.currentDimension()
+
+        do {
+            if let storedDimension = try await VectorStore.shared.getStoredEmbeddingDimension() {
+                if storedDimension != currentDimension {
+                    print("[RAG] Embedding dimension mismatch detected!")
+                    print("[RAG] Stored: \(storedDimension), Current: \(currentDimension)")
+                    print("[RAG] Clearing all vectors to trigger re-indexing...")
+
+                    try await VectorStore.shared.clearAllVectors()
+
+                    // Note: VectorMigrationService will handle re-indexing
+                    // by checking isVectorIndexed on documents
+                    print("[RAG] Migration complete. Documents will be re-indexed on next access.")
+                }
+            }
+        } catch {
+            print("[RAG] Error checking embedding dimensions: \(error)")
+            // Don't fail initialization for migration errors
+        }
     }
 
     // MARK: - Document Indexing

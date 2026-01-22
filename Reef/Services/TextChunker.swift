@@ -45,14 +45,14 @@ struct TextChunk: Identifiable {
 
 /// Service for splitting documents into semantic chunks
 struct TextChunker {
-    /// Target chunk size in characters
-    static let targetChunkSize = 1000
+    /// Target chunk size in characters (~100 tokens for MiniLM's 128 token limit)
+    static let targetChunkSize = 400
 
     /// Minimum chunk size (smaller chunks get merged)
-    static let minChunkSize = 200
+    static let minChunkSize = 100
 
-    /// Maximum chunk size before forcing a split
-    static let maxChunkSize = 1500
+    /// Maximum chunk size before forcing a split (~120 tokens)
+    static let maxChunkSize = 480
 
     // MARK: - Regex Patterns
 
