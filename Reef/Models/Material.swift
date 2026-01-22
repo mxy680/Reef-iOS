@@ -14,6 +14,8 @@ class Material {
     var fileExtension: String     // Extension for type detection
     var dateAdded: Date = Date()
     var course: Course?           // Relationship to parent course
+    var extractedText: String?    // Full text content from PDF for search
+    var isTextExtracted: Bool = false // Track if extraction was attempted
 
     var fileType: FileType {
         switch fileExtension.lowercased() {
