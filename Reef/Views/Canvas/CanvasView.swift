@@ -244,6 +244,11 @@ class CanvasViewModel: ObservableObject {
             fileExtension: material.fileExtension
         )
 
+        print("📄 Loading document: \(material.name)")
+        print("📄 File extension: \(material.fileExtension)")
+        print("📄 File URL: \(fileURL.path)")
+        print("📄 File exists: \(FileManager.default.fileExists(atPath: fileURL.path))")
+
         // Handle blank canvas - create PDF if it doesn't exist
         if material.isBlankCanvas {
             if !FileManager.default.fileExists(atPath: fileURL.path) {
@@ -253,6 +258,7 @@ class CanvasViewModel: ObservableObject {
                     destinationURL: fileURL
                 ) {
                     self.pdfURL = fileURL
+                    print("📄 Created blank canvas at: \(fileURL.path)")
                 }
             } else {
                 self.pdfURL = fileURL
@@ -266,12 +272,25 @@ class CanvasViewModel: ObservableObject {
 
             if let converted = DocumentConverter.shared.convertImageToPDF(from: fileURL, to: convertedURL) {
                 self.pdfURL = converted
+                print("📄 Converted image to PDF at: \(converted.path)")
             } else {
-                // Fallback to original if conversion fails (shouldn't happen)
+                // Fallback to original if conversion fails
                 self.pdfURL = fileURL
+                print("📄 Image conversion failed, using original")
             }
         } else {
+            // PDF file - use directly
             self.pdfURL = fileURL
+            print("📄 Using PDF directly: \(fileURL.path)")
+        }
+
+        // Verify PDF can be loaded
+        if let url = pdfURL {
+            if let doc = PDFDocument(url: url) {
+                print("📄 PDF loaded successfully with \(doc.pageCount) pages")
+            } else {
+                print("📄 ERROR: PDFDocument failed to load from \(url.path)")
+            }
         }
 
         // Load existing annotations
