@@ -13,7 +13,7 @@ import CoreImage.CIFilterBuiltins
 
 struct DrawingOverlayView: UIViewRepresentable {
     let documentURL: URL
-    let fileType: Material.FileType
+    let fileType: Note.FileType
     @Binding var selectedTool: CanvasTool
     @Binding var selectedColor: Color
     var isDarkMode: Bool = false
@@ -59,7 +59,7 @@ class CanvasContainerView: UIView {
     let canvasView = PKCanvasView()
 
     private var documentURL: URL?
-    private var fileType: Material.FileType?
+    private var fileType: Note.FileType?
     private var isDarkMode: Bool = false
 
     /// Light gray background for scroll view in light mode (close to white)
@@ -71,7 +71,7 @@ class CanvasContainerView: UIView {
     /// Darker background for scroll area in dark mode (darker than the page)
     private static let scrollBackgroundDark = UIColor(red: 0, green: 0, blue: 0, alpha: 1)
 
-    convenience init(documentURL: URL, fileType: Material.FileType, isDarkMode: Bool = false) {
+    convenience init(documentURL: URL, fileType: Note.FileType, isDarkMode: Bool = false) {
         self.init(frame: .zero)
         self.documentURL = documentURL
         self.fileType = fileType

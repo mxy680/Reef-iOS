@@ -41,7 +41,7 @@ struct RAGSource: Identifiable {
             parts.append("Page \(page)")
         }
         if parts.isEmpty {
-            return documentType == .material ? "Notes" : "Assignment"
+            return documentType == .note ? "Notes" : "Assignment"
         }
         return parts.joined(separator: " - ")
     }
@@ -68,7 +68,7 @@ actor RAGService {
     /// Index a document for RAG retrieval
     /// - Parameters:
     ///   - documentId: UUID of the document
-    ///   - documentType: Type of document (.material or .assignment)
+    ///   - documentType: Type of document (.note or .assignment)
     ///   - courseId: The course this document belongs to
     ///   - text: Full text content of the document
     func indexDocument(

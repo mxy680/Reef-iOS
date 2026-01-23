@@ -1,5 +1,5 @@
 //
-//  MaterialsView.swift
+//  NotesView.swift
 //  Reef
 //
 
@@ -21,26 +21,26 @@ class ThumbnailCache {
         "\(id.uuidString)_\(isDarkMode ? "dark" : "light")" as NSString
     }
 
-    func thumbnail(for materialID: UUID, isDarkMode: Bool = false) -> UIImage? {
-        cache.object(forKey: cacheKey(for: materialID, isDarkMode: isDarkMode))
+    func thumbnail(for noteID: UUID, isDarkMode: Bool = false) -> UIImage? {
+        cache.object(forKey: cacheKey(for: noteID, isDarkMode: isDarkMode))
     }
 
-    func setThumbnail(_ image: UIImage, for materialID: UUID, isDarkMode: Bool = false) {
-        cache.setObject(image, forKey: cacheKey(for: materialID, isDarkMode: isDarkMode))
+    func setThumbnail(_ image: UIImage, for noteID: UUID, isDarkMode: Bool = false) {
+        cache.setObject(image, forKey: cacheKey(for: noteID, isDarkMode: isDarkMode))
     }
 
-    func removeThumbnail(for materialID: UUID) {
+    func removeThumbnail(for noteID: UUID) {
         // Remove both light and dark variants
-        cache.removeObject(forKey: cacheKey(for: materialID, isDarkMode: false))
-        cache.removeObject(forKey: cacheKey(for: materialID, isDarkMode: true))
+        cache.removeObject(forKey: cacheKey(for: noteID, isDarkMode: false))
+        cache.removeObject(forKey: cacheKey(for: noteID, isDarkMode: true))
     }
 }
 
-// MARK: - Materials View
+// MARK: - Notes View
 
-struct MaterialsView: View {
+struct NotesView: View {
     let course: Course
-    let onAddMaterial: () -> Void
+    let onAddNote: () -> Void
     @Binding var columnVisibility: NavigationSplitViewVisibility
     @Binding var isViewingCanvas: Bool
     @Environment(\.modelContext) private var modelContext
@@ -56,18 +56,18 @@ struct MaterialsView: View {
         themeManager.isDarkMode ? .dark : .light
     }
 
-    private var materials: [Material] {
-        course.materials.sorted { $0.dateAdded > $1.dateAdded }
+    private var notes: [Note] {
+        course.notes.sorted { $0.dateAdded > $1.dateAdded }
     }
 
-    private var filteredMaterials: [Material] {
-        var result = course.materials
+    private var filteredNotes: [Note] {
+        var result = course.notes
 
         // Filter by search text (searches name and PDF content)
         if !debouncedSearchText.isEmpty {
-            result = result.filter { material in
-                material.name.localizedCaseInsensitiveContains(debouncedSearchText) ||
-                (material.extractedText?.localizedCaseInsensitiveContains(debouncedSearchText) ?? false)
+            result = result.filter { note in
+                note.name.localizedCaseInsensitiveContains(debouncedSearchText) ||
+                (note.extractedText?.localizedCaseInsensitiveContains(debouncedSearchText) ?? false)
             }
         }
 
@@ -79,14 +79,14 @@ struct MaterialsView: View {
 
     var body: some View {
         Group {
-            if materials.isEmpty {
+            if notes.isEmpty {
                 emptyStateView
             } else {
-                materialsGrid
+                notesGrid
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            FloatingAddButton(action: onAddMaterial)
+            FloatingAddButton(action: onAddNote)
                 .padding(.trailing, 24)
                 .padding(.bottom, 12)
         }
@@ -120,7 +120,7 @@ struct MaterialsView: View {
             }
 
             Button {
-                onAddMaterial()
+                onAddNote()
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "plus")
@@ -141,22 +141,22 @@ struct MaterialsView: View {
         .background(Color.adaptiveBackground(for: effectiveColorScheme))
     }
 
-    // MARK: - Materials Grid
+    // MARK: - Notes Grid
 
-    private var materialsGrid: some View {
+    private var notesGrid: some View {
         VStack(spacing: 0) {
             FilterBar(searchText: $searchText, sortNewestFirst: $sortNewestFirst, placeholder: "Search notes...")
 
             ScrollView {
-                if filteredMaterials.isEmpty && !debouncedSearchText.isEmpty {
+                if filteredNotes.isEmpty && !debouncedSearchText.isEmpty {
                     noResultsView
                 } else {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: 3), spacing: 24) {
-                        ForEach(filteredMaterials) { material in
-                            NavigationLink(value: material) {
+                        ForEach(filteredNotes) { note in
+                            NavigationLink(value: note) {
                                 DocumentGridItem(
-                                    document: material,
-                                    onDelete: { deleteMaterial(material) },
+                                    document: note,
+                                    onDelete: { deleteNote(note) },
                                     itemType: "Notes"
                                 )
                             }
@@ -164,8 +164,8 @@ struct MaterialsView: View {
                         }
                     }
                     .padding(32)
-                    .navigationDestination(for: Material.self) { material in
-                        CanvasView(material: material, columnVisibility: $columnVisibility, isViewingCanvas: $isViewingCanvas)
+                    .navigationDestination(for: Note.self) { note in
+                        CanvasView(note: note, columnVisibility: $columnVisibility, isViewingCanvas: $isViewingCanvas)
                     }
                 }
             }
@@ -195,19 +195,19 @@ struct MaterialsView: View {
 
     // MARK: - Actions
 
-    private func deleteMaterial(_ material: Material) {
-        ThumbnailCache.shared.removeThumbnail(for: material.id)
+    private func deleteNote(_ note: Note) {
+        ThumbnailCache.shared.removeThumbnail(for: note.id)
         try? FileStorageService.shared.deleteFile(
-            materialID: material.id,
-            fileExtension: material.fileExtension
+            documentID: note.id,
+            fileExtension: note.fileExtension
         )
 
         // Remove from vector index
-        let materialId = material.id
+        let noteId = note.id
         Task {
-            try? await RAGService.shared.deleteDocument(documentId: materialId)
+            try? await RAGService.shared.deleteDocument(documentId: noteId)
         }
 
-        modelContext.delete(material)
+        modelContext.delete(note)
     }
 }

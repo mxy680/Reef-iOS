@@ -7,7 +7,7 @@ import SwiftUI
 import PDFKit
 
 struct CanvasView: View {
-    let material: Material
+    let note: Note
     @Binding var columnVisibility: NavigationSplitViewVisibility
     @Binding var isViewingCanvas: Bool
     @StateObject private var themeManager = ThemeManager.shared
@@ -23,8 +23,8 @@ struct CanvasView: View {
 
     private var fileURL: URL {
         FileStorageService.shared.getFileURL(
-            for: material.id,
-            fileExtension: material.fileExtension
+            for: note.id,
+            fileExtension: note.fileExtension
         )
     }
 
@@ -33,8 +33,7 @@ struct CanvasView: View {
             // Document with drawing canvas overlay
             DrawingOverlayView(
                 documentURL: fileURL,
-                fileType: material.fileType,
-                documentTitle: material.name,
+                fileType: note.fileType,
                 selectedTool: $selectedTool,
                 selectedColor: $selectedColor,
                 isDarkMode: themeManager.isDarkMode

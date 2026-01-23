@@ -9,39 +9,39 @@ class FileStorageService {
     static let shared = FileStorageService()
 
     private let fileManager = FileManager.default
-    private let materialsDirectoryName = "Materials"
+    private let documentsDirectoryName = "Documents"
 
     private init() {
-        createMaterialsDirectoryIfNeeded()
+        createDocumentsDirectoryIfNeeded()
     }
 
     // MARK: - Directory Management
 
-    private var documentsDirectory: URL {
+    private var appDocumentsDirectory: URL {
         fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 
-    private var materialsDirectory: URL {
-        documentsDirectory.appendingPathComponent(materialsDirectoryName)
+    private var storedDocumentsDirectory: URL {
+        appDocumentsDirectory.appendingPathComponent(documentsDirectoryName)
     }
 
-    private func createMaterialsDirectoryIfNeeded() {
-        if !fileManager.fileExists(atPath: materialsDirectory.path) {
-            try? fileManager.createDirectory(at: materialsDirectory, withIntermediateDirectories: true)
+    private func createDocumentsDirectoryIfNeeded() {
+        if !fileManager.fileExists(atPath: storedDocumentsDirectory.path) {
+            try? fileManager.createDirectory(at: storedDocumentsDirectory, withIntermediateDirectories: true)
         }
     }
 
     // MARK: - File Operations
 
-    /// Copies a file from source URL to the materials directory
+    /// Copies a file from source URL to the documents directory
     /// - Parameters:
     ///   - sourceURL: The URL of the file to copy
-    ///   - materialID: The UUID of the material (used as filename)
+    ///   - documentID: The UUID of the document (used as filename)
     ///   - fileExtension: The file extension to use
     /// - Returns: The URL of the copied file
-    func copyFile(from sourceURL: URL, materialID: UUID, fileExtension: String) throws -> URL {
-        let destinationURL = materialsDirectory
-            .appendingPathComponent(materialID.uuidString)
+    func copyFile(from sourceURL: URL, documentID: UUID, fileExtension: String) throws -> URL {
+        let destinationURL = storedDocumentsDirectory
+            .appendingPathComponent(documentID.uuidString)
             .appendingPathExtension(fileExtension)
 
         // Start accessing security-scoped resource
@@ -61,24 +61,24 @@ class FileStorageService {
         return destinationURL
     }
 
-    /// Gets the URL for a stored material
-    func getFileURL(for materialID: UUID, fileExtension: String) -> URL {
-        materialsDirectory
-            .appendingPathComponent(materialID.uuidString)
+    /// Gets the URL for a stored document
+    func getFileURL(for documentID: UUID, fileExtension: String) -> URL {
+        storedDocumentsDirectory
+            .appendingPathComponent(documentID.uuidString)
             .appendingPathExtension(fileExtension)
     }
 
-    /// Deletes a material's file from storage
-    func deleteFile(materialID: UUID, fileExtension: String) throws {
-        let fileURL = getFileURL(for: materialID, fileExtension: fileExtension)
+    /// Deletes a document's file from storage
+    func deleteFile(documentID: UUID, fileExtension: String) throws {
+        let fileURL = getFileURL(for: documentID, fileExtension: fileExtension)
         if fileManager.fileExists(atPath: fileURL.path) {
             try fileManager.removeItem(at: fileURL)
         }
     }
 
-    /// Checks if a file exists for the given material
-    func fileExists(materialID: UUID, fileExtension: String) -> Bool {
-        let fileURL = getFileURL(for: materialID, fileExtension: fileExtension)
+    /// Checks if a file exists for the given document
+    func fileExists(documentID: UUID, fileExtension: String) -> Bool {
+        let fileURL = getFileURL(for: documentID, fileExtension: fileExtension)
         return fileManager.fileExists(atPath: fileURL.path)
     }
 }

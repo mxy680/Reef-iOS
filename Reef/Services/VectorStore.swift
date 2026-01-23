@@ -179,7 +179,7 @@ actor VectorStore {
             let embeddingData = embedding.withUnsafeBufferPointer { buffer in
                 Data(buffer: buffer)
             }
-            embeddingData.withUnsafeBytes { bytes in
+            _ = embeddingData.withUnsafeBytes { bytes in
                 sqlite3_bind_blob(statement, 9, bytes.baseAddress, Int32(embeddingData.count), SQLITE_TRANSIENT)
             }
 
@@ -236,7 +236,7 @@ actor VectorStore {
 
             let id = String(cString: idCStr)
             let documentId = UUID(uuidString: String(cString: docIdCStr)) ?? UUID()
-            let documentType = DocumentType(rawValue: String(cString: docTypeCStr)) ?? .material
+            let documentType = DocumentType(rawValue: String(cString: docTypeCStr)) ?? .note
             let text = String(cString: textCStr)
 
             let pageNumber: Int? = sqlite3_column_type(statement, 3) != SQLITE_NULL

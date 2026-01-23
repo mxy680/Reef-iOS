@@ -90,23 +90,23 @@ struct QuizGenerationView: View {
     @State private var difficulty: QuizDifficulty = .medium
     @State private var numberOfQuestions: Double = 5
     @State private var selectedQuestionTypes: Set<QuizQuestionType> = [.openEnded]
-    @State private var selectedMaterialIds: Set<UUID> = []
-    @State private var isMaterialsExpanded: Bool = true
+    @State private var selectedNoteIds: Set<UUID> = []
+    @State private var isNotesExpanded: Bool = true
     @State private var additionalNotes: String = ""
 
     private var canGenerate: Bool {
-        !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !selectedQuestionTypes.isEmpty && !selectedMaterialIds.isEmpty
+        !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !selectedQuestionTypes.isEmpty && !selectedNoteIds.isEmpty
     }
 
     // Combined notes and assignments for source selection
-    private var allSourceMaterials: [(id: UUID, name: String, icon: String, type: String)] {
-        let notes = course.materials.map { (id: $0.id, name: $0.name, icon: $0.fileTypeIcon, type: "Notes") }
+    private var allSourceNotes: [(id: UUID, name: String, icon: String, type: String)] {
+        let notes = course.notes.map { (id: $0.id, name: $0.name, icon: $0.fileTypeIcon, type: "Notes") }
         let assignments = course.assignments.map { (id: $0.id, name: $0.name, icon: $0.fileTypeIcon, type: "Assignment") }
         return notes + assignments
     }
 
     private var selectedCount: Int {
-        selectedMaterialIds.count
+        selectedNoteIds.count
     }
 
     var body: some View {
@@ -121,7 +121,7 @@ struct QuizGenerationView: View {
 
                     questionTypesSelector
 
-                    sourceMaterialsSelector
+                    sourceNotesSelector
 
                     notesField
                 }
@@ -153,8 +153,8 @@ struct QuizGenerationView: View {
         }
         .preferredColorScheme(effectiveColorScheme)
         .onAppear {
-            // Pre-select all materials by default
-            selectedMaterialIds = Set(allSourceMaterials.map { $0.id })
+            // Pre-select all notes by default
+            selectedNoteIds = Set(allSourceNotes.map { $0.id })
         }
     }
 
@@ -299,17 +299,17 @@ struct QuizGenerationView: View {
 
     // MARK: - Source Selector
 
-    private var sourceMaterialsSelector: some View {
+    private var sourceNotesSelector: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Header with expand/collapse and select all
             HStack {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        isMaterialsExpanded.toggle()
+                        isNotesExpanded.toggle()
                     }
                 } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: isMaterialsExpanded ? "chevron.down" : "chevron.right")
+                        Image(systemName: isNotesExpanded ? "chevron.down" : "chevron.right")
                             .font(.system(size: 12, weight: .semibold))
                         Text("Source (\(selectedCount) selected)")
                             .font(.quicksand(14, weight: .semiBold))
@@ -323,17 +323,17 @@ struct QuizGenerationView: View {
                 Button {
                     toggleSelectAll()
                 } label: {
-                    Text(selectedMaterialIds.count == allSourceMaterials.count ? "Deselect All" : "Select All")
+                    Text(selectedNoteIds.count == allSourceNotes.count ? "Deselect All" : "Select All")
                         .font(.quicksand(12, weight: .medium))
                         .foregroundColor(Color.vibrantTeal)
                 }
                 .buttonStyle(.plain)
             }
 
-            // Materials list
-            if isMaterialsExpanded {
+            // Notes list
+            if isNotesExpanded {
                 VStack(spacing: 0) {
-                    if allSourceMaterials.isEmpty {
+                    if allSourceNotes.isEmpty {
                         HStack {
                             Text("No notes or assignments in this course")
                                 .font(.quicksand(14, weight: .regular))
@@ -343,28 +343,28 @@ struct QuizGenerationView: View {
                         }
                         .padding(.horizontal, 12)
                     } else {
-                        ForEach(allSourceMaterials, id: \.id) { material in
+                        ForEach(allSourceNotes, id: \.id) { sourceNote in
                             Button {
-                                toggleMaterial(material.id)
+                                toggleNote(sourceNote.id)
                             } label: {
                                 HStack(spacing: 12) {
-                                    Image(systemName: selectedMaterialIds.contains(material.id) ? "checkmark.square.fill" : "square")
+                                    Image(systemName: selectedNoteIds.contains(sourceNote.id) ? "checkmark.square.fill" : "square")
                                         .font(.system(size: 20))
-                                        .foregroundColor(selectedMaterialIds.contains(material.id) ? Color.vibrantTeal : Color.adaptiveText(for: effectiveColorScheme).opacity(0.4))
+                                        .foregroundColor(selectedNoteIds.contains(sourceNote.id) ? Color.vibrantTeal : Color.adaptiveText(for: effectiveColorScheme).opacity(0.4))
 
-                                    Image(systemName: material.icon)
+                                    Image(systemName: sourceNote.icon)
                                         .font(.system(size: 16))
                                         .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
                                         .frame(width: 24)
 
-                                    Text(material.name)
+                                    Text(sourceNote.name)
                                         .font(.quicksand(14, weight: .regular))
                                         .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                                         .lineLimit(1)
 
                                     Spacer()
 
-                                    Text(material.type)
+                                    Text(sourceNote.type)
                                         .font(.quicksand(10, weight: .medium))
                                         .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.5))
                                         .padding(.horizontal, 8)
@@ -377,7 +377,7 @@ struct QuizGenerationView: View {
                             }
                             .buttonStyle(.plain)
 
-                            if material.id != allSourceMaterials.last?.id {
+                            if sourceNote.id != allSourceNotes.last?.id {
                                 Divider()
                                     .background(Color.adaptiveText(for: effectiveColorScheme).opacity(0.1))
                             }
@@ -394,19 +394,19 @@ struct QuizGenerationView: View {
         }
     }
 
-    private func toggleMaterial(_ id: UUID) {
-        if selectedMaterialIds.contains(id) {
-            selectedMaterialIds.remove(id)
+    private func toggleNote(_ id: UUID) {
+        if selectedNoteIds.contains(id) {
+            selectedNoteIds.remove(id)
         } else {
-            selectedMaterialIds.insert(id)
+            selectedNoteIds.insert(id)
         }
     }
 
     private func toggleSelectAll() {
-        if selectedMaterialIds.count == allSourceMaterials.count {
-            selectedMaterialIds.removeAll()
+        if selectedNoteIds.count == allSourceNotes.count {
+            selectedNoteIds.removeAll()
         } else {
-            selectedMaterialIds = Set(allSourceMaterials.map { $0.id })
+            selectedNoteIds = Set(allSourceNotes.map { $0.id })
         }
     }
 

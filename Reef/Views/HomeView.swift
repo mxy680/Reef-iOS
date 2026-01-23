@@ -13,8 +13,8 @@ class Course {
     var id: UUID = UUID()
     var name: String
     var icon: String = "folder.fill"
-    @Relationship(deleteRule: .cascade, inverse: \Material.course)
-    var materials: [Material] = []
+    @Relationship(deleteRule: .cascade, inverse: \Note.course)
+    var notes: [Note] = []
     @Relationship(deleteRule: .cascade, inverse: \Assignment.course)
     var assignments: [Assignment] = []
 
@@ -117,7 +117,7 @@ struct HomeView: View {
         if let section = selectedSection, let course = selectedCourse {
             switch section {
             case .notes:
-                MaterialsView(course: course, onAddMaterial: { isShowingDocumentPicker = true }, columnVisibility: $columnVisibility, isViewingCanvas: $isViewingCanvas)
+                NotesView(course: course, onAddNote: { isShowingDocumentPicker = true }, columnVisibility: $columnVisibility, isViewingCanvas: $isViewingCanvas)
             case .quizzes:
                 QuizzesView(course: course, onGenerateQuiz: { isShowingQuizGeneration = true })
             case .exams:
@@ -484,7 +484,7 @@ struct HomeView: View {
         }
         .sheet(isPresented: $isShowingDocumentPicker) {
             DocumentPicker { urls in
-                addMaterials(from: urls)
+                addNotes(from: urls)
             }
         }
         .sheet(isPresented: $isShowingAssignmentPicker) {
@@ -541,7 +541,7 @@ struct HomeView: View {
         }
     }
 
-    private func addMaterials(from urls: [URL]) {
+    private func addNotes(from urls: [URL]) {
         guard let course = selectedCourse else { return }
 
         for url in urls {
@@ -549,7 +549,7 @@ struct HomeView: View {
             let fileExtension = url.pathExtension
             let name = url.deletingPathExtension().lastPathComponent
 
-            let material = Material(
+            let note = Note(
                 name: name,
                 fileName: fileName,
                 fileExtension: fileExtension,
@@ -559,43 +559,43 @@ struct HomeView: View {
             do {
                 _ = try FileStorageService.shared.copyFile(
                     from: url,
-                    materialID: material.id,
+                    documentID: note.id,
                     fileExtension: fileExtension
                 )
-                modelContext.insert(material)
+                modelContext.insert(note)
 
                 // Extract text using OCR and embedded extraction
-                material.extractionStatus = .extracting
-                let materialID = material.id
+                note.extractionStatus = .extracting
+                let noteID = note.id
                 let courseID = course.id
                 Task.detached {
                     let fileURL = FileStorageService.shared.getFileURL(
-                        for: materialID,
+                        for: noteID,
                         fileExtension: fileExtension
                     )
                     let result = await DocumentTextExtractor.shared.extractText(from: fileURL)
                     await MainActor.run {
-                        material.extractedText = result.text
-                        material.extractionMethod = result.method
-                        material.ocrConfidence = result.confidence
-                        material.extractionStatus = result.text != nil ? .completed : .failed
-                        material.isTextExtracted = true
+                        note.extractedText = result.text
+                        note.extractionMethod = result.method
+                        note.ocrConfidence = result.confidence
+                        note.extractionStatus = result.text != nil ? .completed : .failed
+                        note.isTextExtracted = true
                     }
 
                     // Index for RAG if text extraction succeeded
                     if let text = result.text {
                         do {
                             try await RAGService.shared.indexDocument(
-                                documentId: materialID,
-                                documentType: .material,
+                                documentId: noteID,
+                                documentType: .note,
                                 courseId: courseID,
                                 text: text
                             )
                             await MainActor.run {
-                                material.isVectorIndexed = true
+                                note.isVectorIndexed = true
                             }
                         } catch {
-                            print("Failed to index material for RAG: \(error)")
+                            print("Failed to index note for RAG: \(error)")
                         }
                     }
                 }
@@ -628,7 +628,7 @@ struct HomeView: View {
             do {
                 _ = try FileStorageService.shared.copyFile(
                     from: url,
-                    materialID: assignment.id,
+                    documentID: assignment.id,
                     fileExtension: fileExtension
                 )
                 modelContext.insert(assignment)

@@ -155,7 +155,7 @@ struct AssignmentsView: View {
 
     private func deleteAssignment(_ assignment: Assignment) {
         try? FileStorageService.shared.deleteFile(
-            materialID: assignment.id,
+            documentID: assignment.id,
             fileExtension: assignment.fileExtension
         )
 

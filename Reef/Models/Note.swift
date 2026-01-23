@@ -1,5 +1,5 @@
 //
-//  Material.swift
+//  Note.swift
 //  Reef
 //
 
@@ -7,8 +7,8 @@ import Foundation
 import SwiftData
 
 @Model
-class Material: Hashable {
-    static func == (lhs: Material, rhs: Material) -> Bool {
+class Note: Hashable {
+    static func == (lhs: Note, rhs: Note) -> Bool {
         lhs.id == rhs.id
     }
 

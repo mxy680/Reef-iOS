@@ -10,7 +10,7 @@ import Foundation
 
 /// Type of document being chunked
 enum DocumentType: String, Codable {
-    case material
+    case note
     case assignment
 }
 
@@ -85,7 +85,7 @@ struct TextChunker {
     /// - Parameters:
     ///   - text: The full document text
     ///   - documentId: UUID of the source document
-    ///   - documentType: Type of document (.material or .assignment)
+    ///   - documentType: Type of document (.note or .assignment)
     /// - Returns: Array of text chunks with metadata
     static func chunk(
         text: String,

@@ -23,17 +23,17 @@ struct VectorMigrationService {
         var totalMigrated = 0
 
         for course in courses {
-            // Process materials
-            let unindexedMaterials = course.materials.filter {
+            // Process notes
+            let unindexedNotes = course.notes.filter {
                 !$0.isVectorIndexed && $0.extractedText != nil
             }
 
-            if !unindexedMaterials.isEmpty {
-                print("[Migration] Found \(unindexedMaterials.count) unindexed materials in '\(course.name)'")
+            if !unindexedNotes.isEmpty {
+                print("[Migration] Found \(unindexedNotes.count) unindexed notes in '\(course.name)'")
             }
 
-            for batch in unindexedMaterials.chunked(into: batchSize) {
-                await processBatch(batch, courseId: course.id, type: .material)
+            for batch in unindexedNotes.chunked(into: batchSize) {
+                await processBatch(batch, courseId: course.id, type: .note)
                 totalMigrated += batch.count
             }
 
@@ -59,23 +59,23 @@ struct VectorMigrationService {
         }
     }
 
-    /// Process a batch of materials
+    /// Process a batch of notes
     @MainActor
-    private func processBatch(_ materials: [Material], courseId: UUID, type: DocumentType) async {
-        for material in materials {
-            guard let text = material.extractedText else { continue }
+    private func processBatch(_ notes: [Note], courseId: UUID, type: DocumentType) async {
+        for note in notes {
+            guard let text = note.extractedText else { continue }
 
             do {
                 try await RAGService.shared.indexDocument(
-                    documentId: material.id,
+                    documentId: note.id,
                     documentType: type,
                     courseId: courseId,
                     text: text
                 )
-                material.isVectorIndexed = true
-                print("[Migration] Indexed material: \(material.name)")
+                note.isVectorIndexed = true
+                print("[Migration] Indexed note: \(note.name)")
             } catch {
-                print("[Migration] Failed to index material \(material.name): \(error)")
+                print("[Migration] Failed to index note \(note.name): \(error)")
             }
 
             // Small delay between documents to avoid overwhelming the system

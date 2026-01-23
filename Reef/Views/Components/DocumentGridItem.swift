@@ -2,7 +2,7 @@
 //  DocumentGridItem.swift
 //  Reef
 //
-//  Shared grid item component for Materials and Assignments
+//  Shared grid item component for Notes and Assignments
 //
 
 import SwiftUI
@@ -30,8 +30,8 @@ protocol DocumentItem: AnyObject {
     var extractionStatus: ExtractionStatus { get }
 }
 
-// Conform Material to DocumentItem
-extension Material: DocumentItem {
+// Conform Note to DocumentItem
+extension Note: DocumentItem {
     var documentFileType: DocumentFileType {
         switch fileType {
         case .pdf: return .pdf
@@ -57,7 +57,7 @@ extension Assignment: DocumentItem {
 struct DocumentGridItem<T: DocumentItem>: View {
     let document: T
     let onDelete: () -> Void
-    let itemType: String // "Material" or "Assignment"
+    let itemType: String // "Notes" or "Assignment"
 
     @StateObject private var themeManager = ThemeManager.shared
     @State private var thumbnail: UIImage?
@@ -209,7 +209,7 @@ struct DocumentGridItem<T: DocumentItem>: View {
     private func loadThumbnail() {
         let isDarkMode = themeManager.isDarkMode
 
-        // Check cache first (for materials)
+        // Check cache first (for notes)
         if let cached = ThumbnailCache.shared.thumbnail(for: document.id, isDarkMode: isDarkMode) {
             thumbnail = cached
             isLoadingThumbnail = false
