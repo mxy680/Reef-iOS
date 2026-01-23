@@ -10,6 +10,7 @@ struct CanvasView: View {
     let note: Note
     @Binding var columnVisibility: NavigationSplitViewVisibility
     @Binding var isViewingCanvas: Bool
+    var onDismiss: (() -> Void)? = nil
     @StateObject private var themeManager = ThemeManager.shared
     @Environment(\.dismiss) private var dismiss
 
@@ -21,6 +22,8 @@ struct CanvasView: View {
     @State private var highlighterWidth: CGFloat = StrokeWidthRange.highlighterDefault
     @State private var eraserSize: CGFloat = StrokeWidthRange.eraserDefault
     @State private var eraserType: EraserType = .stroke
+    @State private var customPenColors: [Color] = []
+    @State private var customHighlighterColors: [Color] = []
 
     // Undo/Redo state
     @State private var canUndo: Bool = false
@@ -29,11 +32,27 @@ struct CanvasView: View {
     // Lasso selection state
     @State private var hasSelection: Bool = false
 
+    // Clipboard state
+    @State private var canPaste: Bool = false
+
+
     // Reference to canvas for undo/redo
     @State private var canvasViewRef: CanvasContainerView?
 
     private var effectiveColorScheme: ColorScheme {
         themeManager.isDarkMode ? .dark : .light
+    }
+
+    private func updatePasteState() {
+        UIPasteboard.general.detectPatterns(for: [.init(rawValue: "com.apple.pencilkit.drawing")]) { result in
+            DispatchQueue.main.async {
+                if case .success(let patterns) = result {
+                    canPaste = !patterns.isEmpty
+                } else {
+                    canPaste = false
+                }
+            }
+        }
     }
 
     private var fileURL: URL {
@@ -74,16 +93,64 @@ struct CanvasView: View {
                     highlighterWidth: $highlighterWidth,
                     eraserSize: $eraserSize,
                     eraserType: $eraserType,
+                    customPenColors: $customPenColors,
+                    customHighlighterColors: $customHighlighterColors,
                     colorScheme: effectiveColorScheme,
                     canUndo: canUndo,
                     canRedo: canRedo,
+                    canPaste: canPaste,
                     hasSelection: hasSelection,
-                    onHomePressed: { dismiss() },
+                    onHomePressed: {
+                        if let onDismiss = onDismiss {
+                            // Use parent-controlled animation
+                            onDismiss()
+                        } else {
+                            // Fallback for navigation-based usage
+                            dismiss()
+                        }
+                    },
                     onUndo: { canvasViewRef?.canvasView.undoManager?.undo() },
                     onRedo: { canvasViewRef?.canvasView.undoManager?.redo() },
-                    onCut: { /* TODO: Implement cut */ },
-                    onCopy: { /* TODO: Implement copy */ },
-                    onDelete: { /* TODO: Implement delete */ },
+                    onPaste: {
+                        guard let canvas = canvasViewRef?.canvasView else { return }
+                        canvas.becomeFirstResponder()
+                        canvas.performPaste()
+                        updatePasteState()
+                    },
+                    onCut: {
+                        guard let canvas = canvasViewRef?.canvasView else { return }
+                        canvas.becomeFirstResponder()
+                        canvas.performCut()
+                        updatePasteState()
+                        hasSelection = false
+                    },
+                    onCopy: {
+                        guard let canvas = canvasViewRef?.canvasView else { return }
+                        canvas.becomeFirstResponder()
+                        canvas.performCopy()
+                        updatePasteState()
+                    },
+                    onDelete: {
+                        guard let canvas = canvasViewRef?.canvasView else { return }
+                        canvas.becomeFirstResponder()
+                        canvas.performDelete()
+                        hasSelection = false
+                    },
+                    onDuplicate: {
+                        guard let canvas = canvasViewRef?.canvasView else { return }
+                        canvas.becomeFirstResponder()
+                        canvas.performCopy()
+                        // Small delay to let copy complete before paste
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            canvas.performPaste()
+                            updatePasteState()
+                        }
+                    },
+                    onDeselectLasso: {
+                        // Switch to pen tool to deselect, then back to lasso
+                        selectedTool = .pen
+                        hasSelection = false
+                    },
                     onAIPressed: { /* TODO: Implement AI assistant */ },
                     onToggleDarkMode: {
                         withAnimation(.easeInOut(duration: 0.3)) {
@@ -102,14 +169,25 @@ struct CanvasView: View {
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
-            columnVisibility = .detailOnly
-            isViewingCanvas = true
+            // Only manage state if not controlled by parent (onDismiss provided)
+            if onDismiss == nil {
+                columnVisibility = .detailOnly
+                isViewingCanvas = true
+            }
             // Set default pen color based on theme
             selectedPenColor = themeManager.isDarkMode ? .white : .black
+            // Check initial clipboard state
+            updatePasteState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIPasteboard.changedNotification)) { _ in
+            updatePasteState()
         }
         .onDisappear {
-            columnVisibility = .all
-            isViewingCanvas = false
+            // Only manage state if not controlled by parent
+            if onDismiss == nil {
+                columnVisibility = .all
+                isViewingCanvas = false
+            }
         }
     }
 }

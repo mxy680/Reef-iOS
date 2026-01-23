@@ -43,6 +43,7 @@ struct NotesView: View {
     let onAddNote: () -> Void
     @Binding var columnVisibility: NavigationSplitViewVisibility
     @Binding var isViewingCanvas: Bool
+    @Binding var selectedNote: Note?
     @Environment(\.modelContext) private var modelContext
     @StateObject private var themeManager = ThemeManager.shared
 
@@ -153,7 +154,11 @@ struct NotesView: View {
                 } else {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: 3), spacing: 24) {
                         ForEach(filteredNotes) { note in
-                            NavigationLink(value: note) {
+                            Button {
+                                withAnimation(.easeOut(duration: 0.3)) {
+                                    selectedNote = note
+                                }
+                            } label: {
                                 DocumentGridItem(
                                     document: note,
                                     onDelete: { deleteNote(note) },
@@ -164,9 +169,6 @@ struct NotesView: View {
                         }
                     }
                     .padding(32)
-                    .navigationDestination(for: Note.self) { note in
-                        CanvasView(note: note, columnVisibility: $columnVisibility, isViewingCanvas: $isViewingCanvas)
-                    }
                 }
             }
         }

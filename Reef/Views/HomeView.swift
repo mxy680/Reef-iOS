@@ -83,6 +83,8 @@ struct HomeView: View {
     @AppStorage("profileImageData") private var profileImageData: Data?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var isViewingCanvas: Bool = false
+    @State private var selectedNote: Note? = nil
+    @State private var isCanvasExiting: Bool = false
 
     private var effectiveColorScheme: ColorScheme {
         themeManager.isDarkMode ? .dark : .light
@@ -117,7 +119,7 @@ struct HomeView: View {
         if let section = selectedSection, let course = selectedCourse {
             switch section {
             case .notes:
-                NotesView(course: course, onAddNote: { isShowingDocumentPicker = true }, columnVisibility: $columnVisibility, isViewingCanvas: $isViewingCanvas)
+                NotesView(course: course, onAddNote: { isShowingDocumentPicker = true }, columnVisibility: $columnVisibility, isViewingCanvas: $isViewingCanvas, selectedNote: $selectedNote)
             case .quizzes:
                 QuizzesView(course: course, onGenerateQuiz: { isShowingQuizGeneration = true })
             case .exams:
@@ -404,6 +406,7 @@ struct HomeView: View {
     }
 
     var body: some View {
+        ZStack {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             // Sidebar - Sage Mist background
             ZStack(alignment: .trailing) {
@@ -457,7 +460,6 @@ struct HomeView: View {
             NavigationStack {
                 detailContent
                     .navigationBarTitleDisplayMode(.inline)
-                    .toolbar(isViewingCanvas ? .hidden : .visible, for: .navigationBar)
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Text(detailTitle)
@@ -470,7 +472,6 @@ struct HomeView: View {
                         }
                     }
                     .toolbarBackground(Color.adaptiveBackground(for: effectiveColorScheme), for: .navigationBar)
-                    .toolbarBackground(isViewingCanvas ? .hidden : .visible, for: .navigationBar)
             }
         }
         .toolbar(removing: .sidebarToggle)
@@ -543,11 +544,40 @@ struct HomeView: View {
                 )
             }
         }
+
+        // Canvas overlay - slides in from right, stays rendered on top
+        if let note = selectedNote {
+            CanvasView(
+                note: note,
+                columnVisibility: $columnVisibility,
+                isViewingCanvas: $isViewingCanvas,
+                onDismiss: {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        isCanvasExiting = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        selectedNote = nil
+                        isCanvasExiting = false
+                    }
+                }
+            )
+            .offset(x: isCanvasExiting ? UIScreen.main.bounds.width : 0)
+            .transition(.asymmetric(
+                insertion: .move(edge: .trailing),
+                removal: .identity  // We handle removal with offset animation
+            ))
+            .zIndex(1)
+        }
+        }
         .onAppear {
             // Trigger vector index migration for existing documents
             Task.detached(priority: .background) {
                 await VectorMigrationService().migrateIfNeeded(courses: courses)
             }
+        }
+        .onChange(of: selectedNote) { _, newValue in
+            // Don't change columnVisibility - keep home screen rendered behind canvas
+            isViewingCanvas = newValue != nil
         }
     }
 
