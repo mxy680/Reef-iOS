@@ -32,6 +32,7 @@ struct CanvasView: View {
     }
 
     init(material: Material) {
+        print("🟢 CanvasView init for: \(material.name)")
         self.material = material
         self._viewModel = StateObject(wrappedValue: CanvasViewModel(material: material))
     }
@@ -90,6 +91,7 @@ struct CanvasView: View {
         }
         .navigationBarHidden(true)
         .onAppear {
+            print("🟢 CanvasView onAppear")
             viewModel.configure(with: modelContext)
             viewModel.loadDocument()
         }

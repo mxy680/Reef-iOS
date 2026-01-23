@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reef - Complete Feature Documentation</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        :root {
+            --ocean-deep: #003D5B;
+            --ocean-light: #0097B2;
+            --ocean-mid: #006989;
+            --sand: #F5F5DC;
+            --coral: #FF6B6B;
+            --seafoam: #98D8C8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.7;
+            color: #2D3748;
+            background: #fff;
+        }
+
+        .cover-page {
+            height: 100vh;
+            background: linear-gradient(180deg, var(--ocean-light) 0%, var(--ocean-deep) 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            page-break-after: always;
+        }
+
+        .cover-page h1 {
+            font-size: 5rem;
+            font-weight: 700;
+            letter-spacing: -2px;
+            margin-bottom: 1rem;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .cover-page .tagline {
+            font-size: 1.8rem;
+            font-weight: 300;
+            opacity: 0.9;
+            margin-bottom: 3rem;
+        }
+
+        .cover-page .subtitle {
+            font-size: 1.2rem;
+            font-weight: 500;
+            opacity: 0.8;
+            border-top: 1px solid rgba(255,255,255,0.3);
+            padding-top: 2rem;
+            margin-top: 2rem;
+        }
+
+        .cover-page .version {
+            position: absolute;
+            bottom: 3rem;
+            font-size: 0.9rem;
+            opacity: 0.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--ocean-deep);
+            margin-bottom: 1.5rem;
+            border-bottom: 3px solid var(--ocean-light);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            color: var(--ocean-mid);
+            margin-top: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        h3 {
+            font-size: 1.3rem;
+            color: var(--ocean-deep);
+            margin-top: 2rem;
+            margin-bottom: 0.75rem;
+        }
+
+        h4 {
+            font-size: 1.1rem;
+            color: #4A5568;
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: #4A5568;
+        }
+
+        ul, ol {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+            color: #4A5568;
+        }
+
+        .feature-box {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-left: 4px solid var(--ocean-light);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .feature-box h4 {
+            margin-top: 0;
+            color: var(--ocean-deep);
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, var(--ocean-light) 0%, var(--ocean-mid) 100%);
+            color: white;
+            padding: 2rem;
+            margin: 2rem 0;
+            border-radius: 12px;
+        }
+
+        .highlight-box h3 {
+            color: white;
+            margin-top: 0;
+        }
+
+        .highlight-box p, .highlight-box li {
+            color: rgba(255,255,255,0.95);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #E2E8F0;
+        }
+
+        th {
+            background: var(--ocean-deep);
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background: #F7FAFC;
+        }
+
+        .toc {
+            background: #F7FAFC;
+            padding: 2rem;
+            border-radius: 12px;
+            margin: 2rem 0;
+        }
+
+        .toc h2 {
+            margin-top: 0;
+        }
+
+        .toc ol {
+            counter-reset: section;
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .toc > ol > li {
+            counter-increment: section;
+            margin-bottom: 0.75rem;
+        }
+
+        .toc > ol > li::before {
+            content: counter(section) ". ";
+            font-weight: 600;
+            color: var(--ocean-light);
+        }
+
+        .page-break {
+            page-break-before: always;
+        }
+
+        .species-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .species-card {
+            background: #F7FAFC;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #E2E8F0;
+        }
+
+        .species-card h5 {
+            color: var(--ocean-deep);
+            margin-bottom: 0.5rem;
+        }
+
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .tech-item {
+            background: linear-gradient(135deg, var(--ocean-deep) 0%, var(--ocean-mid) 100%);
+            color: white;
+            padding: 1.25rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .tech-item h5 {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.8;
+            margin-bottom: 0.5rem;
+        }
+
+        .tech-item p {
+            color: white;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .flow-diagram {
+            background: #F7FAFC;
+            padding: 2rem;
+            border-radius: 12px;
+            margin: 1.5rem 0;
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .flow-number {
+            width: 40px;
+            height: 40px;
+            background: var(--ocean-light);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            margin-right: 1rem;
+            flex-shrink: 0;
+        }
+
+        .flow-arrow {
+            text-align: center;
+            color: var(--ocean-light);
+            font-size: 1.5rem;
+            margin: 0.5rem 0 0.5rem 1.25rem;
+        }
+
+        @media print {
+            .cover-page {
+                height: 100vh;
+            }
+
+            .page-break {
+                page-break-before: always;
+            }
+
+            body {
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="cover-page">
+    <h1>Reef</h1>
+    <p class="tagline">Dive into smarter studying</p>
+    <p class="subtitle">Complete Feature Documentation</p>
+    <p class="version">Version 1.0 | iPad Application</p>
+</div>
+
+<div class="container">
+
+    <div class="toc">
+        <h2>Table of Contents</h2>
+        <ol>
+            <li>Executive Summary</li>
+            <li>Target Audience & Market Position</li>
+            <li>Visual Identity & Design Language</li>
+            <li>Document Management System</li>
+            <li>Canvas & Annotation Tools</li>
+            <li>AI-Powered Learning Assistant</li>
+            <li>Quiz & Exam Generation Engine</li>
+            <li>Gamification: Species Unlocking System</li>
+            <li>User Profiles & Personal Reef</li>
+            <li>Welcome & Onboarding Experience</li>
+            <li>Technical Architecture</li>
+            <li>Security & Privacy</li>
+            <li>Future Roadmap</li>
+        </ol>
+    </div>
+
+    <div class="page-break"></div>
+
+    <h1>1. Executive Summary</h1>
+
+    <p>Reef is an innovative iPad application designed to transform the way college students study. By combining the familiar, intuitive annotation experience of apps like GoodNotes with cutting-edge AI assistance and engaging gamification mechanics, Reef creates a comprehensive learning ecosystem that adapts to each student's unique studying style.</p>
+
+    <div class="highlight-box">
+        <h3>Core Value Proposition</h3>
+        <p>Reef eliminates the friction between studying and getting help. Instead of switching between a notes app, a search engine, and a tutor, students receive real-time, contextual AI feedback as they work through problems—during their natural pauses, without breaking their flow.</p>
+    </div>
+
+    <h2>Key Differentiators</h2>
+    <ul>
+        <li><strong>Proactive AI Assistance:</strong> Unlike chatbots that require explicit queries, Reef's AI observes your work and offers help at the right moment</li>
+        <li><strong>Handwriting-Native:</strong> Full Apple Pencil support with intelligent handwriting recognition that understands mathematical notation</li>
+        <li><strong>Gamified Mastery:</strong> Topic completion unlocks marine species that build your personal underwater reef, providing visual proof of progress</li>
+        <li><strong>All-in-One Platform:</strong> Upload materials, annotate, practice, get feedback, and track progress—all without leaving the app</li>
+    </ul>
+
+    <div class="page-break"></div>
+
+    <h1>2. Target Audience & Market Position</h1>
+
+    <h2>Primary Audience: College Students</h2>
+
+    <p>Reef is designed specifically for undergraduate and graduate students who need to master complex material efficiently. The app particularly excels for students in:</p>
+
+    <div class="feature-box">
+        <h4>STEM Disciplines</h4>
+        <p>Mathematics, Physics, Chemistry, Engineering, Computer Science—fields where problem-solving and mathematical notation are central to learning.</p>
+    </div>
+
+    <div class="feature-box">
+        <h4>Pre-Professional Programs</h4>
+        <p>Pre-med, Pre-law, and Business students who must absorb large volumes of material and demonstrate mastery through rigorous examinations.</p>
+    </div>
+
+    <div class="feature-box">
+        <h4>Visual & Kinesthetic Learners</h4>
+        <p>Students who learn best by writing, drawing, and actively engaging with material rather than passive reading or watching.</p>
+    </div>
+
+    <h2>User Personas</h2>
+
+    <h3>The Struggling STEM Student</h3>
+    <p>Maya is a sophomore taking Organic Chemistry. She understands concepts in lecture but gets stuck on practice problems at night when office hours are closed. She needs immediate, contextual help to work through problems step-by-step.</p>
+
+    <h3>The Visual Organizer</h3>
+    <p>James is a biology major who learns by creating detailed diagrams and annotating his textbook PDFs. He wants his notes, annotations, and practice problems in one searchable, organized place.</p>
+
+    <h3>The Motivated Achiever</h3>
+    <p>Priya is pre-med and highly motivated but needs external structure and rewards to maintain consistency. Gamification elements help her stay engaged through long study sessions.</p>
+
+    <div class="page-break"></div>
+
+    <h1>3. Visual Identity & Design Language</h1>
+
+    <h2>The Ocean Reef Theme</h2>
+
+    <p>Every element of Reef's design reinforces the ocean metaphor, creating an immersive experience that makes studying feel like exploration rather than obligation.</p>
+
+    <h2>Color Palette</h2>
+
+    <table>
+        <tr>
+            <th>Color Name</th>
+            <th>Hex Code</th>
+            <th>Usage</th>
+        </tr>
+        <tr>
+            <td>Deep Ocean</td>
+            <td>#003D5B</td>
+            <td>Primary backgrounds, headers, emphasis</td>
+        </tr>
+        <tr>
+            <td>Azure Waters</td>
+            <td>#0097B2</td>
+            <td>Primary actions, highlights, interactive elements</td>
+        </tr>
+        <tr>
+            <td>Mid Ocean</td>
+            <td>#006989</td>
+            <td>Secondary elements, gradients</td>
+        </tr>
+        <tr>
+            <td>Seafoam</td>
+            <td>#98D8C8</td>
+            <td>Success states, positive feedback</td>
+        </tr>
+        <tr>
+            <td>Coral</td>
+            <td>#FF6B6B</td>
+            <td>Warnings, errors, important notices</td>
+        </tr>
+        <tr>
+            <td>Sand</td>
+            <td>#F5F5DC</td>
+            <td>Light backgrounds, cards</td>
+        </tr>
+    </table>
+
+    <h2>Typography</h2>
+
+    <p>Reef uses <strong>SF Pro Display</strong> (Apple's system font) for optimal readability and native feel on iPad:</p>
+
+    <ul>
+        <li><strong>Bold (700):</strong> App title, section headers</li>
+        <li><strong>Semibold (600):</strong> Subheadings, button labels</li>
+        <li><strong>Regular (400):</strong> Body text, descriptions</li>
+        <li><strong>Light (300):</strong> Taglines, secondary information</li>
+    </ul>
+
+    <h2>Animation Philosophy</h2>
+
+    <p>Animations in Reef serve two purposes: reinforcing the underwater theme and providing meaningful feedback. All animations are:</p>
+
+    <ul>
+        <li><strong>Fluid:</strong> Mimicking the organic movement of underwater life</li>
+        <li><strong>Purposeful:</strong> Every animation communicates something (loading, success, transition)</li>
+        <li><strong>Respectful:</strong> Never blocking user interaction or slowing down workflows</li>
+        <li><strong>Subtle:</strong> Enhancing without distracting from study content</li>
+    </ul>
+
+    <div class="page-break"></div>
+
+    <h1>4. Document Management System</h1>
+
+    <h2>Overview</h2>
+
+    <p>Reef's document management system serves as the foundation for all study activities. It's designed to handle the diverse range of materials college students encounter while keeping everything organized and accessible.</p>
+
+    <h2>Supported File Types</h2>
+
+    <div class="feature-box">
+        <h4>PDFs</h4>
+        <p>Full support for multi-page PDFs including textbooks, lecture slides, research papers, and handouts. Maintains original formatting while enabling annotation overlay.</p>
+    </div>
+
+    <div class="feature-box">
+        <h4>Images</h4>
+        <p>JPEG, PNG, HEIC support for photographs of whiteboards, diagrams, handwritten notes, and any visual study material.</p>
+    </div>
+
+    <div class="feature-box">
+        <h4>Future Formats</h4>
+        <p>Planned support for PowerPoint/Keynote presentations, Word documents, and web page captures.</p>
+    </div>
+
+    <h2>Organization Features</h2>
+
+    <h3>Course-Based Hierarchy</h3>
+    <p>Documents are organized in a three-level hierarchy:</p>
+    <ol>
+        <li><strong>Courses:</strong> Top-level folders (e.g., "CHEM 201 - Organic Chemistry")</li>
+        <li><strong>Units/Chapters:</strong> Subfolders within courses (e.g., "Unit 3: Stereochemistry")</li>
+        <li><strong>Documents:</strong> Individual files within units</li>
+    </ol>
+
+    <h3>Smart Tagging</h3>
+    <ul>
+        <li>Add custom tags to any document</li>
+        <li>AI-suggested tags based on content analysis</li>
+        <li>Filter and search across all documents by tag</li>
+    </ul>
+
+    <h3>Quick Access</h3>
+    <ul>
+        <li><strong>Recent:</strong> Last 10 opened documents</li>
+        <li><strong>Favorites:</strong> Starred documents for instant access</li>
+        <li><strong>Due Soon:</strong> Documents linked to upcoming assignments or exams</li>
+    </ul>
+
+    <h2>Import Methods</h2>
+
+    <ul>
+        <li><strong>Files App:</strong> Import from iCloud, Google Drive, Dropbox, or local storage</li>
+        <li><strong>Camera Capture:</strong> Photograph physical documents with automatic edge detection and perspective correction</li>
+        <li><strong>Share Extension:</strong> Import directly from other apps via iOS share sheet</li>
+        <li><strong>Drag and Drop:</strong> Full Split View support for dragging files from other apps</li>
+    </ul>
+
+    <div class="page-break"></div>
+
+    <h1>5. Canvas & Annotation Tools</h1>
+
+    <h2>GoodNotes-Style Experience</h2>
+
+    <p>The canvas is where students spend most of their time in Reef. It provides a familiar, fluid writing experience comparable to industry-leading note-taking apps while adding AI-powered features unique to Reef.</p>
+
+    <h2>Apple Pencil Integration</h2>
+
+    <div class="highlight-box">
+        <h3>Precision Writing</h3>
+        <ul>
+            <li>Full pressure sensitivity for natural stroke variation</li>
+            <li>Tilt detection for shading and calligraphy effects</li>
+            <li>Palm rejection for comfortable resting while writing</li>
+            <li>Double-tap support (Apple Pencil 2) for quick tool switching</li>
+            <li>Hover preview (Apple Pencil Pro) showing tool before touching</li>
+        </ul>
+    </div>
+
+    <h2>Writing Tools</h2>
+
+    <h3>Pen Tool</h3>
+    <ul>
+        <li>Variable stroke width based on pressure and velocity</li>
+        <li>Ink smoothing with adjustable latency/accuracy tradeoff</li>
+        <li>Multiple pen styles: Fountain, Ballpoint, Brush</li>
+        <li>Customizable default settings per document type</li>
+    </ul>
+
+    <h3>Highlighter</h3>
+    <ul>
+        <li>Semi-transparent strokes that don't obscure underlying text</li>
+        <li>Automatic straightening option for clean highlighting</li>
+        <li>Multiple widths for different use cases</li>
+    </ul>
+
+    <h3>Eraser</h3>
+    <ul>
+        <li><strong>Stroke Eraser:</strong> Tap to remove entire strokes</li>
+        <li><strong>Pixel Eraser:</strong> Fine control for partial erasing</li>
+        <li>Adjustable eraser size</li>
+    </ul>
+
+    <h3>Color Palette</h3>
+    <ul>
+        <li>Quick access to 8 recent colors</li>
+        <li>Full color picker with RGB/Hex input</li>
+        <li>Save custom color palettes per course</li>
+        <li>Color-blind friendly preset palettes</li>
+    </ul>
+
+    <h2>Shape & Object Tools</h2>
+
+    <h3>Shape Recognition</h3>
+    <p>Draw rough shapes and hold at the end to convert to perfect geometric forms:</p>
+    <ul>
+        <li>Lines (with optional arrow endpoints)</li>
+        <li>Rectangles and squares</li>
+        <li>Circles and ellipses</li>
+        <li>Triangles</li>
+        <li>Arrows and connectors</li>
+    </ul>
+
+    <h3>Text Boxes</h3>
+    <ul>
+        <li>Insert typed text anywhere on the canvas</li>
+        <li>Multiple font options and sizes</li>
+        <li>Useful for labels, titles, and longer passages</li>
+    </ul>
+
+    <h3>Lasso Selection</h3>
+    <ul>
+        <li>Select, move, resize, and copy any drawn content</li>
+        <li>Convert selection to image for export</li>
+        <li>Duplicate selected content</li>
+    </ul>
+
+    <h2>Document Interaction</h2>
+
+    <h3>Zoom & Pan</h3>
+    <ul>
+        <li>Pinch to zoom with smooth interpolation</li>
+        <li>Two-finger pan while zoomed</li>
+        <li>Double-tap to fit page width</li>
+        <li>Minimap navigation for large documents</li>
+    </ul>
+
+    <h3>Page Management</h3>
+    <ul>
+        <li>Add blank pages (lined, grid, or plain)</li>
+        <li>Insert pages between existing pages</li>
+        <li>Rearrange pages via drag and drop</li>
+        <li>Delete pages with confirmation</li>
+        <li>Export selected pages only</li>
+    </ul>
+
+    <div class="page-break"></div>
+
+    <h1>6. AI-Powered Learning Assistant</h1>
+
+    <h2>The Revolutionary Feature</h2>
+
+    <p>Reef's AI assistant represents a paradigm shift in how students get help while studying. Instead of requiring students to stop, formulate a question, and switch to a chatbot, Reef observes their work and provides assistance at natural breaking points.</p>
+
+    <h2>How It Works</h2>
+
+    <div class="flow-diagram">
+        <div class="flow-step">
+            <div class="flow-number">1</div>
+            <div>
+                <strong>Continuous Observation</strong>
+                <p>As you write with Apple Pencil, Reef monitors your work in real-time</p>
+            </div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+            <div class="flow-number">2</div>
+            <div>
+                <strong>Pause Detection</strong>
+                <p>Algorithms detect when you pause, indicating thought or confusion</p>
+            </div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+            <div class="flow-number">3</div>
+            <div>
+                <strong>Work Clustering</strong>
+                <p>AI determines which problem you're working on using spatial clustering</p>
+            </div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+            <div class="flow-number">4</div>
+            <div>
+                <strong>Handwriting Transcription</strong>
+                <p>Gemini 3 Pro converts your handwriting to LaTeX notation</p>
+            </div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+            <div class="flow-number">5</div>
+            <div>
+                <strong>AI Analysis</strong>
+                <p>LaTeX is sent to a reasoning model for understanding and feedback</p>
+            </div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+            <div class="flow-number">6</div>
+            <div>
+                <strong>Contextual Feedback</strong>
+                <p>Helpful guidance appears non-intrusively during your natural pause</p>
+            </div>
+        </div>
+    </div>
+
+    <h2>Pause Detection Intelligence</h2>
+
+    <p>The system uses multiple signals to detect meaningful pauses:</p>
+
+    <ul>
+        <li><strong>Duration:</strong> Pauses longer than a configurable threshold (default: 3 seconds)</li>
+        <li><strong>Context:</strong> Distinguishing between "thinking" pauses and "reading" pauses</li>
+        <li><strong>Pattern Recognition:</strong> Learning your personal pause patterns over time</li>
+        <li><strong>Problem Boundaries:</strong> Detecting when you move to a new problem</li>
+    </ul>
+
+    <h2>Clustering Algorithms</h2>
+
+    <p>When a document contains multiple problems, Reef uses spatial clustering to identify which work belongs to which problem:</p>
+
+    <ul>
+        <li>Proximity-based grouping of strokes</li>
+        <li>Recognition of problem numbers and labels</li>
+        <li>Temporal sequencing (what was written when)</li>
+        <li>Content analysis (this equation relates to that problem)</li>
+    </ul>
+
+    <h2>Handwriting Recognition Pipeline</h2>
+
+    <h3>Powered by Gemini 3 Pro</h3>
+
+    <div class="feature-box">
+        <h4>Mathematical Notation</h4>
+        <p>Accurately transcribes complex mathematical expressions including fractions, integrals, summations, matrices, Greek letters, and subscripts/superscripts.</p>
+    </div>
+
+    <div class="feature-box">
+        <h4>Chemical Formulas</h4>
+        <p>Recognizes molecular formulas, reaction arrows, structural diagrams, and standard chemistry notation.</p>
+    </div>
+
+    <div class="feature-box">
+        <h4>Mixed Content</h4>
+        <p>Handles documents with prose, equations, and diagrams interspersed together.</p>
+    </div>
+
+    <h2>Customizable Reasoning Models</h2>
+
+    <p>Users can select their preferred AI model for generating feedback:</p>
+
+    <table>
+        <tr>
+            <th>Model</th>
+            <th>Strengths</th>
+            <th>Best For</th>
+        </tr>
+        <tr>
+            <td>GPT-4</td>
+            <td>Broad knowledge, strong reasoning</td>
+            <td>General subjects, writing</td>
+        </tr>
+        <tr>
+            <td>Claude</td>
+            <td>Nuanced explanations, safety</td>
+            <td>Complex topics, ethics</td>
+        </tr>
+        <tr>
+            <td>Gemini</td>
+            <td>Multimodal, diagram understanding</td>
+            <td>Visual subjects, science</td>
+        </tr>
+        <tr>
+            <td>Custom/Local</td>
+            <td>Privacy, specialized training</td>
+            <td>Sensitive data, niche subjects</td>
+        </tr>
+    </table>
+
+    <h2>Feedback Types</h2>
+
+    <h3>Encouragement</h3>
+    <p>When work is correct: brief positive confirmation to build confidence without interrupting flow.</p>
+
+    <h3>Gentle Hints</h3>
+    <p>When stuck: Socratic questions that guide toward the answer without giving it away.</p>
+
+    <h3>Error Identification</h3>
+    <p>When mistakes are detected: specific, constructive feedback about where reasoning went wrong.</p>
+
+    <h3>Concept Connections</h3>
+    <p>Links current work to related concepts, previous problems, or upcoming material.</p>
+
+    <h2>Privacy & Control</h2>
+
+    <ul>
+        <li><strong>On-Device Option:</strong> Keep handwriting processing local when possible</li>
+        <li><strong>Selective Sharing:</strong> Choose which documents AI can access</li>
+        <li><strong>Disable Anytime:</strong> Turn off AI features per-document or globally</li>
+        <li><strong>Data Retention:</strong> Clear controls over what's stored and for how long</li>
+    </ul>
+
+    <div class="page-break"></div>
+
+    <h1>7. Quiz & Exam Generation Engine</h1>
+
+    <h2>Overview</h2>
+
+    <p>Reef's quiz generation system transforms uploaded course materials into customized practice assessments. This active recall approach is proven to improve retention compared to passive review.</p>
+
+    <h2>Generation Process</h2>
+
+    <ol>
+        <li><strong>Content Analysis:</strong> AI scans selected documents for key concepts, terms, and relationships</li>
+        <li><strong>Question Synthesis:</strong> Generates questions at the specified difficulty and format</li>
+        <li><strong>Answer Key Creation:</strong> Produces correct answers with explanations</li>
+        <li><strong>Review & Edit:</strong> Users can modify or remove questions before finalizing</li>
+    </ol>
+
+    <h2>Question Types</h2>
+
+    <div class="feature-box">
+        <h4>Multiple Choice</h4>
+        <p>4-5 options with one correct answer. AI generates plausible distractors based on common misconceptions. Supports "select all that apply" variant.</p>
+    </div>
+
+    <div class="feature-box">
+        <h4>Fill in the Blank</h4>
+        <p>Key terms or values removed from statements. Can require exact match or accept synonyms. Supports multiple blanks per question.</p>
+    </div>
+
+    <div class="feature-box">
+        <h4>Open-Ended / Free Response</h4>
+        <p>Essay-style questions requiring written or drawn answers. AI grades based on rubric and key points. Supports mathematical work with LaTeX comparison.</p>
+    </div>
+
+    <div class="feature-box">
+        <h4>Matching</h4>
+        <p>Connect terms to definitions, concepts to examples, or causes to effects. Randomized presentation order.</p>
+    </div>
+
+    <div class="feature-box">
+        <h4>Ordering</h4>
+        <p>Arrange items in correct sequence (timeline, process steps, etc.).</p>
+    </div>
+
+    <h2>Customization Options</h2>
+
+    <h3>Difficulty Levels</h3>
+
+    <table>
+        <tr>
+            <th>Level</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td>Recall</td>
+            <td>Direct factual questions testing memory</td>
+        </tr>
+        <tr>
+            <td>Understanding</td>
+            <td>Explain concepts in own words, identify examples</td>
+        </tr>
+        <tr>
+            <td>Application</td>
+            <td>Apply concepts to new scenarios</td>
+        </tr>
+        <tr>
+            <td>Analysis</td>
+            <td>Break down complex problems, identify relationships</td>
+        </tr>
+        <tr>
+            <td>Synthesis</td>
+            <td>Combine multiple concepts to solve novel problems</td>
+        </tr>
+    </table>
+
+    <h3>Exam Settings</h3>
+
+    <ul>
+        <li><strong>Question Count:</strong> Set total number of questions (5-100+)</li>
+        <li><strong>Time Limit:</strong> Optional countdown timer (5 minutes to 4 hours)</li>
+        <li><strong>Question Distribution:</strong> Percentage per type or let AI optimize</li>
+        <li><strong>Passing Score:</strong> Custom threshold for "passing" (default: 70%)</li>
+        <li><strong>Randomization:</strong> Shuffle question order, shuffle answer choices</li>
+        <li><strong>Retakes:</strong> Allow unlimited, limited, or no retakes</li>
+    </ul>
+
+    <h2>During the Exam</h2>
+
+    <ul>
+        <li>Clean, distraction-free interface</li>
+        <li>Progress indicator showing questions remaining</li>
+        <li>Timer display (if timed)</li>
+        <li>Flag questions for review</li>
+        <li>Navigate between questions freely</li>
+        <li>Handwriting support for free-response questions</li>
+    </ul>
+
+    <h2>Results & Feedback</h2>
+
+    <h3>Immediate Feedback Mode</h3>
+    <p>See if each answer is correct right after submitting. Great for learning.</p>
+
+    <h3>Exam Mode</h3>
+    <p>Results shown only after completing all questions. More realistic test prep.</p>
+
+    <h3>Results Breakdown</h3>
+    <ul>
+        <li>Overall score and pass/fail status</li>
+        <li>Score by question type</li>
+        <li>Score by topic/concept</li>
+        <li>Time spent per question</li>
+        <li>Comparison to previous attempts</li>
+        <li>Detailed explanations for incorrect answers</li>
+    </ul>
+
+    <h2>Spaced Repetition Integration</h2>
+
+    <p>Missed questions are automatically added to a review queue with optimized spacing:</p>
+    <ul>
+        <li>Questions you got wrong appear sooner</li>
+        <li>Correctly answered questions space out over time</li>
+        <li>Daily review reminders based on optimal retention timing</li>
+    </ul>
+
+    <div class="page-break"></div>
+
+    <h1>8. Gamification: Species Unlocking System</h1>
+
+    <h2>Concept Overview</h2>
+
+    <p>The Species Unlocking System transforms academic achievement into a visually rewarding collection game. As students master topics by passing exams, they unlock marine species that populate their personal reef—creating a living, growing representation of their knowledge.</p>
+
+    <div class="highlight-box">
+        <h3>Why Gamification Works</h3>
+        <p>Research shows that gamification increases engagement, motivation, and retention in educational contexts. By making progress visible and collectible, students maintain momentum through difficult material and feel genuine accomplishment when mastering topics.</p>
+    </div>
+
+    <h2>Topic-Species Mapping</h2>
+
+    <p>Each academic topic is pre-mapped to a specific marine species. The mapping follows a meaningful pattern based on topic complexity:</p>
+
+    <h3>Surface-Level Topics → Small, Common Species</h3>
+    <p>Introductory concepts and foundational topics unlock smaller fish that inhabit shallow waters:</p>
+
+    <div class="species-grid">
+        <div class="species-card">
+            <h5>Clownfish</h5>
+            <p>Basic definitions, introductory concepts</p>
+        </div>
+        <div class="species-card">
+            <h5>Blue Tang</h5>
+            <p>Foundational principles</p>
+        </div>
+        <div class="species-card">
+            <h5>Seahorse</h5>
+            <p>Simple processes, basic formulas</p>
+        </div>
+        <div class="species-card">
+            <h5>Angelfish</h5>
+            <p>Core vocabulary, key terms</p>
+        </div>
+    </div>
+
+    <h3>Mid-Depth Topics → Medium Species</h3>
+    <p>Intermediate topics requiring synthesis of multiple concepts:</p>
+
+    <div class="species-grid">
+        <div class="species-card">
+            <h5>Sea Turtle</h5>
+            <p>Multi-step processes</p>
+        </div>
+        <div class="species-card">
+            <h5>Dolphin</h5>
+            <p>Applied problem-solving</p>
+        </div>
+        <div class="species-card">
+            <h5>Manta Ray</h5>
+            <p>Interconnected concepts</p>
+        </div>
+        <div class="species-card">
+            <h5>Moray Eel</h5>
+            <p>Complex mechanisms</p>
+        </div>
+    </div>
+
+    <h3>Deep Topics → Large, Impressive Species</h3>
+    <p>Advanced topics with multiple subtopics unlock apex predators and rare deep-sea creatures:</p>
+
+    <div class="species-grid">
+        <div class="species-card">
+            <h5>Great White Shark</h5>
+            <p>Comprehensive mastery areas</p>
+        </div>
+        <div class="species-card">
+            <h5>Orca</h5>
+            <p>Cross-disciplinary synthesis</p>
+        </div>
+        <div class="species-card">
+            <h5>Giant Squid</h5>
+            <p>Theoretical frameworks</p>
+        </div>
+        <div class="species-card">
+            <h5>Whale Shark</h5>
+            <p>Capstone achievements</p>
+        </div>
+    </div>
+
+    <h2>Unlocking Mechanics</h2>
+
+    <h3>Requirements</h3>
+    <ol>
+        <li>Complete an exam covering the topic</li>
+        <li>Achieve the passing score (customizable, default 70%)</li>
+        <li>Species unlock animation plays</li>
+        <li>Species added to personal reef</li>
+    </ol>
+
+    <h3>Unlock Celebration</h3>
+    <p>When a species is unlocked:</p>
+    <ul>
+        <li>Full-screen animated reveal with species swimming into view</li>
+        <li>Species information card (name, scientific name, fun fact)</li>
+        <li>Connection to the academic topic explained</li>
+        <li>Sound effect and haptic feedback</li>
+        <li>Option to share achievement</li>
+    </ul>
+
+    <h2>Species Attributes</h2>
+
+    <p>Each species has unique attributes that add depth to the collection:</p>
+
+    <table>
+        <tr>
+            <th>Attribute</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td>Rarity</td>
+            <td>Common, Uncommon, Rare, Epic, Legendary</td>
+        </tr>
+        <tr>
+            <td>Habitat Zone</td>
+            <td>Surface, Reef, Mid-water, Deep sea, Abyss</td>
+        </tr>
+        <tr>
+            <td>Animation Style</td>
+            <td>Unique swimming pattern and behavior</td>
+        </tr>
+        <tr>
+            <td>Size</td>
+            <td>Relative size in the reef display</td>
+        </tr>
+        <tr>
+            <td>Real-World Info</td>
+            <td>Educational facts about the actual species</td>
+        </tr>
+    </table>
+
+    <h2>Special Unlocks</h2>
+
+    <h3>Achievement-Based Species</h3>
+    <ul>
+        <li><strong>Perfect Exam:</strong> Score 100% to unlock golden variant</li>
+        <li><strong>Speed Run:</strong> Complete under time limit for special coloring</li>
+        <li><strong>Streak:</strong> 7-day study streak unlocks exclusive species</li>
+        <li><strong>Course Complete:</strong> Finish all topics in a course for unique reward</li>
+    </ul>
+
+    <h3>Seasonal Species</h3>
+    <ul>
+        <li>Limited-time species during academic periods</li>
+        <li>Holiday-themed variants</li>
+        <li>Collaboration events with courses or professors</li>
+    </ul>
+
+    <div class="page-break"></div>
+
+    <h1>9. User Profiles & Personal Reef</h1>
+
+    <h2>The Personal Reef</h2>
+
+    <p>Every user's profile centers on their Personal Reef—a dynamic, animated aquarium displaying all unlocked species swimming together. This visual representation of academic progress is the emotional heart of Reef's gamification.</p>
+
+    <h2>Reef Display Features</h2>
+
+    <h3>Animated Environment</h3>
+    <ul>
+        <li>Living coral reef backdrop with subtle animation</li>
+        <li>Dynamic lighting (day/night cycle optional)</li>
+        <li>Particle effects: bubbles, plankton, light rays</li>
+        <li>Multiple depth layers for parallax effect</li>
+    </ul>
+
+    <h3>Species Behavior</h3>
+    <ul>
+        <li>Each species has unique, realistic swimming patterns</li>
+        <li>Species interact with environment (hiding in coral, surface feeding)</li>
+        <li>School behavior for multiple small fish of same type</li>
+        <li>Tap to focus on individual species with info card</li>
+    </ul>
+
+    <h3>Customization</h3>
+    <ul>
+        <li>Choose reef backdrop style (tropical, kelp forest, deep ocean)</li>
+        <li>Add decorative elements (sunken ship, treasure chest)</li>
+        <li>Adjust population density</li>
+        <li>Filter by course or topic</li>
+    </ul>
+
+    <h2>Profile Statistics</h2>
+
+    <h3>Academic Progress</h3>
+    <ul>
+        <li>Total species collected / Total available</li>
+        <li>Completion percentage per course</li>
+        <li>Study streak (consecutive days active)</li>
+        <li>Total study time</li>
+        <li>Exams taken and passed</li>
+        <li>Average exam score</li>
+    </ul>
+
+    <h3>Collection Stats</h3>
+    <ul>
+        <li>Species by rarity</li>
+        <li>Species by habitat zone</li>
+        <li>Newest additions</li>
+        <li>Most recent unlock date</li>
+    </ul>
+
+    <h2>Social Features</h2>
+
+    <h3>Reef Sharing</h3>
+    <ul>
+        <li>Generate shareable image/video of your reef</li>
+        <li>Share individual unlock moments</li>
+        <li>Compare reefs with friends (mutual consent)</li>
+    </ul>
+
+    <h3>Study Groups</h3>
+    <ul>
+        <li>Create or join groups for specific courses</li>
+        <li>Combined group reef showing all members' species</li>
+        <li>Group challenges and goals</li>
+        <li>Share study materials within group</li>
+    </ul>
+
+    <h2>Account Management</h2>
+
+    <ul>
+        <li>Email and password authentication</li>
+        <li>Sign in with Apple</li>
+        <li>Profile photo and display name</li>
+        <li>Academic institution (optional)</li>
+        <li>Export account data</li>
+        <li>Delete account option</li>
+    </ul>
+
+    <div class="page-break"></div>
+
+    <h1>10. Welcome & Onboarding Experience</h1>
+
+    <h2>Pre-Authentication Welcome Screen</h2>
+
+    <p>The welcome screen serves as the app's first impression—converting visitors into users by showcasing Reef's unique value proposition.</p>
+
+    <h3>Visual Design</h3>
+
+    <div class="feature-box">
+        <h4>Background: Animated Reef</h4>
+        <ul>
+            <li>Full-screen immersive underwater scene</li>
+            <li>Blue gradient: #003D5B (bottom) → #0097B2 (top)</li>
+            <li>Coral reef along bottom third with gentle swaying motion</li>
+            <li>3-5 fish species swimming in organic, looping paths</li>
+            <li>Floating particles (plankton, bubbles) drifting upward</li>
+            <li>Soft light rays filtering from the surface</li>
+        </ul>
+    </div>
+
+    <div class="feature-box">
+        <h4>Content Layer</h4>
+        <ul>
+            <li>"Reef" wordmark centered in upper third</li>
+            <li>SF Pro Display Bold, white with subtle glow</li>
+            <li>Tagline: "Dive into smarter studying"</li>
+            <li>Semi-transparent dark backdrop for readability</li>
+        </ul>
+    </div>
+
+    <div class="feature-box">
+        <h4>Action Buttons</h4>
+        <ul>
+            <li>Positioned above the coral in lower third</li>
+            <li>"Sign Up" - Primary button (#0097B2 fill, white text)</li>
+            <li>"Sign In" - Outline button (white border and text)</li>
+            <li>16px corner radius, generous tap targets (44pt minimum)</li>
+            <li>Full width with horizontal margin</li>
+        </ul>
+    </div>
+
+    <h2>Sign Up Flow</h2>
+
+    <ol>
+        <li><strong>Account Creation:</strong> Email, password, or Sign in with Apple</li>
+        <li><strong>Profile Setup:</strong> Name, optional profile photo</li>
+        <li><strong>Academic Context:</strong> Institution, primary courses (helps personalize)</li>
+        <li><strong>First Course Setup:</strong> Create first course folder</li>
+        <li><strong>Guided Tour:</strong> Interactive walkthrough of key features</li>
+    </ol>
+
+    <h2>Onboarding Tutorial</h2>
+
+    <h3>Interactive Walkthrough</h3>
+
+    <p>New users experience a guided tour highlighting core features:</p>
+
+    <ol>
+        <li><strong>Import a Document:</strong> Upload first PDF or capture with camera</li>
+        <li><strong>Try Annotation:</strong> Draw on the canvas with Apple Pencil prompts</li>
+        <li><strong>Meet the AI:</strong> See AI feedback in action with sample problem</li>
+        <li><strong>Generate a Quiz:</strong> Create first practice quiz from content</li>
+        <li><strong>Unlock First Species:</strong> Pass tutorial quiz to unlock starter fish</li>
+        <li><strong>View Your Reef:</strong> See first species swimming in personal reef</li>
+    </ol>
+
+    <h3>Skippable but Encouraged</h3>
+    <p>Users can skip onboarding but are shown completion rewards (exclusive starter species) to encourage participation.</p>
+
+    <div class="page-break"></div>
+
+    <h1>11. Technical Architecture</h1>
+
+    <h2>Technology Stack</h2>
+
+    <div class="tech-stack">
+        <div class="tech-item">
+            <h5>Language</h5>
+            <p>Swift 5.9+</p>
+        </div>
+        <div class="tech-item">
+            <h5>Framework</h5>
+            <p>SwiftUI</p>
+        </div>
+        <div class="tech-item">
+            <h5>Platform</h5>
+            <p>iPadOS 17+</p>
+        </div>
+        <div class="tech-item">
+            <h5>Graphics</h5>
+            <p>Metal / SpriteKit</p>
+        </div>
+    </div>
+
+    <h2>AI Integration Architecture</h2>
+
+    <h3>Handwriting Recognition Pipeline</h3>
+
+    <div class="flow-diagram">
+        <div class="flow-step">
+            <div class="flow-number">1</div>
+            <div>
+                <strong>Stroke Capture</strong>
+                <p>Apple Pencil input captured with full pressure/tilt data</p>
+            </div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+            <div class="flow-number">2</div>
+            <div>
+                <strong>Region Extraction</strong>
+                <p>Clustering algorithm identifies relevant work area</p>
+            </div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+            <div class="flow-number">3</div>
+            <div>
+                <strong>Image Rendering</strong>
+                <p>Strokes rendered to image for API submission</p>
+            </div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+            <div class="flow-number">4</div>
+            <div>
+                <strong>Gemini 3 Pro API</strong>
+                <p>Multimodal model transcribes handwriting → LaTeX</p>
+            </div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+            <div class="flow-number">5</div>
+            <div>
+                <strong>Reasoning Model</strong>
+                <p>LaTeX + context sent to user-selected model</p>
+            </div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step">
+            <div class="flow-number">6</div>
+            <div>
+                <strong>Response Rendering</strong>
+                <p>Feedback displayed in non-intrusive UI overlay</p>
+            </div>
+        </div>
+    </div>
+
+    <h2>Data Models</h2>
+
+    <h3>Core Entities</h3>
+
+    <ul>
+        <li><strong>User:</strong> Account info, preferences, settings</li>
+        <li><strong>Course:</strong> Name, icon, color, associated topics</li>
+        <li><strong>Document:</strong> File reference, pages, annotations</li>
+        <li><strong>Annotation:</strong> Strokes, shapes, text boxes per page</li>
+        <li><strong>Topic:</strong> Name, difficulty, associated species, prerequisites</li>
+        <li><strong>Species:</strong> Name, rarity, animations, unlock conditions</li>
+        <li><strong>Quiz:</strong> Questions, settings, user attempts</li>
+        <li><strong>Attempt:</strong> Answers, score, duration, timestamp</li>
+    </ul>
+
+    <h2>Storage Architecture</h2>
+
+    <h3>Local Storage</h3>
+    <ul>
+        <li><strong>Core Data:</strong> Structured data (users, courses, quizzes)</li>
+        <li><strong>File System:</strong> Documents, images, exported PDFs</li>
+        <li><strong>UserDefaults:</strong> Preferences, settings, feature flags</li>
+    </ul>
+
+    <h3>Cloud Sync</h3>
+    <ul>
+        <li><strong>CloudKit:</strong> Cross-device sync for all user data</li>
+        <li><strong>Automatic conflict resolution</strong></li>
+        <li><strong>Offline-first with background sync</strong></li>
+    </ul>
+
+    <h2>Performance Considerations</h2>
+
+    <ul>
+        <li><strong>Canvas Rendering:</strong> Metal-accelerated drawing at 120Hz on ProMotion displays</li>
+        <li><strong>Large Documents:</strong> Tiled rendering for PDFs, only visible pages in memory</li>
+        <li><strong>AI Latency:</strong> Background processing with optimistic UI updates</li>
+        <li><strong>Animations:</strong> SpriteKit for efficient reef rendering at 60fps</li>
+    </ul>
+
+    <div class="page-break"></div>
+
+    <h1>12. Security & Privacy</h1>
+
+    <h2>Data Protection</h2>
+
+    <h3>At Rest</h3>
+    <ul>
+        <li>All local data encrypted using iOS Data Protection</li>
+        <li>Keychain storage for authentication tokens</li>
+        <li>CloudKit encryption for synced data</li>
+    </ul>
+
+    <h3>In Transit</h3>
+    <ul>
+        <li>TLS 1.3 for all network communications</li>
+        <li>Certificate pinning for API endpoints</li>
+        <li>No sensitive data in URLs or logs</li>
+    </ul>
+
+    <h2>AI Privacy</h2>
+
+    <ul>
+        <li><strong>Minimal Data Transmission:</strong> Only the relevant work region sent for analysis</li>
+        <li><strong>No Training on User Data:</strong> User content not used to train AI models</li>
+        <li><strong>Configurable AI Access:</strong> Users control which documents AI can process</li>
+        <li><strong>Data Retention Controls:</strong> Choose how long AI interaction history is kept</li>
+        <li><strong>Audit Log:</strong> View exactly what was sent to AI services</li>
+    </ul>
+
+    <h2>Authentication Security</h2>
+
+    <ul>
+        <li>Secure password requirements (12+ characters, complexity rules)</li>
+        <li>Sign in with Apple support (privacy-preserving)</li>
+        <li>Biometric unlock (Face ID / Touch ID)</li>
+        <li>Session management with automatic expiration</li>
+        <li>Rate limiting on login attempts</li>
+    </ul>
+
+    <h2>Compliance</h2>
+
+    <ul>
+        <li><strong>FERPA:</strong> Ready for educational institution deployment</li>
+        <li><strong>COPPA:</strong> Age verification for users under 13</li>
+        <li><strong>GDPR:</strong> Full data export and deletion capabilities</li>
+        <li><strong>App Store Guidelines:</strong> Full compliance with Apple requirements</li>
+    </ul>
+
+    <div class="page-break"></div>
+
+    <h1>13. Future Roadmap</h1>
+
+    <h2>Phase 2: Enhanced Collaboration</h2>
+
+    <ul>
+        <li>Real-time collaborative annotation (multiple users on same document)</li>
+        <li>Study group quiz competitions</li>
+        <li>Shared flashcard decks</li>
+        <li>Professor/TA roles with content distribution</li>
+    </ul>
+
+    <h2>Phase 3: Platform Expansion</h2>
+
+    <ul>
+        <li>iPhone companion app (review, quizzes, reef viewing)</li>
+        <li>Mac app (full feature parity)</li>
+        <li>Web app for cross-platform access</li>
+        <li>Apple Watch complications (streak tracking, quick review)</li>
+    </ul>
+
+    <h2>Phase 4: Advanced AI</h2>
+
+    <ul>
+        <li>Voice-based tutoring conversations</li>
+        <li>Video content analysis (lecture recordings)</li>
+        <li>Predictive struggling detection (proactive help)</li>
+        <li>Personalized learning path recommendations</li>
+    </ul>
+
+    <h2>Phase 5: Institutional Features</h2>
+
+    <ul>
+        <li>LMS integration (Canvas, Blackboard, Moodle)</li>
+        <li>Instructor dashboard with class analytics</li>
+        <li>Official course content packages</li>
+        <li>Proctored exam mode</li>
+    </ul>
+
+    <hr style="margin: 3rem 0; border: none; border-top: 2px solid #E2E8F0;">
+
+    <div style="text-align: center; color: #718096; padding: 2rem 0;">
+        <p style="font-size: 1.5rem; color: var(--ocean-deep); margin-bottom: 0.5rem;"><strong>Reef</strong></p>
+        <p style="font-style: italic;">"Dive into smarter studying"</p>
+        <p style="margin-top: 2rem; font-size: 0.9rem;">© 2025 Reef. All rights reserved.</p>
+        <p style="font-size: 0.85rem;">This document is confidential and intended for internal use.</p>
+    </div>
+
+</div>
+
+</body>
+</html>

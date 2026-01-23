@@ -164,8 +164,10 @@ struct MaterialsView: View {
                                 document: material,
                                 onDelete: { deleteMaterial(material) },
                                 onTap: {
+                                    print("🔵 Tapped on material: \(material.name)")
                                     selectedMaterial = material
                                     isShowingCanvas = true
+                                    print("🔵 isShowingCanvas set to true")
                                 },
                                 itemType: "Notes"
                             )

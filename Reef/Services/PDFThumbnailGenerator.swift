@@ -42,9 +42,18 @@ struct PDFThumbnailGenerator {
     /// Generates a light mode thumbnail with Sage Mist background
     private static func generateLightModeThumbnail(page: PDFPage, size: CGSize) -> UIImage {
         let pageRect = page.bounds(for: .mediaBox)
-        let scale = size.width / pageRect.width  // Scale to fill width
-        let xOffset: CGFloat = 0  // No horizontal offset needed
-        let yOffset: CGFloat = 0  // Align to top
+
+        // Zoom in to crop document edges (1/0.9 ≈ 1.11x zoom)
+        let zoomFactor: CGFloat = 1.0 / 0.9
+        let scale = (size.width / pageRect.width) * zoomFactor
+        let scaledWidth = pageRect.width * scale
+        let scaledHeight = pageRect.height * scale
+
+        // Center horizontally (crops equal from left and right)
+        let xOffset = (size.width - scaledWidth) / 2
+
+        // Crop a bit from top to hide top margin
+        let topCrop = pageRect.height * 0.02 * scale
 
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { context in
@@ -55,7 +64,7 @@ struct PDFThumbnailGenerator {
             // Multiply blend: white → sage mist, black → black
             context.cgContext.setBlendMode(.multiply)
 
-            context.cgContext.translateBy(x: xOffset, y: size.height - yOffset)
+            context.cgContext.translateBy(x: xOffset, y: scaledHeight - topCrop)
             context.cgContext.scaleBy(x: scale, y: -scale)
 
             page.draw(with: .mediaBox, to: context.cgContext)
@@ -65,9 +74,18 @@ struct PDFThumbnailGenerator {
     /// Generates a dark mode thumbnail with Deep Ocean background and light content
     private static func generateDarkModeThumbnail(page: PDFPage, size: CGSize) -> UIImage? {
         let pageRect = page.bounds(for: .mediaBox)
-        let scale = size.width / pageRect.width  // Scale to fill width
-        let xOffset: CGFloat = 0  // No horizontal offset needed
-        let yOffset: CGFloat = 0  // Align to top
+
+        // Zoom in to crop document edges (1/0.9 ≈ 1.11x zoom)
+        let zoomFactor: CGFloat = 1.0 / 0.9
+        let scale = (size.width / pageRect.width) * zoomFactor
+        let scaledWidth = pageRect.width * scale
+        let scaledHeight = pageRect.height * scale
+
+        // Center horizontally (crops equal from left and right)
+        let xOffset = (size.width - scaledWidth) / 2
+
+        // Crop a bit from top to hide top margin
+        let topCrop = pageRect.height * 0.02 * scale
 
         // First render the PDF normally (white background, black content)
         let renderer = UIGraphicsImageRenderer(size: size)
@@ -75,7 +93,7 @@ struct PDFThumbnailGenerator {
             UIColor.white.setFill()
             context.fill(CGRect(origin: .zero, size: size))
 
-            context.cgContext.translateBy(x: xOffset, y: size.height - yOffset)
+            context.cgContext.translateBy(x: xOffset, y: scaledHeight - topCrop)
             context.cgContext.scaleBy(x: scale, y: -scale)
 
             page.draw(with: .mediaBox, to: context.cgContext)

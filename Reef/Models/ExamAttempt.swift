@@ -8,10 +8,20 @@ import SwiftData
 
 // MARK: - Question Type
 
-enum QuestionType: String, Codable {
+enum QuestionType: String, Codable, CaseIterable, Identifiable {
     case multipleChoice
     case fillInBlank
     case openEnded
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .multipleChoice: return "Multiple Choice"
+        case .fillInBlank: return "Fill-in-the-blank"
+        case .openEnded: return "Open-ended"
+        }
+    }
 }
 
 // MARK: - Exam Question
