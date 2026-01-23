@@ -401,6 +401,9 @@ struct AnnotationCanvasContainer: View {
 
     var body: some View {
         ZStack {
+            // Paper background
+            Color.white
+
             // PDF Document View
             PDFDocumentView(
                 url: pdfURL,

@@ -5,6 +5,7 @@
 //  UIViewRepresentable wrapper for PDFKit's PDFView
 
 import SwiftUI
+import UIKit
 import PDFKit
 
 struct PDFDocumentView: UIViewRepresentable {
@@ -24,10 +25,11 @@ struct PDFDocumentView: UIViewRepresentable {
         pdfView.autoScales = true
         pdfView.displayMode = .singlePageContinuous
         pdfView.displayDirection = .vertical
-        pdfView.backgroundColor = .clear
+        pdfView.backgroundColor = .white
         pdfView.pageShadowsEnabled = false
+        pdfView.pageBreakMargins = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
 
-        // Disable default PDF link handling
+        // Enable user interaction for scrolling
         pdfView.isUserInteractionEnabled = true
 
         // Set up notification for page changes
