@@ -34,6 +34,7 @@ struct CanvasView: View {
             DrawingOverlayView(
                 documentURL: fileURL,
                 fileType: material.fileType,
+                documentTitle: material.name,
                 selectedTool: $selectedTool,
                 selectedColor: $selectedColor,
                 isDarkMode: themeManager.isDarkMode
