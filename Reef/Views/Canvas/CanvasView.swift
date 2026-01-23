@@ -29,9 +29,6 @@ struct CanvasView: View {
     @State private var canUndo: Bool = false
     @State private var canRedo: Bool = false
 
-    // Lasso selection state
-    @State private var hasSelection: Bool = false
-
     // Clipboard state
     @State private var canPaste: Bool = false
 
@@ -78,8 +75,7 @@ struct CanvasView: View {
                 isDarkMode: themeManager.isDarkMode,
                 onCanvasReady: { canvasViewRef = $0 },
                 onUndoStateChanged: { canUndo = $0 },
-                onRedoStateChanged: { canRedo = $0 },
-                onSelectionChanged: { hasSelection = $0 }
+                onRedoStateChanged: { canRedo = $0 }
             )
 
             // Floating toolbar at bottom
@@ -99,7 +95,6 @@ struct CanvasView: View {
                     canUndo: canUndo,
                     canRedo: canRedo,
                     canPaste: canPaste,
-                    hasSelection: hasSelection,
                     onHomePressed: {
                         if let onDismiss = onDismiss {
                             // Use parent-controlled animation
@@ -116,40 +111,6 @@ struct CanvasView: View {
                         canvas.becomeFirstResponder()
                         canvas.performPaste()
                         updatePasteState()
-                    },
-                    onCut: {
-                        guard let canvas = canvasViewRef?.canvasView else { return }
-                        canvas.becomeFirstResponder()
-                        canvas.performCut()
-                        updatePasteState()
-                        hasSelection = false
-                    },
-                    onCopy: {
-                        guard let canvas = canvasViewRef?.canvasView else { return }
-                        canvas.becomeFirstResponder()
-                        canvas.performCopy()
-                        updatePasteState()
-                    },
-                    onDelete: {
-                        guard let canvas = canvasViewRef?.canvasView else { return }
-                        canvas.becomeFirstResponder()
-                        canvas.performDelete()
-                        hasSelection = false
-                    },
-                    onDuplicate: {
-                        guard let canvas = canvasViewRef?.canvasView else { return }
-                        canvas.becomeFirstResponder()
-                        canvas.performCopy()
-                        // Small delay to let copy complete before paste
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            canvas.performPaste()
-                            updatePasteState()
-                        }
-                    },
-                    onDeselectLasso: {
-                        // Switch to pen tool to deselect, then back to lasso
-                        selectedTool = .pen
-                        hasSelection = false
                     },
                     onAIPressed: { /* TODO: Implement AI assistant */ },
                     onToggleDarkMode: {

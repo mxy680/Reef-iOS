@@ -25,7 +25,6 @@ struct DrawingOverlayView: UIViewRepresentable {
     var onCanvasReady: (CanvasContainerView) -> Void = { _ in }
     var onUndoStateChanged: (Bool) -> Void = { _ in }
     var onRedoStateChanged: (Bool) -> Void = { _ in }
-    var onSelectionChanged: (Bool) -> Void = { _ in }
 
     func makeUIView(context: Context) -> CanvasContainerView {
         let container = CanvasContainerView(documentURL: documentURL, fileType: fileType, isDarkMode: isDarkMode)
@@ -33,7 +32,6 @@ struct DrawingOverlayView: UIViewRepresentable {
         context.coordinator.container = container
         context.coordinator.onUndoStateChanged = onUndoStateChanged
         context.coordinator.onRedoStateChanged = onRedoStateChanged
-        context.coordinator.onSelectionChanged = onSelectionChanged
 
         // Set initial tool after a brief delay to ensure view is ready
         let initialColor = UIColor(selectedPenColor)
@@ -87,33 +85,19 @@ struct DrawingOverlayView: UIViewRepresentable {
         weak var container: CanvasContainerView?
         var onUndoStateChanged: (Bool) -> Void = { _ in }
         var onRedoStateChanged: (Bool) -> Void = { _ in }
-        var onSelectionChanged: (Bool) -> Void = { _ in }
 
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
             updateUndoRedoState(canvasView)
         }
 
-        func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
-            checkSelectionState(canvasView)
-        }
-
         func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
             updateUndoRedoState(canvasView)
-            checkSelectionState(canvasView)
         }
 
         private func updateUndoRedoState(_ canvasView: PKCanvasView) {
             DispatchQueue.main.async { [weak self] in
                 self?.onUndoStateChanged(canvasView.undoManager?.canUndo ?? false)
                 self?.onRedoStateChanged(canvasView.undoManager?.canRedo ?? false)
-            }
-        }
-
-        private func checkSelectionState(_ canvasView: PKCanvasView) {
-            DispatchQueue.main.async { [weak self] in
-                let hasContent = !canvasView.drawing.strokes.isEmpty
-                // Show selection options when lasso is active and there's content
-                self?.onSelectionChanged(hasContent && canvasView.tool is PKLassoTool)
             }
         }
     }
@@ -125,7 +109,7 @@ class CanvasContainerView: UIView {
     let scrollView = UIScrollView()
     let contentView = UIView()  // Container for document + canvas
     let documentImageView = UIImageView()
-    let canvasView = PKCanvasView()
+    let canvasView = ReefCanvasView()
 
     private var documentURL: URL?
     private var fileType: Note.FileType?

@@ -47,25 +47,45 @@ struct CanvasToolbar: View {
     @Binding var highlighterWidth: CGFloat
     @Binding var eraserSize: CGFloat
     @Binding var eraserType: EraserType
+    @Binding var customPenColors: [Color]
+    @Binding var customHighlighterColors: [Color]
     let colorScheme: ColorScheme
     let canUndo: Bool
     let canRedo: Bool
-    let hasSelection: Bool
+    let canPaste: Bool
     let onHomePressed: () -> Void
     let onUndo: () -> Void
     let onRedo: () -> Void
-    let onCut: () -> Void
-    let onCopy: () -> Void
-    let onDelete: () -> Void
+    let onPaste: () -> Void
     let onAIPressed: () -> Void
     let onToggleDarkMode: () -> Void
 
-    private var showContextualToolbar: Bool {
+    @State private var contextualToolbarHidden: Bool = false
+
+    private var toolHasContextualMenu: Bool {
         switch selectedTool {
         case .pen, .highlighter, .eraser:
             return true
         case .lasso:
-            return hasSelection
+            return false
+        }
+    }
+
+    private var showContextualToolbar: Bool {
+        switch selectedTool {
+        case .pen, .highlighter, .eraser:
+            return !contextualToolbarHidden
+        case .lasso:
+            return false
+        }
+    }
+
+    private func selectTool(_ tool: CanvasTool) {
+        if selectedTool == tool && toolHasContextualMenu {
+            contextualToolbarHidden.toggle()
+        } else {
+            selectedTool = tool
+            contextualToolbarHidden = false
         }
     }
 
@@ -81,11 +101,10 @@ struct CanvasToolbar: View {
                     eraserType: $eraserType,
                     selectedPenColor: $selectedPenColor,
                     selectedHighlighterColor: $selectedHighlighterColor,
+                    customPenColors: $customPenColors,
+                    customHighlighterColors: $customHighlighterColors,
                     colorScheme: colorScheme,
-                    hasSelection: hasSelection,
-                    onCut: onCut,
-                    onCopy: onCopy,
-                    onDelete: onDelete
+                    onClose: { contextualToolbarHidden = true }
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -95,6 +114,7 @@ struct CanvasToolbar: View {
         }
         .animation(.easeOut(duration: 0.2), value: showContextualToolbar)
         .animation(.easeOut(duration: 0.2), value: selectedTool)
+        .animation(.easeOut(duration: 0.2), value: contextualToolbarHidden)
     }
 
     private var mainToolbar: some View {
@@ -114,33 +134,33 @@ struct CanvasToolbar: View {
                 icon: "pencil.tip",
                 isSelected: selectedTool == .pen,
                 colorScheme: colorScheme,
-                action: { selectedTool = .pen }
+                action: { selectTool(.pen) }
             )
 
             ToolbarButton(
                 icon: "highlighter",
                 isSelected: selectedTool == .highlighter,
                 colorScheme: colorScheme,
-                action: { selectedTool = .highlighter }
+                action: { selectTool(.highlighter) }
             )
 
             ToolbarButton(
                 icon: "eraser.fill",
                 isSelected: selectedTool == .eraser,
                 colorScheme: colorScheme,
-                action: { selectedTool = .eraser }
+                action: { selectTool(.eraser) }
             )
 
             ToolbarButton(
                 icon: "lasso",
                 isSelected: selectedTool == .lasso,
                 colorScheme: colorScheme,
-                action: { selectedTool = .lasso }
+                action: { selectTool(.lasso) }
             )
 
             toolbarDivider
 
-            // Undo/Redo
+            // Undo/Redo/Paste
             ToolbarButton(
                 icon: "arrow.uturn.backward",
                 isSelected: false,
@@ -155,6 +175,14 @@ struct CanvasToolbar: View {
                 isDisabled: !canRedo,
                 colorScheme: colorScheme,
                 action: onRedo
+            )
+
+            ToolbarButton(
+                icon: "doc.on.clipboard",
+                isSelected: false,
+                isDisabled: !canPaste,
+                colorScheme: colorScheme,
+                action: onPaste
             )
 
             toolbarDivider
@@ -253,16 +281,16 @@ private struct ToolbarButton: View {
             highlighterWidth: .constant(StrokeWidthRange.highlighterDefault),
             eraserSize: .constant(StrokeWidthRange.eraserDefault),
             eraserType: .constant(.stroke),
+            customPenColors: .constant([]),
+            customHighlighterColors: .constant([]),
             colorScheme: .light,
             canUndo: true,
             canRedo: false,
-            hasSelection: false,
+            canPaste: true,
             onHomePressed: {},
             onUndo: {},
             onRedo: {},
-            onCut: {},
-            onCopy: {},
-            onDelete: {},
+            onPaste: {},
             onAIPressed: {},
             onToggleDarkMode: {}
         )
