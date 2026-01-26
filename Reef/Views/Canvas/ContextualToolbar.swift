@@ -19,6 +19,14 @@ struct ContextualToolbar: View {
     @Binding var customPenColors: [Color]
     @Binding var customHighlighterColors: [Color]
     let colorScheme: ColorScheme
+
+    // Lasso actions
+    var canPaste: Bool = false
+    var onCopy: (() -> Void)? = nil
+    var onCut: (() -> Void)? = nil
+    var onDelete: (() -> Void)? = nil
+    var onPaste: (() -> Void)? = nil
+
     var onClose: (() -> Void)? = nil
 
     private static let maxCustomColors = 4  // 3 default + 4 custom = 7 max
