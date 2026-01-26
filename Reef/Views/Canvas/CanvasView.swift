@@ -139,6 +139,22 @@ struct CanvasView: View {
             }
         }
     }
+
+    // MARK: - Clipboard Helpers
+
+    private func updatePasteState() {
+        UIPasteboard.general.detectPatterns(
+            for: [.init(rawValue: "com.apple.pencilkit.drawing")]
+        ) { result in
+            DispatchQueue.main.async {
+                if case .success(let patterns) = result {
+                    canPaste = !patterns.isEmpty
+                } else {
+                    canPaste = false
+                }
+            }
+        }
+    }
 }
 
 // MARK: - PDF View
