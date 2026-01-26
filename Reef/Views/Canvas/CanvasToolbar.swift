@@ -75,6 +75,7 @@ struct CanvasToolbar: View {
     @Binding var customPenColors: [Color]
     @Binding var customHighlighterColors: [Color]
     @Binding var canvasBackgroundMode: CanvasBackgroundMode
+    @Binding var canvasBackgroundOpacity: CGFloat
     let colorScheme: ColorScheme
     let canUndo: Bool
     let canRedo: Bool
@@ -159,6 +160,7 @@ struct CanvasToolbar: View {
             if showBackgroundModeToolbar {
                 BackgroundModeToolbar(
                     canvasBackgroundMode: $canvasBackgroundMode,
+                    canvasBackgroundOpacity: $canvasBackgroundOpacity,
                     colorScheme: colorScheme,
                     onClose: { backgroundModeSelected = false }
                 )
@@ -341,6 +343,7 @@ private struct ToolbarButton: View {
 
 private struct BackgroundModeToolbar: View {
     @Binding var canvasBackgroundMode: CanvasBackgroundMode
+    @Binding var canvasBackgroundOpacity: CGFloat
     let colorScheme: ColorScheme
     var onClose: (() -> Void)? = nil
 
@@ -364,6 +367,28 @@ private struct BackgroundModeToolbar: View {
                     )
                 }
                 .buttonStyle(.plain)
+            }
+
+            // Opacity slider (only show when not normal mode)
+            if canvasBackgroundMode != .normal {
+                Rectangle()
+                    .fill(Color.adaptiveText(for: colorScheme).opacity(0.2))
+                    .frame(width: 1, height: 24)
+                    .padding(.horizontal, 8)
+
+                HStack(spacing: 6) {
+                    Image(systemName: "circle.dotted")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.5))
+
+                    Slider(value: $canvasBackgroundOpacity, in: 0.05...0.5)
+                        .accentColor(.vibrantTeal)
+                        .frame(width: 80)
+
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.5))
+                }
             }
 
             if onClose != nil {
@@ -421,6 +446,7 @@ private struct BackgroundModeToolbar: View {
             customPenColors: .constant([]),
             customHighlighterColors: .constant([]),
             canvasBackgroundMode: .constant(.normal),
+            canvasBackgroundOpacity: .constant(0.15),
             colorScheme: .light,
             canUndo: true,
             canRedo: false,

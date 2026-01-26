@@ -34,6 +34,7 @@ struct DrawingOverlayView: UIViewRepresentable {
     @Binding var eraserSize: CGFloat
     @Binding var eraserType: EraserType
     var canvasBackgroundMode: CanvasBackgroundMode = .normal
+    var canvasBackgroundOpacity: CGFloat = 0.15
     var isDarkMode: Bool = false
     var recognitionEnabled: Bool = false
     var pauseSensitivity: Double = 0.5
@@ -43,7 +44,7 @@ struct DrawingOverlayView: UIViewRepresentable {
     var onRecognitionResult: (RecognitionResult) -> Void = { _ in }
 
     func makeUIView(context: Context) -> CanvasContainerView {
-        let container = CanvasContainerView(documentURL: documentURL, fileType: fileType, backgroundMode: canvasBackgroundMode, isDarkMode: isDarkMode)
+        let container = CanvasContainerView(documentURL: documentURL, fileType: fileType, backgroundMode: canvasBackgroundMode, backgroundOpacity: canvasBackgroundOpacity, isDarkMode: isDarkMode)
         container.canvasView.delegate = context.coordinator
         context.coordinator.container = container
         context.coordinator.onUndoStateChanged = onUndoStateChanged
@@ -71,6 +72,7 @@ struct DrawingOverlayView: UIViewRepresentable {
         updateTool(container.canvasView)
         container.updateDarkMode(isDarkMode)
         container.updateBackgroundMode(canvasBackgroundMode)
+        container.updateBackgroundOpacity(canvasBackgroundOpacity)
 
         // Keep recognition settings in sync
         context.coordinator.recognitionEnabled = recognitionEnabled
@@ -424,6 +426,7 @@ class CanvasContainerView: UIView {
     private var documentURL: URL?
     private var fileType: Note.FileType?
     private var backgroundMode: CanvasBackgroundMode = .normal
+    private var backgroundOpacity: CGFloat = 0.15
     private var isDarkMode: Bool = false
 
     /// Light gray background for scroll view in light mode (close to white)
@@ -435,11 +438,12 @@ class CanvasContainerView: UIView {
     /// Lighter background for scroll area in dark mode (lighter than the page)
     private static let scrollBackgroundDark = UIColor(red: 18/255, green: 32/255, blue: 52/255, alpha: 1)
 
-    convenience init(documentURL: URL, fileType: Note.FileType, backgroundMode: CanvasBackgroundMode = .normal, isDarkMode: Bool = false) {
+    convenience init(documentURL: URL, fileType: Note.FileType, backgroundMode: CanvasBackgroundMode = .normal, backgroundOpacity: CGFloat = 0.15, isDarkMode: Bool = false) {
         self.init(frame: .zero)
         self.documentURL = documentURL
         self.fileType = fileType
         self.backgroundMode = backgroundMode
+        self.backgroundOpacity = backgroundOpacity
         self.isDarkMode = isDarkMode
         loadDocument()
     }
@@ -486,6 +490,7 @@ class CanvasContainerView: UIView {
         backgroundPatternView.backgroundColor = .clear
         backgroundPatternView.isOpaque = false
         backgroundPatternView.mode = backgroundMode
+        backgroundPatternView.opacity = backgroundOpacity
         backgroundPatternView.isDarkMode = isDarkMode
         contentView.addSubview(backgroundPatternView)
 
@@ -542,6 +547,12 @@ class CanvasContainerView: UIView {
         guard newMode != backgroundMode else { return }
         backgroundMode = newMode
         backgroundPatternView.mode = newMode
+    }
+
+    func updateBackgroundOpacity(_ newOpacity: CGFloat) {
+        guard newOpacity != backgroundOpacity else { return }
+        backgroundOpacity = newOpacity
+        backgroundPatternView.opacity = newOpacity
     }
 
     private func animateThemeChange() {
@@ -753,15 +764,21 @@ class CanvasBackgroundPatternView: UIView {
         }
     }
 
+    var opacity: CGFloat = 0.15 {
+        didSet {
+            setNeedsDisplay()
+        }
+    }
+
     /// Spacing between grid lines/dots in points
     private let gridSpacing: CGFloat = 48
 
     /// Spacing between horizontal lines for lined paper
     private let lineSpacing: CGFloat = 36
 
-    /// Pattern color - subtle gray that doesn't interfere with content
+    /// Pattern color - uses the opacity property
     private var patternColor: UIColor {
-        isDarkMode ? UIColor(white: 1.0, alpha: 0.08) : UIColor(white: 0.0, alpha: 0.1)
+        isDarkMode ? UIColor(white: 1.0, alpha: opacity) : UIColor(white: 0.0, alpha: opacity)
     }
 
     override func draw(_ rect: CGRect) {
