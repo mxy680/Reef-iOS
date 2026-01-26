@@ -66,6 +66,7 @@ struct HomeView: View {
     @ObservedObject var authManager: AuthenticationManager
     @StateObject private var themeManager = ThemeManager.shared
     @StateObject private var navStateManager = NavigationStateManager.shared
+    @StateObject private var userPrefsManager = UserPreferencesManager.shared
     @Environment(\.modelContext) private var modelContext
     @Query private var courses: [Course]
     @State private var selectedItem: SidebarItem?
@@ -131,10 +132,44 @@ struct HomeView: View {
             }
         } else if selectedItem == .settings {
             SettingsView(authManager: authManager)
+        } else if selectedItem == .myReef || selectedItem == .analytics || selectedItem == .tutors {
+            // Placeholder for unimplemented sections
+            VStack(spacing: 16) {
+                Image(systemName: selectedItem?.icon ?? "questionmark")
+                    .font(.system(size: 48))
+                    .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme).opacity(0.5))
+                Text(selectedItem?.rawValue ?? "")
+                    .font(.quicksand(24, weight: .semiBold))
+                    .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                Text("Coming soon")
+                    .font(.quicksand(16, weight: .regular))
+                    .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.adaptiveBackground(for: effectiveColorScheme))
         } else {
-            // Default welcome/placeholder view
-            Color.adaptiveBackground(for: effectiveColorScheme)
-                .ignoresSafeArea()
+            // Dashboard home view (when nothing is selected)
+            DashboardView(
+                courses: courses,
+                colorScheme: effectiveColorScheme,
+                onSelectCourse: { course in
+                    selectedCourse = course
+                    selectedSection = .notes
+                    selectedItem = nil
+                },
+                onSelectNote: { note, course in
+                    note.lastOpenedAt = Date()
+                    selectedCourse = course
+                    selectedSection = .notes
+                    selectedItem = nil
+                    selectedNote = note
+                },
+                onSelectAssignment: { _, course in
+                    selectedCourse = course
+                    selectedSection = .assignments
+                    selectedItem = nil
+                }
+            )
         }
     }
 
@@ -316,6 +351,17 @@ struct HomeView: View {
     @ViewBuilder
     private var toolbarTrailingContent: some View {
         HStack(spacing: 20) {
+            // Pin button (shown on course pages)
+            if let course = selectedCourse, selectedSection != nil {
+                Button {
+                    userPrefsManager.togglePin(id: course.id)
+                } label: {
+                    Image(systemName: userPrefsManager.isPinned(id: course.id) ? "pin.fill" : "pin")
+                        .font(.system(size: 18))
+                        .foregroundColor(userPrefsManager.isPinned(id: course.id) ? .vibrantTeal : Color.adaptiveText(for: effectiveColorScheme))
+                }
+            }
+
             // Add button (shown on Notes, Assignments, or Quizzes section)
             toolbarAddButton
 
@@ -413,20 +459,27 @@ struct HomeView: View {
             // Sidebar - Sage Mist background
             ZStack(alignment: .trailing) {
                 VStack(spacing: 0) {
-                    // Custom header (replaces toolbar)
-                    HStack(spacing: 4) {
-                        Image("ReefLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 40)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    // Custom header (replaces toolbar) - tap to go home
+                    Button {
+                        selectedItem = nil
+                        selectedCourse = nil
+                        selectedSection = nil
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image("ReefLogo")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 40)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                        Text("Reef")
-                            .font(.dynaPuff(28, weight: .bold))
-                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                            Text("Reef")
+                                .font(.dynaPuff(28, weight: .bold))
+                                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
 
-                        Spacer()
+                            Spacer()
+                        }
                     }
+                    .buttonStyle(.plain)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
 
