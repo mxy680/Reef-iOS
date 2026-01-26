@@ -341,6 +341,7 @@ private struct ToolbarButton: View {
             onAIPressed: {},
             onToggleDarkMode: {},
             canPaste: false,
+            hasSelection: false,
             onCopy: {},
             onCut: {},
             onDelete: {},
