@@ -120,6 +120,7 @@ struct DrawingOverlayView: UIViewRepresentable {
         weak var container: CanvasContainerView?
         var onUndoStateChanged: (Bool) -> Void = { _ in }
         var onRedoStateChanged: (Bool) -> Void = { _ in }
+        var onSelectionChanged: (Bool) -> Void = { _ in }
         var onRecognitionResult: (RecognitionResult) -> Void = { _ in }
 
         // Recognition state
