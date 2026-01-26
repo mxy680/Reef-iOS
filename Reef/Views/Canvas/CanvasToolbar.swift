@@ -204,7 +204,7 @@ struct CanvasToolbar: View {
 
             toolbarDivider
 
-            // Undo/Redo/Paste
+            // Undo/Redo
             ToolbarButton(
                 icon: "arrow.uturn.backward",
                 isSelected: false,
