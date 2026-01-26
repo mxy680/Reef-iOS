@@ -86,6 +86,7 @@ struct CanvasToolbar: View {
 
     // Lasso clipboard actions
     let canPaste: Bool
+    let hasSelection: Bool
     let onCopy: () -> Void
     let onCut: () -> Void
     let onDelete: () -> Void
