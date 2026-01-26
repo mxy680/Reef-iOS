@@ -322,6 +322,88 @@ private struct ToolbarButton: View {
     }
 }
 
+// MARK: - Lasso Button with Info Hint
+
+private struct LassoButtonWithHint: View {
+    let isSelected: Bool
+    let colorScheme: ColorScheme
+    @Binding var showingHint: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            // Tooltip positioned above
+            if showingHint {
+                LassoHintTooltip(colorScheme: colorScheme)
+                    .offset(y: -48)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottom)))
+                    .zIndex(1)
+            }
+
+            HStack(spacing: 0) {
+                // Lasso button
+                Button(action: onSelect) {
+                    Image(systemName: "lasso")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(isSelected ? .vibrantTeal : Color.adaptiveText(for: colorScheme))
+                        .frame(width: 44, height: 44)
+                        .background(
+                            isSelected ?
+                                Color.vibrantTeal.opacity(0.15) :
+                                Color.clear
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+
+                // Info button (only when lasso is selected)
+                if isSelected {
+                    Button {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            showingHint.toggle()
+                        }
+                        // Auto-dismiss after 3 seconds
+                        if showingHint {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    showingHint = false
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.5))
+                            .frame(width: 24, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                }
+            }
+            .animation(.easeOut(duration: 0.2), value: isSelected)
+        }
+    }
+}
+
+// MARK: - Lasso Hint Tooltip
+
+private struct LassoHintTooltip: View {
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        Text("Tap selection for options")
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(colorScheme == .dark ? .white : .black)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(colorScheme == .dark ? Color(white: 0.2) : Color.white)
+                    .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+            )
+    }
+}
+
 #Preview {
     VStack {
         CanvasToolbar(
