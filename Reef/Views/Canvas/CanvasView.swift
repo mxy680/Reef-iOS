@@ -32,10 +32,6 @@ struct CanvasView: View {
     @State private var canUndo: Bool = false
     @State private var canRedo: Bool = false
 
-    // Clipboard state
-    @State private var canPaste: Bool = false
-    @State private var hasSelection: Bool = false
-
     // Reference to canvas for undo/redo
     @State private var canvasViewRef: CanvasContainerView?
 
@@ -69,8 +65,7 @@ struct CanvasView: View {
                 isDarkMode: themeManager.isDarkMode,
                 onCanvasReady: { canvasViewRef = $0 },
                 onUndoStateChanged: { canUndo = $0 },
-                onRedoStateChanged: { canRedo = $0 },
-                onSelectionChanged: { hasSelection = $0 }
+                onRedoStateChanged: { canRedo = $0 }
             )
 
             // Floating toolbar at bottom
@@ -110,13 +105,7 @@ struct CanvasView: View {
                         }
                         // Update pen color to match new theme
                         selectedPenColor = themeManager.isDarkMode ? .white : .black
-                    },
-                    canPaste: canPaste,
-                    hasSelection: hasSelection,
-                    onCopy: { canvasViewRef?.canvasView.performCopy() },
-                    onCut: { canvasViewRef?.canvasView.performCut() },
-                    onDelete: { canvasViewRef?.canvasView.performDelete() },
-                    onPaste: { canvasViewRef?.canvasView.performPaste() }
+                    }
                 )
                 .padding(.bottom, 24)
             }
@@ -134,33 +123,12 @@ struct CanvasView: View {
             }
             // Set default pen color based on theme
             selectedPenColor = themeManager.isDarkMode ? .white : .black
-            // Check initial paste state
-            updatePasteState()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIPasteboard.changedNotification)) { _ in
-            updatePasteState()
         }
         .onDisappear {
             // Only manage state if not controlled by parent
             if onDismiss == nil {
                 columnVisibility = .all
                 isViewingCanvas = false
-            }
-        }
-    }
-
-    // MARK: - Clipboard Helpers
-
-    private func updatePasteState() {
-        UIPasteboard.general.detectPatterns(
-            for: [.init(rawValue: "com.apple.pencilkit.drawing")]
-        ) { result in
-            DispatchQueue.main.async {
-                if case .success(let patterns) = result {
-                    canPaste = !patterns.isEmpty
-                } else {
-                    canPaste = false
-                }
             }
         }
     }

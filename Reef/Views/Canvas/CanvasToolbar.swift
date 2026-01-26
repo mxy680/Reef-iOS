@@ -13,7 +13,7 @@ enum CanvasTool: Equatable {
     case pen
     case highlighter
     case eraser
-    case lasso
+    case diagram
 }
 
 enum EraserType: String, CaseIterable {
@@ -86,33 +86,21 @@ struct CanvasToolbar: View {
     let onAIPressed: () -> Void
     let onToggleDarkMode: () -> Void
 
-    // Lasso clipboard actions
-    let canPaste: Bool
-    let hasSelection: Bool
-    let onCopy: () -> Void
-    let onCut: () -> Void
-    let onDelete: () -> Void
-    let onPaste: () -> Void
-
     @State private var contextualToolbarHidden: Bool = false
     @State private var backgroundModeSelected: Bool = false
 
     private var toolHasContextualMenu: Bool {
         switch selectedTool {
-        case .pen, .highlighter, .eraser:
+        case .pen, .highlighter, .eraser, .diagram:
             return true
-        case .lasso:
-            return false
         }
     }
 
     private var showToolContextualToolbar: Bool {
         guard !backgroundModeSelected else { return false }
         switch selectedTool {
-        case .pen, .highlighter, .eraser:
+        case .pen, .highlighter, .eraser, .diagram:
             return !contextualToolbarHidden
-        case .lasso:
-            return false
         }
     }
 
@@ -158,12 +146,6 @@ struct CanvasToolbar: View {
                     customPenColors: $customPenColors,
                     customHighlighterColors: $customHighlighterColors,
                     colorScheme: colorScheme,
-                    canPaste: canPaste,
-                    hasSelection: hasSelection,
-                    onCopy: onCopy,
-                    onCut: onCut,
-                    onDelete: onDelete,
-                    onPaste: onPaste,
                     onClose: { contextualToolbarHidden = true }
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -226,10 +208,10 @@ struct CanvasToolbar: View {
             )
 
             ToolbarButton(
-                icon: "lasso",
-                isSelected: selectedTool == .lasso,
+                icon: "triangle",
+                isSelected: selectedTool == .diagram,
                 colorScheme: colorScheme,
-                action: { selectTool(.lasso) }
+                action: { selectTool(.diagram) }
             )
 
             // Background mode button
@@ -486,13 +468,7 @@ private struct BackgroundModeToolbar: View {
             onUndo: {},
             onRedo: {},
             onAIPressed: {},
-            onToggleDarkMode: {},
-            canPaste: false,
-            hasSelection: false,
-            onCopy: {},
-            onCut: {},
-            onDelete: {},
-            onPaste: {}
+            onToggleDarkMode: {}
         )
     }
     .padding()

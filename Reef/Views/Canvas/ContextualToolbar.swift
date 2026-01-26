@@ -8,12 +8,6 @@
 import SwiftUI
 import UIKit
 
-// MARK: - Lasso Action Type
-
-private enum LassoAction: String, CaseIterable {
-    case copy, cut, delete
-}
-
 // MARK: - Contextual Toolbar
 
 struct ContextualToolbar: View {
@@ -27,14 +21,6 @@ struct ContextualToolbar: View {
     @Binding var customPenColors: [Color]
     @Binding var customHighlighterColors: [Color]
     let colorScheme: ColorScheme
-
-    // Lasso actions
-    var canPaste: Bool = false
-    var hasSelection: Bool = false
-    var onCopy: (() -> Void)? = nil
-    var onCut: (() -> Void)? = nil
-    var onDelete: (() -> Void)? = nil
-    var onPaste: (() -> Void)? = nil
 
     var onClose: (() -> Void)? = nil
 
@@ -72,8 +58,8 @@ struct ContextualToolbar: View {
                     highlighterOptions
                 case .eraser:
                     eraserOptions
-                case .lasso:
-                    lassoOptions
+                case .diagram:
+                    diagramOptions
                 }
             }
 
@@ -337,68 +323,47 @@ struct ContextualToolbar: View {
         }
     }
 
-    // MARK: - Lasso Options
+    // MARK: - Diagram Options
 
-    @State private var showingTooltip: LassoAction? = nil
+    private var diagramOptions: some View {
+        HStack(spacing: 12) {
+            // Color swatches only (no thickness slider - uses penWidth * 2)
+            ForEach(Array(allPenColors.enumerated()), id: \.offset) { index, color in
+                let isCustomColor = index >= defaultPenColors.count
+                let customIndex = index - defaultPenColors.count
+                let isRemoving = isCustomColor && removingPenColorIndex == customIndex
 
-    private var lassoOptions: some View {
-        HStack(spacing: 4) {
-            // Copy button
-            LassoActionButton(
-                icon: "doc.on.doc",
-                label: "Copy",
-                isEnabled: hasSelection,
-                colorScheme: colorScheme,
-                showingTooltip: $showingTooltip,
-                tooltipAction: hasSelection ? nil : .copy,
-                action: { onCopy?() }
-            )
+                ColorSwatch(
+                    color: color,
+                    isSelected: selectedPenColor == color,
+                    isRemoving: isRemoving,
+                    onTap: { selectedPenColor = color },
+                    onLongPress: isCustomColor ? {
+                        removeCustomPenColor(at: customIndex)
+                    } : nil
+                )
+            }
 
-            // Cut button
-            LassoActionButton(
-                icon: "scissors",
-                label: "Cut",
-                isEnabled: hasSelection,
-                colorScheme: colorScheme,
-                showingTooltip: $showingTooltip,
-                tooltipAction: hasSelection ? nil : .cut,
-                action: { onCut?() }
-            )
-
-            // Divider
-            Rectangle()
-                .fill(Color.adaptiveText(for: colorScheme).opacity(0.2))
-                .frame(width: 1, height: 24)
-                .padding(.horizontal, 4)
-
-            // Paste button (enabled when clipboard has content)
-            LassoActionButton(
-                icon: "doc.on.clipboard",
-                label: "Paste",
-                isEnabled: canPaste,
-                colorScheme: colorScheme,
-                showingTooltip: .constant(nil),
-                tooltipAction: nil,
-                action: { onPaste?() }
-            )
-
-            // Divider
-            Rectangle()
-                .fill(Color.adaptiveText(for: colorScheme).opacity(0.2))
-                .frame(width: 1, height: 24)
-                .padding(.horizontal, 4)
-
-            // Delete button
-            LassoActionButton(
-                icon: "trash",
-                label: "Delete",
-                isEnabled: hasSelection,
-                isDestructive: true,
-                colorScheme: colorScheme,
-                showingTooltip: $showingTooltip,
-                tooltipAction: hasSelection ? nil : .delete,
-                action: { onDelete?() }
-            )
+            // Add color button
+            if customPenColors.count < Self.maxCustomColors {
+                ColorPicker("", selection: $penColorPickerColor, supportsOpacity: false)
+                    .labelsHidden()
+                    .frame(width: 28, height: 28)
+                    .overlay(
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.5))
+                            .allowsHitTesting(false)
+                    )
+                    .onChange(of: penColorPickerColor) { _, newColor in
+                        if !allPenColors.contains(where: { colorsAreClose($0, newColor) }) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                customPenColors.append(newColor)
+                            }
+                            selectedPenColor = newColor
+                        }
+                    }
+            }
         }
     }
 
@@ -477,25 +442,6 @@ struct ContextualToolbar: View {
             onClose: {}
         )
 
-        ContextualToolbar(
-            selectedTool: .lasso,
-            penWidth: .constant(StrokeWidthRange.penDefault),
-            highlighterWidth: .constant(StrokeWidthRange.highlighterDefault),
-            eraserSize: .constant(StrokeWidthRange.eraserDefault),
-            eraserType: .constant(.stroke),
-            selectedPenColor: .constant(.black),
-            selectedHighlighterColor: .constant(Color(red: 1.0, green: 0.92, blue: 0.23)),
-            customPenColors: .constant([]),
-            customHighlighterColors: .constant([]),
-            colorScheme: .light,
-            canPaste: true,
-            hasSelection: true,
-            onCopy: {},
-            onCut: {},
-            onDelete: {},
-            onPaste: {},
-            onClose: {}
-        )
     }
     .padding()
     .background(Color.gray.opacity(0.3))
@@ -544,93 +490,5 @@ private struct ColorSwatch: View {
                 onLongPress?()
             }
             .allowsHitTesting(onLongPress != nil || true)
-    }
-}
-
-// MARK: - Lasso Action Button Component
-
-private struct LassoActionButton: View {
-    let icon: String
-    let label: String
-    let isEnabled: Bool
-    var isDestructive: Bool = false
-    let colorScheme: ColorScheme
-    @Binding var showingTooltip: LassoAction?
-    let tooltipAction: LassoAction?
-    let action: () -> Void
-
-    private var foregroundColor: Color {
-        if isEnabled {
-            return isDestructive ? .deleteRed : Color.adaptiveText(for: colorScheme)
-        } else {
-            return isDestructive
-                ? Color.deleteRed.opacity(0.35)
-                : Color.adaptiveText(for: colorScheme).opacity(0.35)
-        }
-    }
-
-    private var isShowingTooltip: Bool {
-        guard let tooltipAction = tooltipAction else { return false }
-        return showingTooltip == tooltipAction
-    }
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            // Tooltip positioned above
-            if isShowingTooltip {
-                TooltipView(colorScheme: colorScheme)
-                    .offset(y: -38)
-                    .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottom)))
-            }
-
-            // Button
-            Button {
-                if isEnabled {
-                    action()
-                } else if let tooltipAction = tooltipAction {
-                    // Show tooltip for disabled button
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        showingTooltip = tooltipAction
-                    }
-                    // Auto-dismiss after 1.5 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            if showingTooltip == tooltipAction {
-                                showingTooltip = nil
-                            }
-                        }
-                    }
-                }
-            } label: {
-                VStack(spacing: 2) {
-                    Image(systemName: icon)
-                        .font(.system(size: 16, weight: .medium))
-                    Text(label)
-                        .font(.system(size: 10, weight: .medium))
-                }
-                .foregroundColor(foregroundColor)
-                .frame(width: 48, height: 40)
-            }
-            .buttonStyle(.plain)
-        }
-    }
-}
-
-// MARK: - Tooltip View
-
-private struct TooltipView: View {
-    let colorScheme: ColorScheme
-
-    var body: some View {
-        Text("Select strokes first")
-            .font(.system(size: 12, weight: .medium))
-            .foregroundColor(colorScheme == .dark ? .white : .black)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(colorScheme == .dark ? Color(white: 0.25) : Color(white: 0.95))
-                    .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
-            )
     }
 }
