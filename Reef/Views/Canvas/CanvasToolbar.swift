@@ -323,11 +323,9 @@ private struct ToolbarButton: View {
             colorScheme: .light,
             canUndo: true,
             canRedo: false,
-            canPaste: true,
             onHomePressed: {},
             onUndo: {},
             onRedo: {},
-            onPaste: {},
             onAIPressed: {},
             onToggleDarkMode: {}
         )
