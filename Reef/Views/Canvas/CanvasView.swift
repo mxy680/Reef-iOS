@@ -92,12 +92,6 @@ struct CanvasView: View {
                     },
                     onUndo: { canvasViewRef?.canvasView.undoManager?.undo() },
                     onRedo: { canvasViewRef?.canvasView.undoManager?.redo() },
-                    onPaste: {
-                        guard let canvas = canvasViewRef?.canvasView else { return }
-                        canvas.becomeFirstResponder()
-                        canvas.performPaste()
-                        updatePasteState()
-                    },
                     onAIPressed: { /* TODO: Implement AI assistant */ },
                     onToggleDarkMode: {
                         withAnimation(.easeInOut(duration: 0.3)) {
