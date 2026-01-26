@@ -332,10 +332,6 @@ struct ContextualToolbar: View {
 
     @State private var showingTooltip: LassoAction? = nil
 
-    private enum LassoAction: String, CaseIterable {
-        case copy, cut, delete
-    }
-
     private var lassoOptions: some View {
         HStack(spacing: 4) {
             // Copy button (disabled - selection state unknown)
