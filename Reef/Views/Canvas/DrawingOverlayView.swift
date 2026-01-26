@@ -11,6 +11,18 @@ import PDFKit
 import CoreImage
 import CoreImage.CIFilterBuiltins
 
+/// Result of a recognition operation
+struct RecognitionResult {
+    /// The recognized text content
+    let text: String
+    /// The LaTeX representation (for math content)
+    let latex: String?
+    /// Raw JIIX JSON for stroke mapping
+    let jiix: String
+    /// Number of strokes processed
+    let strokeCount: Int
+}
+
 struct DrawingOverlayView: UIViewRepresentable {
     let documentURL: URL
     let fileType: Note.FileType
@@ -22,9 +34,12 @@ struct DrawingOverlayView: UIViewRepresentable {
     @Binding var eraserSize: CGFloat
     @Binding var eraserType: EraserType
     var isDarkMode: Bool = false
+    var recognitionEnabled: Bool = false
+    var pauseSensitivity: Double = 0.5
     var onCanvasReady: (CanvasContainerView) -> Void = { _ in }
     var onUndoStateChanged: (Bool) -> Void = { _ in }
     var onRedoStateChanged: (Bool) -> Void = { _ in }
+    var onRecognitionResult: (RecognitionResult) -> Void = { _ in }
 
     func makeUIView(context: Context) -> CanvasContainerView {
         let container = CanvasContainerView(documentURL: documentURL, fileType: fileType, isDarkMode: isDarkMode)
@@ -32,6 +47,9 @@ struct DrawingOverlayView: UIViewRepresentable {
         context.coordinator.container = container
         context.coordinator.onUndoStateChanged = onUndoStateChanged
         context.coordinator.onRedoStateChanged = onRedoStateChanged
+        context.coordinator.onRecognitionResult = onRecognitionResult
+        context.coordinator.recognitionEnabled = recognitionEnabled
+        context.coordinator.pauseSensitivity = pauseSensitivity
 
         // Set initial tool after a brief delay to ensure view is ready
         let initialColor = UIColor(selectedPenColor)
@@ -45,8 +63,17 @@ struct DrawingOverlayView: UIViewRepresentable {
     }
 
     func updateUIView(_ container: CanvasContainerView, context: Context) {
+        print("[ShapeSnap] updateUIView called with selectedTool=\(selectedTool)")
+        context.coordinator.currentTool = selectedTool
+        context.coordinator.currentPenColor = UIColor(selectedPenColor)
+        context.coordinator.currentPenWidth = penWidth
         updateTool(container.canvasView)
         container.updateDarkMode(isDarkMode)
+
+        // Keep recognition settings in sync
+        context.coordinator.recognitionEnabled = recognitionEnabled
+        context.coordinator.pauseSensitivity = pauseSensitivity
+        context.coordinator.onRecognitionResult = onRecognitionResult
     }
 
     private func updateTool(_ canvasView: PKCanvasView) {
@@ -55,6 +82,10 @@ struct DrawingOverlayView: UIViewRepresentable {
             // Convert SwiftUI Color to UIColor using explicit RGB to avoid color scheme adaptation
             let uiColor = uiColorFromSwiftUIColor(selectedPenColor)
             canvasView.tool = PKInkingTool(.pen, color: uiColor, width: penWidth)
+        case .diagram:
+            // Diagram tool uses pen ink but twice as thick
+            let uiColor = uiColorFromSwiftUIColor(selectedPenColor)
+            canvasView.tool = PKInkingTool(.pen, color: uiColor, width: penWidth * 4)
         case .highlighter:
             let uiColor = UIColor(selectedHighlighterColor).withAlphaComponent(0.3)
             canvasView.tool = PKInkingTool(.marker, color: uiColor, width: highlighterWidth * 3)
@@ -85,13 +116,72 @@ struct DrawingOverlayView: UIViewRepresentable {
         weak var container: CanvasContainerView?
         var onUndoStateChanged: (Bool) -> Void = { _ in }
         var onRedoStateChanged: (Bool) -> Void = { _ in }
+        var onRecognitionResult: (RecognitionResult) -> Void = { _ in }
+
+        // Recognition state
+        var recognitionEnabled: Bool = false
+        var pauseSensitivity: Double = 0.5
+
+        // Diagram tool state
+        var currentTool: CanvasTool = .pen
+        var currentPenColor: UIColor = .black
+        var currentPenWidth: CGFloat = 4.0
+        private var strokeCountBeforeDrawing: Int = 0
 
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
             updateUndoRedoState(canvasView)
         }
 
+        func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
+            // Record stroke count before drawing
+            strokeCountBeforeDrawing = canvasView.drawing.strokes.count
+            print("[ShapeSnap] Tool began. currentTool=\(currentTool), strokeCount=\(strokeCountBeforeDrawing)")
+        }
+
         func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
             updateUndoRedoState(canvasView)
+
+            // Shape snap for diagram tool (with small delay to ensure stroke is committed)
+            print("[ShapeSnap] Tool ended. currentTool=\(currentTool), strokeCount=\(canvasView.drawing.strokes.count), before=\(strokeCountBeforeDrawing)")
+            if currentTool == .diagram {
+                let beforeCount = strokeCountBeforeDrawing
+                let color = currentPenColor
+
+                // Small delay to ensure PencilKit has committed the stroke
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak canvasView] in
+                    guard let canvasView = canvasView else { return }
+                    let strokeCount = canvasView.drawing.strokes.count
+                    print("[ShapeSnap] After delay: strokeCount=\(strokeCount), before=\(beforeCount)")
+
+                    if strokeCount > beforeCount {
+                        let strokeIndex = strokeCount - 1
+                        let stroke = canvasView.drawing.strokes[strokeIndex]
+                        let points = stroke.path.map { $0.location }
+                        print("[ShapeSnap] Attempting detection on stroke with \(points.count) points")
+
+                        // Use the original stroke's width to maintain consistent thickness
+                        let originalWidth = stroke.path.first?.size.width ?? 4.0
+                        if let snappedStroke = ShapeDetector.detect(stroke, color: color, width: originalWidth) {
+                            print("[ShapeSnap] Shape detected! Replacing stroke")
+                            // Replace stroke with snapped version
+                            var newDrawing = canvasView.drawing
+                            var strokes = newDrawing.strokes
+                            strokes[strokeIndex] = snappedStroke
+                            newDrawing.strokes = strokes
+                            canvasView.drawing = newDrawing
+
+                            // Haptic feedback on successful snap
+                            let generator = UIImpactFeedbackGenerator(style: .light)
+                            generator.impactOccurred()
+                        } else {
+                            print("[ShapeSnap] No shape detected")
+                        }
+                    } else {
+                        print("[ShapeSnap] No new stroke (count didn't increase)")
+                    }
+                }
+                strokeCountBeforeDrawing = canvasView.drawing.strokes.count
+            }
         }
 
         private func updateUndoRedoState(_ canvasView: PKCanvasView) {
@@ -100,6 +190,269 @@ struct DrawingOverlayView: UIViewRepresentable {
                 self?.onRedoStateChanged(canvasView.undoManager?.canRedo ?? false)
             }
         }
+    }
+}
+
+// MARK: - Shape Detector
+
+enum ShapeDetector {
+    enum DetectedShape {
+        case line(start: CGPoint, end: CGPoint)
+        case rectangle(CGRect)
+    }
+
+    /// Minimum line length in points
+    private static let minLineLength: CGFloat = 20
+
+    /// Maximum perpendicular deviation as percentage of line length (15% is fairly lenient)
+    private static let lineDeviationThreshold: CGFloat = 0.15
+
+    /// Threshold for stroke closure (as percentage of bounding diagonal)
+    private static let closureThreshold: CGFloat = 0.40
+
+    /// Minimum angle change to detect a corner (in radians, ~30°)
+    private static let cornerAngleThreshold: CGFloat = .pi / 6
+
+    /// Main entry point - detects shape and returns snapped stroke if recognized
+    static func detect(_ stroke: PKStroke, color: UIColor, width: CGFloat) -> PKStroke? {
+        let points = stroke.path.map { $0.location }
+        guard points.count >= 3 else { return nil }
+
+        // Try line detection first (simpler shape)
+        if let shape = detectLine(points: points) {
+            switch shape {
+            case .line(let start, let end):
+                return StrokeBuilder.createStroke(points: [start, end], color: color, width: width)
+            default:
+                break
+            }
+        }
+
+        // Try rectangle detection
+        if let shape = detectRectangle(points: points) {
+            switch shape {
+            case .rectangle(let rect):
+                // Generate points along each edge to prevent spline smoothing
+                let rectanglePoints = generateRectanglePoints(rect: rect, pointsPerEdge: 10)
+                return StrokeBuilder.createStroke(points: rectanglePoints, color: color, width: width)
+            default:
+                break
+            }
+        }
+
+        return nil
+    }
+
+    /// Detects if points form a straight line
+    static func detectLine(points: [CGPoint]) -> DetectedShape? {
+        guard let first = points.first, let last = points.last else {
+            print("[ShapeSnap] Line: No first/last points")
+            return nil
+        }
+
+        let lineLength = distance(first, last)
+        print("[ShapeSnap] Line: length=\(lineLength), min=\(minLineLength)")
+        guard lineLength >= minLineLength else {
+            print("[ShapeSnap] Line: Too short")
+            return nil
+        }
+
+        // Calculate max perpendicular deviation from ideal line
+        var maxDeviation: CGFloat = 0
+        for point in points {
+            let deviation = pointToLineDistance(point: point, lineStart: first, lineEnd: last)
+            maxDeviation = max(maxDeviation, deviation)
+        }
+
+        let deviationRatio = maxDeviation / lineLength
+        print("[ShapeSnap] Line: maxDeviation=\(maxDeviation), ratio=\(deviationRatio), threshold=\(lineDeviationThreshold)")
+        guard deviationRatio < lineDeviationThreshold else {
+            print("[ShapeSnap] Line: Too much deviation")
+            return nil
+        }
+
+        print("[ShapeSnap] Line: DETECTED!")
+        return .line(start: first, end: last)
+    }
+
+    /// Detects if points form a rectangle
+    static func detectRectangle(points: [CGPoint]) -> DetectedShape? {
+        guard let first = points.first, let last = points.last else { return nil }
+
+        let boundingBox = boundingRect(for: points)
+
+        // Minimum size to avoid snapping tiny marks
+        guard boundingBox.width >= 30 && boundingBox.height >= 30 else { return nil }
+
+        let diagonal = distance(
+            CGPoint(x: boundingBox.minX, y: boundingBox.minY),
+            CGPoint(x: boundingBox.maxX, y: boundingBox.maxY)
+        )
+
+        // Check if stroke is closed (endpoints near each other)
+        let closedDistance = distance(first, last)
+        guard closedDistance < diagonal * closureThreshold else { return nil }
+
+        // Check aspect ratio isn't too extreme (between 1:5 and 5:1)
+        let aspectRatio = boundingBox.width / boundingBox.height
+        guard aspectRatio > 0.2 && aspectRatio < 5.0 else { return nil }
+
+        // Any closed shape with reasonable proportions snaps to rectangle
+        return .rectangle(boundingBox)
+    }
+
+    // MARK: - Helper Functions
+
+    private static func distance(_ p1: CGPoint, _ p2: CGPoint) -> CGFloat {
+        return hypot(p2.x - p1.x, p2.y - p1.y)
+    }
+
+    private static func pointToLineDistance(point: CGPoint, lineStart: CGPoint, lineEnd: CGPoint) -> CGFloat {
+        let lineLength = distance(lineStart, lineEnd)
+        guard lineLength > 0 else { return distance(point, lineStart) }
+
+        // Project point onto line segment
+        let t = max(0, min(1, ((point.x - lineStart.x) * (lineEnd.x - lineStart.x) +
+                               (point.y - lineStart.y) * (lineEnd.y - lineStart.y)) / (lineLength * lineLength)))
+
+        let projection = CGPoint(
+            x: lineStart.x + t * (lineEnd.x - lineStart.x),
+            y: lineStart.y + t * (lineEnd.y - lineStart.y)
+        )
+
+        return distance(point, projection)
+    }
+
+    private static func boundingRect(for points: [CGPoint]) -> CGRect {
+        guard !points.isEmpty else { return .zero }
+
+        var minX = points[0].x, maxX = points[0].x
+        var minY = points[0].y, maxY = points[0].y
+
+        for point in points {
+            minX = min(minX, point.x)
+            maxX = max(maxX, point.x)
+            minY = min(minY, point.y)
+            maxY = max(maxY, point.y)
+        }
+
+        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+    }
+
+    /// Finds corners by detecting direction changes > 60°
+    private static func findCorners(points: [CGPoint]) -> [CGPoint] {
+        guard points.count >= 8 else { return [] }
+
+        var corners: [CGPoint] = []
+        let step = max(1, points.count / 30) // Sample at regular intervals
+
+        for i in stride(from: step, to: points.count - step, by: step) {
+            let prev = points[i - step]
+            let curr = points[i]
+            let next = points[i + step]
+
+            let angle1 = atan2(curr.y - prev.y, curr.x - prev.x)
+            let angle2 = atan2(next.y - curr.y, next.x - curr.x)
+            var angleDiff = abs(angle2 - angle1)
+            if angleDiff > .pi { angleDiff = 2 * .pi - angleDiff }
+
+            if angleDiff > cornerAngleThreshold {
+                // Ensure this corner is not too close to existing corners
+                let tooClose = corners.contains { distance($0, curr) < 20 }
+                if !tooClose {
+                    corners.append(curr)
+                }
+            }
+        }
+
+        return corners
+    }
+
+    /// Validates that opposite sides of a quadrilateral are similar length
+    private static func validateRectangleSides(corners: [CGPoint]) -> Bool {
+        guard corners.count == 4 else { return false }
+
+        // Sort corners by angle from center to get consistent order
+        let center = CGPoint(
+            x: corners.map(\.x).reduce(0, +) / 4,
+            y: corners.map(\.y).reduce(0, +) / 4
+        )
+
+        let sorted = corners.sorted { c1, c2 in
+            atan2(c1.y - center.y, c1.x - center.x) < atan2(c2.y - center.y, c2.x - center.x)
+        }
+
+        // Check opposite sides
+        let side1 = distance(sorted[0], sorted[1])
+        let side2 = distance(sorted[1], sorted[2])
+        let side3 = distance(sorted[2], sorted[3])
+        let side4 = distance(sorted[3], sorted[0])
+
+        // Avoid division by zero
+        guard side1 > 0 && side2 > 0 && side3 > 0 && side4 > 0 else { return false }
+
+        let ratio1 = min(side1, side3) / max(side1, side3)
+        let ratio2 = min(side2, side4) / max(side2, side4)
+
+        return ratio1 > 0.3 && ratio2 > 0.3
+    }
+
+    /// Generates points along each edge of a rectangle to prevent spline smoothing
+    private static func generateRectanglePoints(rect: CGRect, pointsPerEdge: Int) -> [CGPoint] {
+        var points: [CGPoint] = []
+
+        let corners = [
+            CGPoint(x: rect.minX, y: rect.minY),  // Top-left
+            CGPoint(x: rect.maxX, y: rect.minY),  // Top-right
+            CGPoint(x: rect.maxX, y: rect.maxY),  // Bottom-right
+            CGPoint(x: rect.minX, y: rect.maxY),  // Bottom-left
+        ]
+
+        // Generate points along each edge
+        for i in 0..<4 {
+            let start = corners[i]
+            let end = corners[(i + 1) % 4]
+
+            for j in 0..<pointsPerEdge {
+                let t = CGFloat(j) / CGFloat(pointsPerEdge)
+                let point = CGPoint(
+                    x: start.x + (end.x - start.x) * t,
+                    y: start.y + (end.y - start.y) * t
+                )
+                points.append(point)
+            }
+        }
+
+        // Close the rectangle by adding the starting point
+        points.append(corners[0])
+
+        return points
+    }
+}
+
+// MARK: - Stroke Builder
+
+enum StrokeBuilder {
+    /// Creates a PKStroke from a list of points using pen ink
+    static func createStroke(points: [CGPoint], color: UIColor, width: CGFloat) -> PKStroke {
+        var pathPoints: [PKStrokePoint] = []
+
+        for (index, point) in points.enumerated() {
+            let strokePoint = PKStrokePoint(
+                location: point,
+                timeOffset: TimeInterval(index) * 0.01,
+                size: CGSize(width: width, height: width),
+                opacity: 1.0,
+                force: 1.0,
+                azimuth: 0,
+                altitude: .pi / 2
+            )
+            pathPoints.append(strokePoint)
+        }
+
+        let path = PKStrokePath(controlPoints: pathPoints, creationDate: Date())
+        let ink = PKInk(.pen, color: color)
+        return PKStroke(ink: ink, path: path)
     }
 }
 
@@ -431,3 +784,4 @@ extension CanvasContainerView: UIScrollViewDelegate {
     )
     .background(Color.gray.opacity(0.2))
 }
+
