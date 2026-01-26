@@ -136,6 +136,7 @@ class AuthenticationManager: ObservableObject {
     func signOut() {
         print("DEBUG Auth: signOut called")
         KeychainService.deleteAll()
+        NavigationStateManager.shared.clearState()
         userIdentifier = nil
         userName = nil
         userEmail = nil
