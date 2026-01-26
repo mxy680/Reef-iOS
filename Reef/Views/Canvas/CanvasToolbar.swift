@@ -356,11 +356,12 @@ private struct BackgroundModeToolbar: View {
                     VStack(spacing: 4) {
                         Image(systemName: mode.iconName)
                             .font(.system(size: 18, weight: .medium))
+                            .frame(width: 24, height: 24)
                         Text(mode.displayName)
                             .font(.system(size: 10, weight: .medium))
                     }
                     .foregroundColor(canvasBackgroundMode == mode ? .vibrantTeal : Color.adaptiveText(for: colorScheme))
-                    .frame(width: 56, height: 40)
+                    .frame(width: 56, height: 44)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
                             .fill(canvasBackgroundMode == mode ? Color.vibrantTeal.opacity(0.15) : Color.clear)
@@ -369,27 +370,27 @@ private struct BackgroundModeToolbar: View {
                 .buttonStyle(.plain)
             }
 
-            // Opacity slider (only show when not normal mode)
-            if canvasBackgroundMode != .normal {
-                Rectangle()
-                    .fill(Color.adaptiveText(for: colorScheme).opacity(0.2))
-                    .frame(width: 1, height: 24)
-                    .padding(.horizontal, 8)
+            // Opacity slider (always visible, disabled when normal)
+            Rectangle()
+                .fill(Color.adaptiveText(for: colorScheme).opacity(0.2))
+                .frame(width: 1, height: 24)
+                .padding(.horizontal, 8)
 
-                HStack(spacing: 6) {
-                    Image(systemName: "circle.dotted")
-                        .font(.system(size: 12))
-                        .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.5))
+            HStack(spacing: 6) {
+                Image(systemName: "circle.dotted")
+                    .font(.system(size: 12))
+                    .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(canvasBackgroundMode == .normal ? 0.2 : 0.5))
 
-                    Slider(value: $canvasBackgroundOpacity, in: 0.05...0.5)
-                        .accentColor(.vibrantTeal)
-                        .frame(width: 80)
+                Slider(value: $canvasBackgroundOpacity, in: 0.05...0.5)
+                    .accentColor(.vibrantTeal)
+                    .frame(width: 80)
+                    .disabled(canvasBackgroundMode == .normal)
 
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.5))
-                }
+                Image(systemName: "circle.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(canvasBackgroundMode == .normal ? 0.2 : 0.5))
             }
+            .opacity(canvasBackgroundMode == .normal ? 0.4 : 1.0)
 
             if onClose != nil {
                 // Divider before close button
