@@ -20,4 +20,19 @@ class ReefCanvasView: PKCanvasView {
         becomeFirstResponder()
         paste(nil)
     }
+
+    func performCopy() {
+        becomeFirstResponder()
+        copy(nil)
+    }
+
+    func performCut() {
+        becomeFirstResponder()
+        cut(nil)
+    }
+
+    func performDelete() {
+        becomeFirstResponder()
+        delete(nil)
+    }
 }
