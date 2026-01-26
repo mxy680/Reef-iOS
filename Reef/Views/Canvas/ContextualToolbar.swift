@@ -30,6 +30,7 @@ struct ContextualToolbar: View {
 
     // Lasso actions
     var canPaste: Bool = false
+    var hasSelection: Bool = false
     var onCopy: (() -> Void)? = nil
     var onCut: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
