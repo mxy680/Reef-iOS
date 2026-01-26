@@ -204,6 +204,9 @@ struct NotesView: View {
             fileExtension: note.fileExtension
         )
 
+        // Delete associated drawing
+        DrawingStorageService.shared.deleteDrawing(for: note.id)
+
         // Remove from vector index
         let noteId = note.id
         Task {

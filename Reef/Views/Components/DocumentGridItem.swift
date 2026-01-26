@@ -76,7 +76,7 @@ struct DocumentGridItem<T: DocumentItem>: View {
             // Thumbnail area (9:10 aspect ratio)
             ZStack(alignment: .topTrailing) {
                 ZStack {
-                    (effectiveColorScheme == .dark ? Color.deepOcean : Color(white: 0.97))
+                    Color.adaptiveCardBackground(for: effectiveColorScheme)
 
                     if let thumbnail = thumbnail {
                         Image(uiImage: thumbnail)
@@ -163,7 +163,7 @@ struct DocumentGridItem<T: DocumentItem>: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(effectiveColorScheme == .dark ? Color.deepOcean : Color.lightGrayBackground)
+            .background(Color.adaptiveCardBackground(for: effectiveColorScheme))
         }
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(effectiveColorScheme == .dark ? 0.5 : 0.08), radius: 8, x: 0, y: 4)
@@ -278,8 +278,8 @@ struct DocumentGridItem<T: DocumentItem>: View {
 
         let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
         return renderer.image { context in
-            // Fill with background color matching the thumbnail area (Deep Ocean in dark mode)
-            let bgColor = isDarkMode ? UIColor(red: 10/255, green: 22/255, blue: 40/255, alpha: 1) : UIColor(white: 0.97, alpha: 1)
+            // Fill with background color matching card background (deepOceanCard in dark mode)
+            let bgColor = isDarkMode ? UIColor(red: 19/255, green: 31/255, blue: 51/255, alpha: 1) : UIColor.white
             bgColor.setFill()
             context.fill(CGRect(origin: .zero, size: thumbnailSize))
 

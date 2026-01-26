@@ -115,6 +115,9 @@ extension Color {
     /// Dark mode accent - lighter teal for dark backgrounds
     static let lightTeal = Color(hex: "1A7A8A")
 
+    /// Dark mode card background - slightly lighter than deepOcean for contrast
+    static let deepOceanCard = Color(hex: "131F33")
+
     // MARK: - Adaptive Colors
 
     /// Light gray background for light mode (close to white)
@@ -143,6 +146,11 @@ extension Color {
     /// Adaptive accent color
     static func adaptiveAccent(for scheme: ColorScheme) -> Color {
         scheme == .dark ? lightTeal : deepSea
+    }
+
+    /// Adaptive card background - slightly elevated from page background in dark mode
+    static func adaptiveCardBackground(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? deepOceanCard : .white
     }
 }
 

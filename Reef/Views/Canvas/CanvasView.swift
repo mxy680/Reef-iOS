@@ -5,6 +5,7 @@
 
 import SwiftUI
 import PDFKit
+import PencilKit
 
 struct CanvasView: View {
     let note: Note
@@ -35,6 +36,9 @@ struct CanvasView: View {
     // Reference to canvas for undo/redo
     @State private var canvasViewRef: CanvasContainerView?
 
+    // Drawing persistence
+    @State private var saveTask: Task<Void, Never>?
+
     private var effectiveColorScheme: ColorScheme {
         themeManager.isDarkMode ? .dark : .light
     }
@@ -63,7 +67,13 @@ struct CanvasView: View {
                 canvasBackgroundOpacity: canvasBackgroundOpacity,
                 canvasBackgroundSpacing: canvasBackgroundSpacing,
                 isDarkMode: themeManager.isDarkMode,
-                onCanvasReady: { canvasViewRef = $0 },
+                onCanvasReady: { container in
+                    canvasViewRef = container
+                    // Load saved drawing after canvas is ready
+                    if let drawing = DrawingStorageService.shared.loadDrawing(for: note.id) {
+                        container.canvasView.drawing = drawing
+                    }
+                },
                 onUndoStateChanged: { canUndo = $0 },
                 onRedoStateChanged: { canRedo = $0 }
             )
