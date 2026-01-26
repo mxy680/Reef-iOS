@@ -66,16 +66,24 @@ struct DocumentGridItem<T: DocumentItem>: View {
     @State private var isShowingDeleteConfirmation = false
     @State private var editedName = ""
     @State private var extractionPulseScale: CGFloat = 1.0
+    @State private var isPressed: Bool = false
 
     private var effectiveColorScheme: ColorScheme {
         themeManager.isDarkMode ? .dark : .light
+    }
+
+    /// Footer color matches canvas scroll background (behind the page)
+    private var footerColor: Color {
+        effectiveColorScheme == .dark
+            ? Color(red: 18/255, green: 32/255, blue: 52/255)  // #122034
+            : Color(white: 245/255)  // #F5F5F5
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Thumbnail area (9:10 aspect ratio)
             ZStack(alignment: .topTrailing) {
-                ZStack {
+                ZStack(alignment: .bottom) {
                     Color.adaptiveCardBackground(for: effectiveColorScheme)
 
                     if let thumbnail = thumbnail {
@@ -89,6 +97,17 @@ struct DocumentGridItem<T: DocumentItem>: View {
                     } else {
                         placeholderIcon
                     }
+
+                    // Subtle gradient fade at bottom of thumbnail
+                    LinearGradient(
+                        colors: [
+                            Color.black.opacity(0),
+                            Color.black.opacity(effectiveColorScheme == .dark ? 0.25 : 0.12)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 60)
                 }
 
                 // Extraction status indicator - pulsing teal dot when extracting
@@ -163,11 +182,16 @@ struct DocumentGridItem<T: DocumentItem>: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(Color.adaptiveCardBackground(for: effectiveColorScheme))
+            .background(footerColor)
         }
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(effectiveColorScheme == .dark ? 0.5 : 0.08), radius: 8, x: 0, y: 4)
         .shadow(color: Color.black.opacity(effectiveColorScheme == .dark ? 0.3 : 0.04), radius: 2, x: 0, y: 1)
+        .scaleEffect(isPressed ? 0.95 : 1.0)
+        .animation(.easeInOut(duration: 0.12), value: isPressed)
+        .onLongPressGesture(minimumDuration: .infinity, pressing: { pressing in
+            isPressed = pressing
+        }, perform: {})
         .onAppear {
             loadThumbnail()
         }
@@ -278,7 +302,7 @@ struct DocumentGridItem<T: DocumentItem>: View {
 
         let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
         return renderer.image { context in
-            // Fill with background color matching card background (deepOceanCard in dark mode)
+            // Fill with background color matching thumbnail area (deepOceanCard in dark mode)
             let bgColor = isDarkMode ? UIColor(red: 19/255, green: 31/255, blue: 51/255, alpha: 1) : UIColor.white
             bgColor.setFill()
             context.fill(CGRect(origin: .zero, size: thumbnailSize))
