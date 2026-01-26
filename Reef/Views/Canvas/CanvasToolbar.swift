@@ -185,14 +185,6 @@ struct CanvasToolbar: View {
                 action: onHomePressed
             )
 
-            // Background mode button
-            ToolbarButton(
-                icon: canvasBackgroundMode.iconName,
-                isSelected: backgroundModeSelected,
-                colorScheme: colorScheme,
-                action: selectBackgroundMode
-            )
-
             toolbarDivider
 
             // Drawing tools
@@ -222,6 +214,14 @@ struct CanvasToolbar: View {
                 isSelected: selectedTool == .lasso,
                 colorScheme: colorScheme,
                 action: { selectTool(.lasso) }
+            )
+
+            // Background mode button
+            ToolbarButton(
+                icon: "squareshape.split.3x3",
+                isSelected: backgroundModeSelected,
+                colorScheme: colorScheme,
+                action: selectBackgroundMode
             )
 
             toolbarDivider
