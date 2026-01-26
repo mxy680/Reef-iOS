@@ -13,6 +13,7 @@ class Assignment {
     var fileName: String          // Original file name with extension
     var fileExtension: String     // Extension for type detection
     var dateAdded: Date = Date()
+    var lastOpenedAt: Date?       // Track when document was last opened
     var thumbnailData: Data?      // JPEG data of PDF first page thumbnail
     var course: Course?           // Relationship to parent course
     var extractedText: String?    // Full text content from PDF for search

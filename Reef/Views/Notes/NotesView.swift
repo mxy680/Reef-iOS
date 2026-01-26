@@ -155,6 +155,7 @@ struct NotesView: View {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: 3), spacing: 24) {
                         ForEach(filteredNotes) { note in
                             Button {
+                                note.lastOpenedAt = Date()
                                 withAnimation(.easeOut(duration: 0.3)) {
                                     selectedNote = note
                                 }
