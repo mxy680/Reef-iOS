@@ -343,25 +343,25 @@ struct ContextualToolbar: View {
 
     private var lassoOptions: some View {
         HStack(spacing: 4) {
-            // Copy button (disabled - selection state unknown)
+            // Copy button
             LassoActionButton(
                 icon: "doc.on.doc",
                 label: "Copy",
-                isEnabled: false,
+                isEnabled: hasSelection,
                 colorScheme: colorScheme,
                 showingTooltip: $showingTooltip,
-                tooltipAction: .copy,
+                tooltipAction: hasSelection ? nil : .copy,
                 action: { onCopy?() }
             )
 
-            // Cut button (disabled - selection state unknown)
+            // Cut button
             LassoActionButton(
                 icon: "scissors",
                 label: "Cut",
-                isEnabled: false,
+                isEnabled: hasSelection,
                 colorScheme: colorScheme,
                 showingTooltip: $showingTooltip,
-                tooltipAction: .cut,
+                tooltipAction: hasSelection ? nil : .cut,
                 action: { onCut?() }
             )
 
@@ -388,15 +388,15 @@ struct ContextualToolbar: View {
                 .frame(width: 1, height: 24)
                 .padding(.horizontal, 4)
 
-            // Delete button (disabled - selection state unknown)
+            // Delete button
             LassoActionButton(
                 icon: "trash",
                 label: "Delete",
-                isEnabled: false,
+                isEnabled: hasSelection,
                 isDestructive: true,
                 colorScheme: colorScheme,
                 showingTooltip: $showingTooltip,
-                tooltipAction: .delete,
+                tooltipAction: hasSelection ? nil : .delete,
                 action: { onDelete?() }
             )
         }
