@@ -102,7 +102,12 @@ struct CanvasView: View {
                         }
                         // Update pen color to match new theme
                         selectedPenColor = themeManager.isDarkMode ? .white : .black
-                    }
+                    },
+                    canPaste: canPaste,
+                    onCopy: { canvasViewRef?.canvasView.performCopy() },
+                    onCut: { canvasViewRef?.canvasView.performCut() },
+                    onDelete: { canvasViewRef?.canvasView.performDelete() },
+                    onPaste: { canvasViewRef?.canvasView.performPaste() }
                 )
                 .padding(.bottom, 24)
             }
