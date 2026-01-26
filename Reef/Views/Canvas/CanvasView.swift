@@ -65,7 +65,8 @@ struct CanvasView: View {
                 isDarkMode: themeManager.isDarkMode,
                 onCanvasReady: { canvasViewRef = $0 },
                 onUndoStateChanged: { canUndo = $0 },
-                onRedoStateChanged: { canRedo = $0 }
+                onRedoStateChanged: { canRedo = $0 },
+                onSelectionChanged: { hasSelection = $0 }
             )
 
             // Floating toolbar at bottom
