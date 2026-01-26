@@ -221,14 +221,6 @@ struct CanvasToolbar: View {
                 action: onRedo
             )
 
-            ToolbarButton(
-                icon: "doc.on.clipboard",
-                isSelected: false,
-                isDisabled: !canPaste,
-                colorScheme: colorScheme,
-                action: onPaste
-            )
-
             toolbarDivider
 
             // AI button
