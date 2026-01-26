@@ -521,3 +521,91 @@ private struct ColorSwatch: View {
             .allowsHitTesting(onLongPress != nil || true)
     }
 }
+
+// MARK: - Lasso Action Button Component
+
+private struct LassoActionButton: View {
+    let icon: String
+    let label: String
+    let isEnabled: Bool
+    var isDestructive: Bool = false
+    let colorScheme: ColorScheme
+    @Binding var showingTooltip: ContextualToolbar.LassoAction?
+    let tooltipAction: ContextualToolbar.LassoAction?
+    let action: () -> Void
+
+    private var foregroundColor: Color {
+        if isEnabled {
+            return isDestructive ? .deleteRed : Color.adaptiveText(for: colorScheme)
+        } else {
+            return isDestructive
+                ? Color.deleteRed.opacity(0.35)
+                : Color.adaptiveText(for: colorScheme).opacity(0.35)
+        }
+    }
+
+    private var isShowingTooltip: Bool {
+        guard let tooltipAction = tooltipAction else { return false }
+        return showingTooltip == tooltipAction
+    }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            // Tooltip positioned above
+            if isShowingTooltip {
+                TooltipView(colorScheme: colorScheme)
+                    .offset(y: -38)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottom)))
+            }
+
+            // Button
+            Button {
+                if isEnabled {
+                    action()
+                } else if let tooltipAction = tooltipAction {
+                    // Show tooltip for disabled button
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        showingTooltip = tooltipAction
+                    }
+                    // Auto-dismiss after 1.5 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            if showingTooltip == tooltipAction {
+                                showingTooltip = nil
+                            }
+                        }
+                    }
+                }
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .medium))
+                    Text(label)
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .foregroundColor(foregroundColor)
+                .frame(width: 48, height: 40)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+// MARK: - Tooltip View
+
+private struct TooltipView: View {
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        Text("Select strokes first")
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(colorScheme == .dark ? .white : .black)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(colorScheme == .dark ? Color(white: 0.25) : Color(white: 0.95))
+                    .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
+            )
+    }
+}
