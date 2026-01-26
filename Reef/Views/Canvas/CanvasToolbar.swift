@@ -21,6 +21,31 @@ enum EraserType: String, CaseIterable {
     case bitmap = "Pixel"
 }
 
+enum CanvasBackgroundMode: String, CaseIterable {
+    case normal
+    case grid
+    case dotted
+    case lined
+
+    var displayName: String {
+        switch self {
+        case .normal: return "Normal"
+        case .grid: return "Grid"
+        case .dotted: return "Dotted"
+        case .lined: return "Lined"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .normal: return "rectangle"
+        case .grid: return "grid"
+        case .dotted: return "circle.grid.3x3"
+        case .lined: return "line.3.horizontal"
+        }
+    }
+}
+
 // MARK: - Stroke Width Constants
 
 enum StrokeWidthRange {
@@ -49,6 +74,7 @@ struct CanvasToolbar: View {
     @Binding var eraserType: EraserType
     @Binding var customPenColors: [Color]
     @Binding var customHighlighterColors: [Color]
+    @Binding var canvasBackgroundMode: CanvasBackgroundMode
     let colorScheme: ColorScheme
     let canUndo: Bool
     let canRedo: Bool
@@ -126,6 +152,26 @@ struct CanvasToolbar: View {
                 colorScheme: colorScheme,
                 action: onHomePressed
             )
+
+            // Background mode menu
+            Menu {
+                ForEach(CanvasBackgroundMode.allCases, id: \.self) { mode in
+                    Button(action: { canvasBackgroundMode = mode }) {
+                        Label(mode.displayName, systemImage: mode.iconName)
+                    }
+                }
+            } label: {
+                Image(systemName: canvasBackgroundMode.iconName)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(canvasBackgroundMode != .normal ? .vibrantTeal : Color.adaptiveText(for: colorScheme))
+                    .frame(width: 44, height: 44)
+                    .background(
+                        canvasBackgroundMode != .normal ?
+                            Color.vibrantTeal.opacity(0.15) :
+                            Color.clear
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
 
             toolbarDivider
 
@@ -283,6 +329,7 @@ private struct ToolbarButton: View {
             eraserType: .constant(.stroke),
             customPenColors: .constant([]),
             customHighlighterColors: .constant([]),
+            canvasBackgroundMode: .constant(.normal),
             colorScheme: .light,
             canUndo: true,
             canRedo: false,

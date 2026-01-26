@@ -24,6 +24,7 @@ struct CanvasView: View {
     @State private var eraserType: EraserType = .stroke
     @State private var customPenColors: [Color] = []
     @State private var customHighlighterColors: [Color] = []
+    @State private var canvasBackgroundMode: CanvasBackgroundMode = .normal
 
     // Undo/Redo state
     @State private var canUndo: Bool = false
@@ -72,6 +73,7 @@ struct CanvasView: View {
                 highlighterWidth: $highlighterWidth,
                 eraserSize: $eraserSize,
                 eraserType: $eraserType,
+                canvasBackgroundMode: canvasBackgroundMode,
                 isDarkMode: themeManager.isDarkMode,
                 onCanvasReady: { canvasViewRef = $0 },
                 onUndoStateChanged: { canUndo = $0 },
@@ -91,6 +93,7 @@ struct CanvasView: View {
                     eraserType: $eraserType,
                     customPenColors: $customPenColors,
                     customHighlighterColors: $customHighlighterColors,
+                    canvasBackgroundMode: $canvasBackgroundMode,
                     colorScheme: effectiveColorScheme,
                     canUndo: canUndo,
                     canRedo: canRedo,

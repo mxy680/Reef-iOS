@@ -33,6 +33,7 @@ struct DrawingOverlayView: UIViewRepresentable {
     @Binding var highlighterWidth: CGFloat
     @Binding var eraserSize: CGFloat
     @Binding var eraserType: EraserType
+    var canvasBackgroundMode: CanvasBackgroundMode = .normal
     var isDarkMode: Bool = false
     var recognitionEnabled: Bool = false
     var pauseSensitivity: Double = 0.5
@@ -42,7 +43,7 @@ struct DrawingOverlayView: UIViewRepresentable {
     var onRecognitionResult: (RecognitionResult) -> Void = { _ in }
 
     func makeUIView(context: Context) -> CanvasContainerView {
-        let container = CanvasContainerView(documentURL: documentURL, fileType: fileType, isDarkMode: isDarkMode)
+        let container = CanvasContainerView(documentURL: documentURL, fileType: fileType, backgroundMode: canvasBackgroundMode, isDarkMode: isDarkMode)
         container.canvasView.delegate = context.coordinator
         context.coordinator.container = container
         context.coordinator.onUndoStateChanged = onUndoStateChanged
@@ -69,6 +70,7 @@ struct DrawingOverlayView: UIViewRepresentable {
         context.coordinator.currentPenWidth = penWidth
         updateTool(container.canvasView)
         container.updateDarkMode(isDarkMode)
+        container.updateBackgroundMode(canvasBackgroundMode)
 
         // Keep recognition settings in sync
         context.coordinator.recognitionEnabled = recognitionEnabled
@@ -82,10 +84,6 @@ struct DrawingOverlayView: UIViewRepresentable {
             // Convert SwiftUI Color to UIColor using explicit RGB to avoid color scheme adaptation
             let uiColor = uiColorFromSwiftUIColor(selectedPenColor)
             canvasView.tool = PKInkingTool(.pen, color: uiColor, width: penWidth)
-        case .diagram:
-            // Diagram tool uses pen ink but twice as thick
-            let uiColor = uiColorFromSwiftUIColor(selectedPenColor)
-            canvasView.tool = PKInkingTool(.pen, color: uiColor, width: penWidth * 4)
         case .highlighter:
             let uiColor = UIColor(selectedHighlighterColor).withAlphaComponent(0.3)
             canvasView.tool = PKInkingTool(.marker, color: uiColor, width: highlighterWidth * 3)
@@ -140,48 +138,6 @@ struct DrawingOverlayView: UIViewRepresentable {
 
         func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
             updateUndoRedoState(canvasView)
-
-            // Shape snap for diagram tool (with small delay to ensure stroke is committed)
-            print("[ShapeSnap] Tool ended. currentTool=\(currentTool), strokeCount=\(canvasView.drawing.strokes.count), before=\(strokeCountBeforeDrawing)")
-            if currentTool == .diagram {
-                let beforeCount = strokeCountBeforeDrawing
-                let color = currentPenColor
-
-                // Small delay to ensure PencilKit has committed the stroke
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak canvasView] in
-                    guard let canvasView = canvasView else { return }
-                    let strokeCount = canvasView.drawing.strokes.count
-                    print("[ShapeSnap] After delay: strokeCount=\(strokeCount), before=\(beforeCount)")
-
-                    if strokeCount > beforeCount {
-                        let strokeIndex = strokeCount - 1
-                        let stroke = canvasView.drawing.strokes[strokeIndex]
-                        let points = stroke.path.map { $0.location }
-                        print("[ShapeSnap] Attempting detection on stroke with \(points.count) points")
-
-                        // Use the original stroke's width to maintain consistent thickness
-                        let originalWidth = stroke.path.first?.size.width ?? 4.0
-                        if let snappedStroke = ShapeDetector.detect(stroke, color: color, width: originalWidth) {
-                            print("[ShapeSnap] Shape detected! Replacing stroke")
-                            // Replace stroke with snapped version
-                            var newDrawing = canvasView.drawing
-                            var strokes = newDrawing.strokes
-                            strokes[strokeIndex] = snappedStroke
-                            newDrawing.strokes = strokes
-                            canvasView.drawing = newDrawing
-
-                            // Haptic feedback on successful snap
-                            let generator = UIImpactFeedbackGenerator(style: .light)
-                            generator.impactOccurred()
-                        } else {
-                            print("[ShapeSnap] No shape detected")
-                        }
-                    } else {
-                        print("[ShapeSnap] No new stroke (count didn't increase)")
-                    }
-                }
-                strokeCountBeforeDrawing = canvasView.drawing.strokes.count
-            }
         }
 
         private func updateUndoRedoState(_ canvasView: PKCanvasView) {
@@ -461,11 +417,13 @@ enum StrokeBuilder {
 class CanvasContainerView: UIView {
     let scrollView = UIScrollView()
     let contentView = UIView()  // Container for document + canvas
+    let backgroundPatternView = CanvasBackgroundPatternView()
     let documentImageView = UIImageView()
     let canvasView = ReefCanvasView()
 
     private var documentURL: URL?
     private var fileType: Note.FileType?
+    private var backgroundMode: CanvasBackgroundMode = .normal
     private var isDarkMode: Bool = false
 
     /// Light gray background for scroll view in light mode (close to white)
@@ -477,10 +435,11 @@ class CanvasContainerView: UIView {
     /// Lighter background for scroll area in dark mode (lighter than the page)
     private static let scrollBackgroundDark = UIColor(red: 18/255, green: 32/255, blue: 52/255, alpha: 1)
 
-    convenience init(documentURL: URL, fileType: Note.FileType, isDarkMode: Bool = false) {
+    convenience init(documentURL: URL, fileType: Note.FileType, backgroundMode: CanvasBackgroundMode = .normal, isDarkMode: Bool = false) {
         self.init(frame: .zero)
         self.documentURL = documentURL
         self.fileType = fileType
+        self.backgroundMode = backgroundMode
         self.isDarkMode = isDarkMode
         loadDocument()
     }
@@ -516,6 +475,13 @@ class CanvasContainerView: UIView {
         contentView.layer.shadowRadius = 12
         scrollView.addSubview(contentView)
 
+        // Configure background pattern view (behind document)
+        backgroundPatternView.translatesAutoresizingMaskIntoConstraints = false
+        backgroundPatternView.backgroundColor = .clear
+        backgroundPatternView.mode = backgroundMode
+        backgroundPatternView.isDarkMode = isDarkMode
+        contentView.addSubview(backgroundPatternView)
+
         // Configure document image view
         documentImageView.translatesAutoresizingMaskIntoConstraints = false
         documentImageView.contentMode = .scaleAspectFit
@@ -545,6 +511,12 @@ class CanvasContainerView: UIView {
             contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
             contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
 
+            // Background pattern fills content view
+            backgroundPatternView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            backgroundPatternView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            backgroundPatternView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            backgroundPatternView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+
             // Document and canvas fill the content view
             documentImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             documentImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
@@ -561,7 +533,14 @@ class CanvasContainerView: UIView {
     func updateDarkMode(_ newDarkMode: Bool) {
         guard newDarkMode != isDarkMode else { return }
         isDarkMode = newDarkMode
+        backgroundPatternView.isDarkMode = newDarkMode
         animateThemeChange()
+    }
+
+    func updateBackgroundMode(_ newMode: CanvasBackgroundMode) {
+        guard newMode != backgroundMode else { return }
+        backgroundMode = newMode
+        backgroundPatternView.mode = newMode
     }
 
     private func animateThemeChange() {
@@ -758,6 +737,106 @@ class CanvasContainerView: UIView {
     }
 }
 
+// MARK: - Canvas Background Pattern View
+
+class CanvasBackgroundPatternView: UIView {
+    var mode: CanvasBackgroundMode = .normal {
+        didSet {
+            setNeedsDisplay()
+        }
+    }
+
+    var isDarkMode: Bool = false {
+        didSet {
+            setNeedsDisplay()
+        }
+    }
+
+    /// Spacing between grid lines/dots in points
+    private let gridSpacing: CGFloat = 20
+
+    /// Spacing between horizontal lines for lined paper
+    private let lineSpacing: CGFloat = 24
+
+    /// Pattern color - subtle gray that doesn't interfere with content
+    private var patternColor: UIColor {
+        isDarkMode ? UIColor(white: 1.0, alpha: 0.08) : UIColor(white: 0.0, alpha: 0.1)
+    }
+
+    override func draw(_ rect: CGRect) {
+        guard mode != .normal else { return }
+        guard let context = UIGraphicsGetCurrentContext() else { return }
+
+        context.setStrokeColor(patternColor.cgColor)
+        context.setFillColor(patternColor.cgColor)
+
+        switch mode {
+        case .normal:
+            break
+        case .grid:
+            drawGrid(in: rect, context: context)
+        case .dotted:
+            drawDots(in: rect, context: context)
+        case .lined:
+            drawLines(in: rect, context: context)
+        }
+    }
+
+    private func drawGrid(in rect: CGRect, context: CGContext) {
+        context.setLineWidth(0.5)
+
+        // Vertical lines
+        var x = gridSpacing
+        while x < rect.width {
+            context.move(to: CGPoint(x: x, y: 0))
+            context.addLine(to: CGPoint(x: x, y: rect.height))
+            x += gridSpacing
+        }
+
+        // Horizontal lines
+        var y = gridSpacing
+        while y < rect.height {
+            context.move(to: CGPoint(x: 0, y: y))
+            context.addLine(to: CGPoint(x: rect.width, y: y))
+            y += gridSpacing
+        }
+
+        context.strokePath()
+    }
+
+    private func drawDots(in rect: CGRect, context: CGContext) {
+        let dotRadius: CGFloat = 1.5
+
+        var x = gridSpacing
+        while x < rect.width {
+            var y = gridSpacing
+            while y < rect.height {
+                context.fillEllipse(in: CGRect(
+                    x: x - dotRadius,
+                    y: y - dotRadius,
+                    width: dotRadius * 2,
+                    height: dotRadius * 2
+                ))
+                y += gridSpacing
+            }
+            x += gridSpacing
+        }
+    }
+
+    private func drawLines(in rect: CGRect, context: CGContext) {
+        context.setLineWidth(0.5)
+
+        var y = lineSpacing
+        while y < rect.height {
+            context.move(to: CGPoint(x: 0, y: y))
+            context.addLine(to: CGPoint(x: rect.width, y: y))
+            y += lineSpacing
+        }
+
+        context.strokePath()
+    }
+}
+
 // MARK: - UIScrollViewDelegate
 
 extension CanvasContainerView: UIScrollViewDelegate {
@@ -780,7 +859,8 @@ extension CanvasContainerView: UIScrollViewDelegate {
         penWidth: .constant(StrokeWidthRange.penDefault),
         highlighterWidth: .constant(StrokeWidthRange.highlighterDefault),
         eraserSize: .constant(StrokeWidthRange.eraserDefault),
-        eraserType: .constant(.stroke)
+        eraserType: .constant(.stroke),
+        canvasBackgroundMode: .grid
     )
     .background(Color.gray.opacity(0.2))
 }
