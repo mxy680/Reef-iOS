@@ -53,6 +53,11 @@ struct DrawingOverlayView: UIViewRepresentable {
         context.coordinator.recognitionEnabled = recognitionEnabled
         context.coordinator.pauseSensitivity = pauseSensitivity
 
+        // Wire up selection change callback
+        container.canvasView.onSelectionChanged = { [weak context] hasSelection in
+            context?.coordinator.onSelectionChanged(hasSelection)
+        }
+
         // Set initial tool after a brief delay to ensure view is ready
         let initialColor = UIColor(selectedPenColor)
         let width = penWidth
