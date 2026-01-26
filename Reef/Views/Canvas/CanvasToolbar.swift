@@ -615,6 +615,7 @@ private struct AIToolbarButton: View {
             VStack(spacing: 2) {
                 Image(systemName: icon)
                     .font(.system(size: 18, weight: .medium))
+                    .frame(width: 24, height: 24)
                 Text(label)
                     .font(.system(size: 10, weight: .medium))
             }
