@@ -93,6 +93,7 @@ struct CanvasToolbar: View {
     let onPaste: () -> Void
 
     @State private var contextualToolbarHidden: Bool = false
+    @State private var showingLassoHint: Bool = false
 
     private var toolHasContextualMenu: Bool {
         switch selectedTool {
