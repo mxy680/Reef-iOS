@@ -40,6 +40,7 @@ struct DrawingOverlayView: UIViewRepresentable {
     var onCanvasReady: (CanvasContainerView) -> Void = { _ in }
     var onUndoStateChanged: (Bool) -> Void = { _ in }
     var onRedoStateChanged: (Bool) -> Void = { _ in }
+    var onSelectionChanged: (Bool) -> Void = { _ in }
     var onRecognitionResult: (RecognitionResult) -> Void = { _ in }
 
     func makeUIView(context: Context) -> CanvasContainerView {
