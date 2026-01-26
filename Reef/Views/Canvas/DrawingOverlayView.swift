@@ -44,6 +44,7 @@ struct DrawingOverlayView: UIViewRepresentable {
     var onRedoStateChanged: (Bool) -> Void = { _ in }
     var onSelectionChanged: (Bool) -> Void = { _ in }
     var onRecognitionResult: (RecognitionResult) -> Void = { _ in }
+    var onDrawingChanged: (PKDrawing) -> Void = { _ in }
 
     func makeUIView(context: Context) -> CanvasContainerView {
         let container = CanvasContainerView(documentURL: documentURL, fileType: fileType, backgroundMode: canvasBackgroundMode, backgroundOpacity: canvasBackgroundOpacity, backgroundSpacing: canvasBackgroundSpacing, isDarkMode: isDarkMode)
@@ -52,6 +53,7 @@ struct DrawingOverlayView: UIViewRepresentable {
         context.coordinator.onUndoStateChanged = onUndoStateChanged
         context.coordinator.onRedoStateChanged = onRedoStateChanged
         context.coordinator.onRecognitionResult = onRecognitionResult
+        context.coordinator.onDrawingChanged = onDrawingChanged
         context.coordinator.recognitionEnabled = recognitionEnabled
         context.coordinator.pauseSensitivity = pauseSensitivity
 
@@ -88,6 +90,7 @@ struct DrawingOverlayView: UIViewRepresentable {
         context.coordinator.pauseSensitivity = pauseSensitivity
         context.coordinator.onRecognitionResult = onRecognitionResult
         context.coordinator.onSelectionChanged = onSelectionChanged
+        context.coordinator.onDrawingChanged = onDrawingChanged
     }
 
     private func updateTool(_ canvasView: PKCanvasView) {
@@ -128,6 +131,10 @@ struct DrawingOverlayView: UIViewRepresentable {
         var onRedoStateChanged: (Bool) -> Void = { _ in }
         var onSelectionChanged: (Bool) -> Void = { _ in }
         var onRecognitionResult: (RecognitionResult) -> Void = { _ in }
+        var onDrawingChanged: (PKDrawing) -> Void = { _ in }
+
+        // Drawing change debounce
+        private var drawingChangeTask: Task<Void, Never>?
 
         // Recognition state
         var recognitionEnabled: Bool = false
@@ -141,6 +148,15 @@ struct DrawingOverlayView: UIViewRepresentable {
 
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
             updateUndoRedoState(canvasView)
+
+            // Debounced save callback (500ms)
+            drawingChangeTask?.cancel()
+            drawingChangeTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                if !Task.isCancelled {
+                    self.onDrawingChanged(canvasView.drawing)
+                }
+            }
         }
 
         func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
