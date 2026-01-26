@@ -43,6 +43,7 @@ enum CourseSection: String, CaseIterable, Identifiable {
 }
 
 enum SidebarItem: String, CaseIterable, Identifiable {
+    case home = "Home"
     case courses = "Courses"
     case myReef = "My Reef"
     case analytics = "Analytics"
@@ -53,6 +54,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .home: return "house.fill"
         case .courses: return "book.closed.fill"
         case .myReef: return "fish.fill"
         case .analytics: return "chart.line.uptrend.xyaxis"
@@ -131,8 +133,12 @@ struct HomeView: View {
             }
         } else if selectedItem == .settings {
             SettingsView(authManager: authManager)
+        } else if selectedItem == .home || selectedItem == nil {
+            // Welcome/Home page
+            Color.adaptiveBackground(for: effectiveColorScheme)
+                .ignoresSafeArea()
         } else {
-            // Default welcome/placeholder view
+            // Placeholder for other tabs (My Reef, Analytics, Tutors)
             Color.adaptiveBackground(for: effectiveColorScheme)
                 .ignoresSafeArea()
         }
@@ -140,6 +146,38 @@ struct HomeView: View {
 
     @ViewBuilder
     private var sidebarListContent: some View {
+        // Home tab (welcome page)
+        Button {
+            selectedItem = .home
+            selectedSection = nil
+        } label: {
+            HStack {
+                Label(SidebarItem.home.rawValue, systemImage: SidebarItem.home.icon)
+                    .font(.quicksand(17, weight: .medium))
+                    .foregroundColor(selectedItem == .home ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
+
+        // My Reef tab
+        Button {
+            selectedItem = .myReef
+            selectedSection = nil
+        } label: {
+            HStack {
+                Label(SidebarItem.myReef.rawValue, systemImage: SidebarItem.myReef.icon)
+                    .font(.quicksand(17, weight: .medium))
+                    .foregroundColor(selectedItem == .myReef ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
+
         // Courses tab (not selectable, toggles expansion)
         Button {
             withAnimation(.easeInOut(duration: 0.25)) {
@@ -148,15 +186,16 @@ struct HomeView: View {
         } label: {
             HStack {
                 Label(SidebarItem.courses.rawValue, systemImage: SidebarItem.courses.icon)
-                    .font(.quicksand(16, weight: .medium))
+                    .font(.quicksand(17, weight: .medium))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                 Spacer()
                 Image(systemName: isCoursesExpanded ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
             }
         }
         .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
 
         // Show courses when expanded
         if isCoursesExpanded {
@@ -174,16 +213,16 @@ struct HomeView: View {
                 } label: {
                     HStack {
                         Label(course.name, systemImage: course.icon)
-                            .font(.quicksand(16, weight: .medium))
+                            .font(.quicksand(17, weight: .medium))
                             .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                         Spacer()
                         Image(systemName: selectedCourse?.id == course.id ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                     }
                 }
                 .buttonStyle(.plain)
-                .listRowInsets(EdgeInsets(top: 8, leading: 32, bottom: 8, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 12, leading: 32, bottom: 12, trailing: 16))
 
                 // Show sections when course is expanded
                 if selectedCourse?.id == course.id {
@@ -194,14 +233,14 @@ struct HomeView: View {
                         } label: {
                             HStack {
                                 Label(section.rawValue, systemImage: section.icon)
-                                    .font(.quicksand(16, weight: .medium))
+                                    .font(.quicksand(17, weight: .medium))
                                     .foregroundColor(selectedSection == section ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
                                 Spacer()
                             }
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .listRowInsets(EdgeInsets(top: 6, leading: 52, bottom: 6, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 10, leading: 56, bottom: 10, trailing: 16))
                     }
                 }
             }
@@ -211,41 +250,28 @@ struct HomeView: View {
                 isAddingCourse = true
             } label: {
                 Label("Add Course", systemImage: "plus.circle.fill")
-                    .font(.quicksand(16, weight: .medium))
+                    .font(.quicksand(17, weight: .medium))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
             }
             .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets(top: 8, leading: 32, bottom: 8, trailing: 16))
+            .listRowInsets(EdgeInsets(top: 12, leading: 32, bottom: 12, trailing: 16))
         }
 
-        // My Reef, Tutors, Profile, and Settings (selectable)
-        Button {
-            selectedItem = .myReef
-            selectedSection = nil
-        } label: {
-            HStack {
-                Label(SidebarItem.myReef.rawValue, systemImage: SidebarItem.myReef.icon)
-                    .font(.quicksand(16, weight: .medium))
-                    .foregroundColor(selectedItem == .myReef ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
-                Spacer()
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-
+        // Analytics, Tutors, and Settings (selectable)
         Button {
             selectedItem = .analytics
             selectedSection = nil
         } label: {
             HStack {
                 Label(SidebarItem.analytics.rawValue, systemImage: SidebarItem.analytics.icon)
-                    .font(.quicksand(16, weight: .medium))
+                    .font(.quicksand(17, weight: .medium))
                     .foregroundColor(selectedItem == .analytics ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
                 Spacer()
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
 
         Button {
             selectedItem = .tutors
@@ -253,13 +279,14 @@ struct HomeView: View {
         } label: {
             HStack {
                 Label(SidebarItem.tutors.rawValue, systemImage: SidebarItem.tutors.icon)
-                    .font(.quicksand(16, weight: .medium))
+                    .font(.quicksand(17, weight: .medium))
                     .foregroundColor(selectedItem == .tutors ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
                 Spacer()
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
 
         Button {
             selectedItem = .settings
@@ -267,13 +294,14 @@ struct HomeView: View {
         } label: {
             HStack {
                 Label(SidebarItem.settings.rawValue, systemImage: SidebarItem.settings.icon)
-                    .font(.quicksand(16, weight: .medium))
+                    .font(.quicksand(17, weight: .medium))
                     .foregroundColor(selectedItem == .settings ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
                 Spacer()
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
     }
 
     @ViewBuilder
@@ -350,7 +378,7 @@ struct HomeView: View {
 
     @ViewBuilder
     private var userFooterView: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             if let imageData = profileImageData, let uiImage = UIImage(data: imageData) {
                 Image(uiImage: uiImage)
                     .resizable()
@@ -363,19 +391,19 @@ struct HomeView: View {
                     .frame(width: 44, height: 44)
                     .overlay(
                         Text(userInitials)
-                            .font(.quicksand(16, weight: .semiBold))
+                            .font(.quicksand(18, weight: .semiBold))
                             .foregroundColor(.white)
                     )
             }
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(authManager.userName ?? "User")
-                    .font(.quicksand(14, weight: .semiBold))
+                    .font(.quicksand(16, weight: .semiBold))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
 
                 if let email = authManager.userEmail {
                     Text(email)
-                        .font(.quicksand(12, weight: .regular))
+                        .font(.quicksand(14, weight: .regular))
                         .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
                         .lineLimit(1)
                 }
@@ -404,7 +432,7 @@ struct HomeView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
-        .padding(.bottom, 4)
+        .padding(.bottom, 16)
     }
 
     var body: some View {
@@ -414,7 +442,7 @@ struct HomeView: View {
             ZStack(alignment: .trailing) {
                 VStack(spacing: 0) {
                     // Custom header (replaces toolbar)
-                    HStack(spacing: 4) {
+                    HStack(spacing: 10) {
                         Image("ReefLogo")
                             .resizable()
                             .scaledToFit()
@@ -428,7 +456,7 @@ struct HomeView: View {
                         Spacer()
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 16)
 
                     List {
                         sidebarListContent
@@ -437,7 +465,7 @@ struct HomeView: View {
                 .tint(Color.adaptiveText(for: effectiveColorScheme))
                 .environment(\.symbolRenderingMode, .monochrome)
                 .scrollContentBackground(.hidden)
-                .padding(.top, 12)
+                .padding(.top, 8)
 
                 Spacer()
 
