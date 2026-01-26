@@ -41,17 +41,6 @@ extension Note: DocumentItem {
     }
 }
 
-// Conform Assignment to DocumentItem
-extension Assignment: DocumentItem {
-    var documentFileType: DocumentFileType {
-        switch fileType {
-        case .pdf: return .pdf
-        case .image: return .image
-        case .document: return .document
-        }
-    }
-}
-
 // MARK: - Document Grid Item
 
 struct DocumentGridItem<T: DocumentItem>: View {
@@ -136,7 +125,7 @@ struct DocumentGridItem<T: DocumentItem>: View {
 
             // Separator between thumbnail and footer
             Rectangle()
-                .fill(Color.adaptiveText(for: effectiveColorScheme).opacity(0.15))
+                .fill(Color.vibrantTeal.opacity(0.25))
                 .frame(height: 1)
 
             // Name, date, and action icons footer
@@ -185,6 +174,10 @@ struct DocumentGridItem<T: DocumentItem>: View {
             .background(footerColor)
         }
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.vibrantTeal.opacity(0.25), lineWidth: 1)
+        )
         .shadow(color: Color.black.opacity(effectiveColorScheme == .dark ? 0.5 : 0.08), radius: 8, x: 0, y: 4)
         .shadow(color: Color.black.opacity(effectiveColorScheme == .dark ? 0.3 : 0.04), radius: 2, x: 0, y: 1)
         .scaleEffect(isPressed ? 0.95 : 1.0)
@@ -240,16 +233,6 @@ struct DocumentGridItem<T: DocumentItem>: View {
             return
         }
 
-        // Check stored thumbnail data (for assignments) - only for light mode
-        // Dark mode thumbnails are always generated fresh
-        if !isDarkMode,
-           let assignment = document as? Assignment,
-           let thumbnailData = assignment.thumbnailData,
-           let image = UIImage(data: thumbnailData) {
-            thumbnail = image
-            isLoadingThumbnail = false
-            return
-        }
 
         // Capture values before entering detached task (Swift 6 concurrency)
         let documentId = document.id

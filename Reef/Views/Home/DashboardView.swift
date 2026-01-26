@@ -13,7 +13,6 @@ struct DashboardView: View {
     let colorScheme: ColorScheme
     let onSelectCourse: (Course) -> Void
     let onSelectNote: (Note, Course) -> Void
-    let onSelectAssignment: (Assignment, Course) -> Void
 
     @StateObject private var statsService = StudyStatsService.shared
     @StateObject private var userPrefs = UserPreferencesManager.shared
@@ -33,8 +32,7 @@ struct DashboardView: View {
                     courses: courses,
                     colorScheme: colorScheme,
                     onSelectCourse: onSelectCourse,
-                    onSelectNote: onSelectNote,
-                    onSelectAssignment: onSelectAssignment
+                    onSelectNote: onSelectNote
                 )
 
                 // Recent Items Section
@@ -42,8 +40,7 @@ struct DashboardView: View {
                     userPrefs: userPrefs,
                     courses: courses,
                     colorScheme: colorScheme,
-                    onSelectNote: onSelectNote,
-                    onSelectAssignment: onSelectAssignment
+                    onSelectNote: onSelectNote
                 )
 
                 Spacer(minLength: 24)
@@ -59,7 +56,6 @@ struct DashboardView: View {
         courses: [],
         colorScheme: .light,
         onSelectCourse: { _ in },
-        onSelectNote: { _, _ in },
-        onSelectAssignment: { _, _ in }
+        onSelectNote: { _, _ in }
     )
 }

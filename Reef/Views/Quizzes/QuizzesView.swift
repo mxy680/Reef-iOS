@@ -98,11 +98,9 @@ struct QuizGenerationView: View {
         !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !selectedQuestionTypes.isEmpty && !selectedNoteIds.isEmpty
     }
 
-    // Combined notes and assignments for source selection
+    // Notes for source selection
     private var allSourceNotes: [(id: UUID, name: String, icon: String, type: String)] {
-        let notes = course.notes.map { (id: $0.id, name: $0.name, icon: $0.fileTypeIcon, type: "Notes") }
-        let assignments = course.assignments.map { (id: $0.id, name: $0.name, icon: $0.fileTypeIcon, type: "Assignment") }
-        return notes + assignments
+        course.notes.map { (id: $0.id, name: $0.name, icon: $0.fileTypeIcon, type: "Notes") }
     }
 
     private var selectedCount: Int {
@@ -335,7 +333,7 @@ struct QuizGenerationView: View {
                 VStack(spacing: 0) {
                     if allSourceNotes.isEmpty {
                         HStack {
-                            Text("No notes or assignments in this course")
+                            Text("No notes in this course")
                                 .font(.quicksand(14, weight: .regular))
                                 .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.6))
                                 .padding(.vertical, 12)

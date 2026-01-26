@@ -14,7 +14,6 @@ struct PinnedItemsView: View {
     let colorScheme: ColorScheme
     let onSelectCourse: (Course) -> Void
     let onSelectNote: (Note, Course) -> Void
-    let onSelectAssignment: (Assignment, Course) -> Void
 
     private var pinnedItems: [PinnedItem] {
         var items: [PinnedItem] = []
@@ -29,13 +28,6 @@ struct PinnedItemsView: View {
             for note in course.notes {
                 if userPrefs.isPinned(id: note.id) {
                     items.append(.note(note, course))
-                }
-            }
-
-            // Check pinned assignments in this course
-            for assignment in course.assignments {
-                if userPrefs.isPinned(id: assignment.id) {
-                    items.append(.assignment(assignment, course))
                 }
             }
         }
@@ -82,8 +74,6 @@ struct PinnedItemsView: View {
                                     onSelectCourse(course)
                                 case .note(let note, let course):
                                     onSelectNote(note, course)
-                                case .assignment(let assignment, let course):
-                                    onSelectAssignment(assignment, course)
                                 }
                             }
                         )
@@ -104,13 +94,11 @@ struct PinnedItemsView: View {
 enum PinnedItem: Identifiable {
     case course(Course)
     case note(Note, Course)
-    case assignment(Assignment, Course)
 
     var id: UUID {
         switch self {
         case .course(let course): return course.id
         case .note(let note, _): return note.id
-        case .assignment(let assignment, _): return assignment.id
         }
     }
 
@@ -118,7 +106,6 @@ enum PinnedItem: Identifiable {
         switch self {
         case .course(let course): return course.icon
         case .note(let note, _): return note.fileTypeIcon
-        case .assignment(let assignment, _): return assignment.fileTypeIcon
         }
     }
 
@@ -126,7 +113,6 @@ enum PinnedItem: Identifiable {
         switch self {
         case .course(let course): return course.name
         case .note(let note, _): return note.name
-        case .assignment(let assignment, _): return assignment.name
         }
     }
 
@@ -134,7 +120,6 @@ enum PinnedItem: Identifiable {
         switch self {
         case .course: return nil
         case .note(_, let course): return course.name
-        case .assignment(_, let course): return course.name
         }
     }
 }

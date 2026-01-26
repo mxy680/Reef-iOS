@@ -13,7 +13,6 @@ struct RecentItemsView: View {
     let courses: [Course]
     let colorScheme: ColorScheme
     let onSelectNote: (Note, Course) -> Void
-    let onSelectAssignment: (Assignment, Course) -> Void
 
     private var recentItems: [RecentItem] {
         var items: [RecentItem] = []
@@ -23,13 +22,6 @@ struct RecentItemsView: View {
             for note in course.notes {
                 if let lastOpened = note.lastOpenedAt {
                     items.append(.note(note, course, lastOpened))
-                }
-            }
-
-            // Add assignments with lastOpenedAt
-            for assignment in course.assignments {
-                if let lastOpened = assignment.lastOpenedAt {
-                    items.append(.assignment(assignment, course, lastOpened))
                 }
             }
         }
@@ -78,16 +70,12 @@ struct RecentItemsView: View {
                                 switch item {
                                 case .note(let note, let course, _):
                                     onSelectNote(note, course)
-                                case .assignment(let assignment, let course, _):
-                                    onSelectAssignment(assignment, course)
                                 }
                             },
                             onPin: {
                                 switch item {
                                 case .note(let note, _, _):
                                     userPrefs.togglePin(id: note.id)
-                                case .assignment(let assignment, _, _):
-                                    userPrefs.togglePin(id: assignment.id)
                                 }
                             }
                         )
@@ -108,48 +96,40 @@ struct RecentItemsView: View {
         switch item {
         case .note(let note, _, _):
             return userPrefs.isPinned(id: note.id)
-        case .assignment(let assignment, _, _):
-            return userPrefs.isPinned(id: assignment.id)
         }
     }
 }
 
 enum RecentItem: Identifiable {
     case note(Note, Course, Date)
-    case assignment(Assignment, Course, Date)
 
     var id: UUID {
         switch self {
         case .note(let note, _, _): return note.id
-        case .assignment(let assignment, _, _): return assignment.id
         }
     }
 
     var lastOpened: Date {
         switch self {
         case .note(_, _, let date): return date
-        case .assignment(_, _, let date): return date
         }
     }
 
     var icon: String {
         switch self {
         case .note(let note, _, _): return note.fileTypeIcon
-        case .assignment(let assignment, _, _): return assignment.fileTypeIcon
         }
     }
 
     var title: String {
         switch self {
         case .note(let note, _, _): return note.name
-        case .assignment(let assignment, _, _): return assignment.name
         }
     }
 
     var courseName: String {
         switch self {
         case .note(_, let course, _): return course.name
-        case .assignment(_, let course, _): return course.name
         }
     }
 

@@ -15,8 +15,6 @@ class Course {
     var icon: String = "folder.fill"
     @Relationship(deleteRule: .cascade, inverse: \Note.course)
     var notes: [Note] = []
-    @Relationship(deleteRule: .cascade, inverse: \Assignment.course)
-    var assignments: [Assignment] = []
 
     init(name: String, icon: String = "folder.fill") {
         self.name = name
@@ -24,27 +22,8 @@ class Course {
     }
 }
 
-enum CourseSection: String, CaseIterable, Identifiable {
-    case notes = "Notes"
-    case assignments = "Assignments"
-    case quizzes = "Quizzes"
-    case exams = "Exams"
-
-    var id: String { rawValue }
-
-    var icon: String {
-        switch self {
-        case .notes: return "doc.text"
-        case .assignments: return "pencil.and.list.clipboard"
-        case .quizzes: return "list.bullet.clipboard"
-        case .exams: return "doc.text.magnifyingglass"
-        }
-    }
-}
-
 enum SidebarItem: String, CaseIterable, Identifiable {
     case home = "Home"
-    case courses = "Courses"
     case myReef = "My Reef"
     case analytics = "Analytics"
     case tutors = "Tutors"
@@ -55,7 +34,6 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .home: return "house.fill"
-        case .courses: return "book.closed.fill"
         case .myReef: return "fish.fill"
         case .analytics: return "chart.line.uptrend.xyaxis"
         case .tutors: return "figure.surfing"
@@ -73,13 +51,11 @@ struct HomeView: View {
     @Query private var courses: [Course]
     @State private var selectedItem: SidebarItem?
     @State private var hasRestoredState = false
-    @State private var isCoursesExpanded = true
     @State private var selectedCourse: Course?
-    @State private var selectedSection: CourseSection?
+    @State private var selectedCourseSubPage: String? // "notes", "quizzes", "exams", nil = detail view
     @State private var isAddingCourse = false
     @State private var newCourseName = ""
     @State private var isShowingDocumentPicker = false
-    @State private var isShowingAssignmentPicker = false
     @State private var isShowingGenerateExam = false
     @State private var isShowingQuizGeneration = false
     @State private var isShowingCourseMenu = false
@@ -111,8 +87,11 @@ struct HomeView: View {
     }
 
     private var detailTitle: String {
-        if let section = selectedSection, let course = selectedCourse {
-            return "\(course.name) - \(section.rawValue)"
+        if let course = selectedCourse {
+            if let subPage = selectedCourseSubPage {
+                return "\(course.name) - \(subPage.capitalized)"
+            }
+            return course.name
         } else if let item = selectedItem {
             return item.rawValue
         }
@@ -121,16 +100,42 @@ struct HomeView: View {
 
     @ViewBuilder
     private var detailContent: some View {
-        if let section = selectedSection, let course = selectedCourse {
-            switch section {
-            case .notes:
-                NotesView(course: course, onAddNote: { isShowingDocumentPicker = true }, columnVisibility: $columnVisibility, isViewingCanvas: $isViewingCanvas, selectedNote: $selectedNote)
-            case .quizzes:
-                QuizzesView(course: course, onGenerateQuiz: { isShowingQuizGeneration = true })
-            case .exams:
-                ExamsView(course: course, onGenerateExam: { isShowingGenerateExam = true })
-            case .assignments:
-                AssignmentsView(course: course, onAddAssignment: { isShowingAssignmentPicker = true })
+        if let course = selectedCourse {
+            if let subPage = selectedCourseSubPage {
+                switch subPage {
+                case "notes":
+                    NotesView(course: course, onAddNote: { isShowingDocumentPicker = true }, columnVisibility: $columnVisibility, isViewingCanvas: $isViewingCanvas, selectedNote: $selectedNote)
+                case "quizzes":
+                    QuizzesView(course: course, onGenerateQuiz: { isShowingQuizGeneration = true })
+                case "exams":
+                    ExamsView(course: course, onGenerateExam: { isShowingGenerateExam = true })
+                default:
+                    CourseDetailView(
+                        course: course,
+                        colorScheme: effectiveColorScheme,
+                        onSelectSubPage: { subPage in
+                            selectedCourseSubPage = subPage
+                        },
+                        onSelectNote: { note in
+                            note.lastOpenedAt = Date()
+                            selectedCourseSubPage = "notes"
+                            selectedNote = note
+                        }
+                    )
+                }
+            } else {
+                CourseDetailView(
+                    course: course,
+                    colorScheme: effectiveColorScheme,
+                    onSelectSubPage: { subPage in
+                        selectedCourseSubPage = subPage
+                    },
+                    onSelectNote: { note in
+                        note.lastOpenedAt = Date()
+                        selectedCourseSubPage = "notes"
+                        selectedNote = note
+                    }
+                )
             }
         } else if selectedItem == .settings {
             SettingsView(authManager: authManager)
@@ -156,20 +161,15 @@ struct HomeView: View {
                 colorScheme: effectiveColorScheme,
                 onSelectCourse: { course in
                     selectedCourse = course
-                    selectedSection = .notes
+                    selectedCourseSubPage = nil
                     selectedItem = nil
                 },
                 onSelectNote: { note, course in
                     note.lastOpenedAt = Date()
                     selectedCourse = course
-                    selectedSection = .notes
+                    selectedCourseSubPage = "notes"
                     selectedItem = nil
                     selectedNote = note
-                },
-                onSelectAssignment: { _, course in
-                    selectedCourse = course
-                    selectedSection = .assignments
-                    selectedItem = nil
                 }
             )
         }
@@ -177,167 +177,153 @@ struct HomeView: View {
 
     @ViewBuilder
     private var sidebarListContent: some View {
-        // Home tab (welcome page)
-        Button {
-            selectedItem = .home
-            selectedSection = nil
-        } label: {
-            HStack {
-                Label(SidebarItem.home.rawValue, systemImage: SidebarItem.home.icon)
-                    .font(.quicksand(17, weight: .medium))
-                    .foregroundColor(selectedItem == .home ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
-                Spacer()
+        // SECTION A: Main Pages
+        Section {
+            // Home tab
+            Button {
+                selectedItem = .home
+                selectedCourse = nil
+                selectedCourseSubPage = nil
+            } label: {
+                HStack {
+                    Label(SidebarItem.home.rawValue, systemImage: SidebarItem.home.icon)
+                        .font(.quicksand(17, weight: .medium))
+                        .foregroundColor(selectedItem == .home && selectedCourse == nil ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
+                    Spacer()
+                }
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
+            .buttonStyle(.plain)
+            .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
 
-        // My Reef tab
-        Button {
-            selectedItem = .myReef
-            selectedSection = nil
-        } label: {
-            HStack {
-                Label(SidebarItem.myReef.rawValue, systemImage: SidebarItem.myReef.icon)
-                    .font(.quicksand(17, weight: .medium))
-                    .foregroundColor(selectedItem == .myReef ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
-                Spacer()
+            // My Reef tab
+            Button {
+                selectedItem = .myReef
+                selectedCourse = nil
+                selectedCourseSubPage = nil
+            } label: {
+                HStack {
+                    Label(SidebarItem.myReef.rawValue, systemImage: SidebarItem.myReef.icon)
+                        .font(.quicksand(17, weight: .medium))
+                        .foregroundColor(selectedItem == .myReef ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
+                    Spacer()
+                }
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
+            .buttonStyle(.plain)
+            .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
 
-        // Courses tab (not selectable, toggles expansion)
-        Button {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                isCoursesExpanded.toggle()
+            // Analytics tab
+            Button {
+                selectedItem = .analytics
+                selectedCourse = nil
+                selectedCourseSubPage = nil
+            } label: {
+                HStack {
+                    Label(SidebarItem.analytics.rawValue, systemImage: SidebarItem.analytics.icon)
+                        .font(.quicksand(17, weight: .medium))
+                        .foregroundColor(selectedItem == .analytics ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
+                    Spacer()
+                }
+                .contentShape(Rectangle())
             }
-        } label: {
+            .buttonStyle(.plain)
+            .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+
+            // Tutors tab
+            Button {
+                selectedItem = .tutors
+                selectedCourse = nil
+                selectedCourseSubPage = nil
+            } label: {
+                HStack {
+                    Label(SidebarItem.tutors.rawValue, systemImage: SidebarItem.tutors.icon)
+                        .font(.quicksand(17, weight: .medium))
+                        .foregroundColor(selectedItem == .tutors ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+
+            // Settings tab
+            Button {
+                selectedItem = .settings
+                selectedCourse = nil
+                selectedCourseSubPage = nil
+            } label: {
+                HStack {
+                    Label(SidebarItem.settings.rawValue, systemImage: SidebarItem.settings.icon)
+                        .font(.quicksand(17, weight: .medium))
+                        .foregroundColor(selectedItem == .settings ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+        }
+
+        // SECTION B: Courses (always visible)
+        Section {
+            // Section header with add button
             HStack {
-                Label(SidebarItem.courses.rawValue, systemImage: SidebarItem.courses.icon)
-                    .font(.quicksand(17, weight: .medium))
+                Text("Courses")
+                    .font(.quicksand(14, weight: .semiBold))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
-                Spacer()
-                Image(systemName: isCoursesExpanded ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
-            }
-        }
-        .buttonStyle(.plain)
-        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
+                    .textCase(.uppercase)
 
-        // Show courses when expanded
-        if isCoursesExpanded {
+                Spacer()
+
+                Button {
+                    isAddingCourse = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                }
+                .buttonStyle(.plain)
+            }
+            .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 8, trailing: 16))
+
+            // Course list
             ForEach(courses) { course in
                 Button {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        if selectedCourse?.id == course.id {
-                            selectedCourse = nil
-                            selectedSection = nil
-                        } else {
-                            selectedCourse = course
-                            selectedSection = nil
-                        }
-                    }
+                    selectedCourse = course
+                    selectedCourseSubPage = nil
+                    selectedItem = nil
                 } label: {
                     HStack {
                         Label(course.name, systemImage: course.icon)
                             .font(.quicksand(17, weight: .medium))
-                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                            .foregroundColor(selectedCourse?.id == course.id ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
                         Spacer()
-                        Image(systemName: selectedCourse?.id == course.id ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                     }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .listRowInsets(EdgeInsets(top: 12, leading: 32, bottom: 12, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+            }
 
-                // Show sections when course is expanded
-                if selectedCourse?.id == course.id {
-                    ForEach(CourseSection.allCases) { section in
-                        Button {
-                            selectedSection = section
-                            selectedItem = nil
-                        } label: {
-                            HStack {
-                                Label(section.rawValue, systemImage: section.icon)
-                                    .font(.quicksand(17, weight: .medium))
-                                    .foregroundColor(selectedSection == section ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
-                                Spacer()
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .listRowInsets(EdgeInsets(top: 10, leading: 56, bottom: 10, trailing: 16))
-                    }
+            // Add Course row at bottom
+            if courses.isEmpty {
+                Button {
+                    isAddingCourse = true
+                } label: {
+                    Label("Add Course", systemImage: "plus")
+                        .font(.quicksand(17, weight: .medium))
+                        .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
                 }
+                .buttonStyle(.plain)
+                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
             }
-
-            // Add Course button
-            Button {
-                isAddingCourse = true
-            } label: {
-                Label("Add Course", systemImage: "plus.circle.fill")
-                    .font(.quicksand(17, weight: .medium))
-                    .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
-            }
-            .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets(top: 12, leading: 32, bottom: 12, trailing: 16))
         }
-
-        // Analytics, Tutors, and Settings (selectable)
-        Button {
-            selectedItem = .analytics
-            selectedSection = nil
-        } label: {
-            HStack {
-                Label(SidebarItem.analytics.rawValue, systemImage: SidebarItem.analytics.icon)
-                    .font(.quicksand(17, weight: .medium))
-                    .foregroundColor(selectedItem == .analytics ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
-                Spacer()
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
-
-        Button {
-            selectedItem = .tutors
-            selectedSection = nil
-        } label: {
-            HStack {
-                Label(SidebarItem.tutors.rawValue, systemImage: SidebarItem.tutors.icon)
-                    .font(.quicksand(17, weight: .medium))
-                    .foregroundColor(selectedItem == .tutors ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
-                Spacer()
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
-
-        Button {
-            selectedItem = .settings
-            selectedSection = nil
-        } label: {
-            HStack {
-                Label(SidebarItem.settings.rawValue, systemImage: SidebarItem.settings.icon)
-                    .font(.quicksand(17, weight: .medium))
-                    .foregroundColor(selectedItem == .settings ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
-                Spacer()
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
     }
 
     @ViewBuilder
     private var toolbarAddButton: some View {
-        if selectedSection == .notes {
+        if selectedCourseSubPage == "notes" {
             Button {
                 isShowingDocumentPicker = true
             } label: {
@@ -345,15 +331,7 @@ struct HomeView: View {
                     .font(.system(size: 18, weight: .medium))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
             }
-        } else if selectedSection == .assignments {
-            Button {
-                isShowingAssignmentPicker = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
-            }
-        } else if selectedSection == .quizzes {
+        } else if selectedCourseSubPage == "quizzes" {
             Button {
                 isShowingQuizGeneration = true
             } label: {
@@ -361,7 +339,7 @@ struct HomeView: View {
                     .font(.system(size: 18, weight: .medium))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
             }
-        } else if selectedSection == .exams {
+        } else if selectedCourseSubPage == "exams" {
             Button {
                 isShowingGenerateExam = true
             } label: {
@@ -376,7 +354,7 @@ struct HomeView: View {
     private var toolbarTrailingContent: some View {
         HStack(spacing: 20) {
             // Pin button (shown on course pages)
-            if let course = selectedCourse, selectedSection != nil {
+            if let course = selectedCourse {
                 Button {
                     userPrefsManager.togglePin(id: course.id)
                 } label: {
@@ -386,7 +364,7 @@ struct HomeView: View {
                 }
             }
 
-            // Add button (shown on Notes, Assignments, or Quizzes section)
+            // Add button (shown on Notes, Quizzes, or Exams sub-page)
             toolbarAddButton
 
             // Dark mode toggle
@@ -400,15 +378,15 @@ struct HomeView: View {
 
             // Settings
             Button {
-                if selectedSection != nil && selectedCourse != nil {
-                    // On course-specific page - show course menu
+                if selectedCourse != nil {
+                    // On course page - show course menu
                     editedCourseName = selectedCourse?.name ?? ""
                     editedCourseIcon = selectedCourse?.icon ?? "folder.fill"
                     isShowingCourseMenu = true
                 } else {
                     // On non-course page - navigate to settings
                     selectedItem = .settings
-                    selectedSection = nil
+                    selectedCourseSubPage = nil
                 }
             } label: {
                 Image(systemName: "gearshape.fill")
@@ -487,7 +465,7 @@ struct HomeView: View {
                     Button {
                         selectedItem = .home
                         selectedCourse = nil
-                        selectedSection = nil
+                        selectedCourseSubPage = nil
                     } label: {
                         HStack(spacing: 10) {
                             Image("ReefLogo")
@@ -577,11 +555,6 @@ struct HomeView: View {
                 addNotes(from: urls)
             }
         }
-        .sheet(isPresented: $isShowingAssignmentPicker) {
-            DocumentPicker { urls in
-                addAssignments(from: urls)
-            }
-        }
         .sheet(isPresented: $isShowingQuizGeneration) {
             if let course = selectedCourse {
                 QuizGenerationView(course: course)
@@ -614,7 +587,7 @@ struct HomeView: View {
 
                         modelContext.delete(course)
                         selectedCourse = nil
-                        selectedSection = nil
+                        selectedCourseSubPage = nil
                         isShowingCourseMenu = false
                     },
                     onDismiss: {
@@ -669,24 +642,20 @@ struct HomeView: View {
                let courseUUID = UUID(uuidString: courseIDString),
                let course = courses.first(where: { $0.id == courseUUID }) {
                 selectedCourse = course
-                isCoursesExpanded = true
 
-                // Restore section
-                if let rawSection = navStateManager.selectedSectionRaw,
-                   let section = CourseSection(rawValue: rawSection) {
-                    selectedSection = section
+                // Restore sub-page
+                selectedCourseSubPage = navStateManager.selectedCourseSubPage
 
-                    // Restore note if viewing canvas
-                    if navStateManager.isViewingCanvas,
-                       let noteIDString = navStateManager.selectedNoteID,
-                       let noteUUID = UUID(uuidString: noteIDString),
-                       let note = course.notes.first(where: { $0.id == noteUUID }) {
-                        selectedNote = note
-                        isViewingCanvas = true
-                    } else {
-                        // Note was deleted or not found - clear note state
-                        navStateManager.clearNoteState()
-                    }
+                // Restore note if viewing canvas
+                if navStateManager.isViewingCanvas,
+                   let noteIDString = navStateManager.selectedNoteID,
+                   let noteUUID = UUID(uuidString: noteIDString),
+                   let note = course.notes.first(where: { $0.id == noteUUID }) {
+                    selectedNote = note
+                    isViewingCanvas = true
+                } else {
+                    // Note was deleted or not found - clear note state
+                    navStateManager.clearNoteState()
                 }
             } else if navStateManager.selectedCourseID != nil {
                 // Course was deleted - clear course state
@@ -704,8 +673,8 @@ struct HomeView: View {
         .onChange(of: selectedCourse) { _, newValue in
             navStateManager.selectedCourseID = newValue?.id.uuidString
         }
-        .onChange(of: selectedSection) { _, newValue in
-            navStateManager.selectedSectionRaw = newValue?.rawValue
+        .onChange(of: selectedCourseSubPage) { _, newValue in
+            navStateManager.selectedCourseSubPage = newValue
         }
         .onChange(of: selectedNote) { _, newValue in
             navStateManager.selectedNoteID = newValue?.id.uuidString
@@ -777,74 +746,6 @@ struct HomeView: View {
         }
     }
 
-    private func addAssignments(from urls: [URL]) {
-        guard let course = selectedCourse else { return }
-
-        for url in urls {
-            let fileName = url.lastPathComponent
-            let fileExtension = url.pathExtension
-            let name = url.deletingPathExtension().lastPathComponent
-
-            let assignment = Assignment(
-                name: name,
-                fileName: fileName,
-                fileExtension: fileExtension,
-                course: course
-            )
-
-            // Generate thumbnail for PDFs
-            if fileExtension.lowercased() == "pdf" {
-                assignment.thumbnailData = PDFThumbnailGenerator.generateThumbnailData(from: url)
-            }
-
-            do {
-                _ = try FileStorageService.shared.copyFile(
-                    from: url,
-                    documentID: assignment.id,
-                    fileExtension: fileExtension
-                )
-                modelContext.insert(assignment)
-
-                // Extract text using OCR and embedded extraction
-                assignment.extractionStatus = .extracting
-                let assignmentID = assignment.id
-                let courseID = course.id
-                Task.detached {
-                    let fileURL = FileStorageService.shared.getFileURL(
-                        for: assignmentID,
-                        fileExtension: fileExtension
-                    )
-                    let result = await DocumentTextExtractor.shared.extractText(from: fileURL)
-                    await MainActor.run {
-                        assignment.extractedText = result.text
-                        assignment.extractionMethod = result.method
-                        assignment.ocrConfidence = result.confidence
-                        assignment.extractionStatus = result.text != nil ? .completed : .failed
-                        assignment.isTextExtracted = true
-                    }
-
-                    // Index for RAG if text extraction succeeded
-                    if let text = result.text {
-                        do {
-                            try await RAGService.shared.indexDocument(
-                                documentId: assignmentID,
-                                documentType: .assignment,
-                                courseId: courseID,
-                                text: text
-                            )
-                            await MainActor.run {
-                                assignment.isVectorIndexed = true
-                            }
-                        } catch {
-                            print("Failed to index assignment for RAG: \(error)")
-                        }
-                    }
-                }
-            } catch {
-                print("Failed to copy file: \(error)")
-            }
-        }
-    }
 }
 
 // MARK: - Course Options Popup
@@ -1146,7 +1047,7 @@ struct CourseOptionsPopup: View {
             .background(Color.deleteRed)
 
             VStack(spacing: 20) {
-                Text("This action cannot be undone. All notes, assignments, quizzes, and exams will be permanently deleted.")
+                Text("This action cannot be undone. All notes, quizzes, and exams will be permanently deleted.")
                     .font(.quicksand(15, weight: .regular))
                     .foregroundColor(Color.adaptiveText(for: colorScheme))
                     .multilineTextAlignment(.center)

@@ -16,7 +16,7 @@ class NavigationStateManager: ObservableObject {
 
     @AppStorage("nav_sidebarItem") var selectedSidebarItemRaw: String?
     @AppStorage("nav_courseID") var selectedCourseID: String?
-    @AppStorage("nav_section") var selectedSectionRaw: String?
+    @AppStorage("nav_courseSubPage") var selectedCourseSubPage: String? // "notes", "quizzes", "exams"
     @AppStorage("nav_noteID") var selectedNoteID: String?
     @AppStorage("nav_isViewingCanvas") var isViewingCanvas: Bool = false
 
@@ -28,7 +28,7 @@ class NavigationStateManager: ObservableObject {
     func clearState() {
         selectedSidebarItemRaw = nil
         selectedCourseID = nil
-        selectedSectionRaw = nil
+        selectedCourseSubPage = nil
         selectedNoteID = nil
         isViewingCanvas = false
     }
@@ -42,7 +42,7 @@ class NavigationStateManager: ObservableObject {
     /// Clears course and downstream state (when course is deleted or not found).
     func clearCourseState() {
         selectedCourseID = nil
-        selectedSectionRaw = nil
+        selectedCourseSubPage = nil
         selectedNoteID = nil
         isViewingCanvas = false
     }

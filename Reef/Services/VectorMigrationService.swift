@@ -36,20 +36,6 @@ struct VectorMigrationService {
                 await processBatch(batch, courseId: course.id, type: .note)
                 totalMigrated += batch.count
             }
-
-            // Process assignments
-            let unindexedAssignments = course.assignments.filter {
-                !$0.isVectorIndexed && $0.extractedText != nil
-            }
-
-            if !unindexedAssignments.isEmpty {
-                print("[Migration] Found \(unindexedAssignments.count) unindexed assignments in '\(course.name)'")
-            }
-
-            for batch in unindexedAssignments.chunked(into: batchSize) {
-                await processBatch(batch, courseId: course.id, type: .assignment)
-                totalMigrated += batch.count
-            }
         }
 
         if totalMigrated > 0 {
@@ -79,30 +65,6 @@ struct VectorMigrationService {
             }
 
             // Small delay between documents to avoid overwhelming the system
-            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-        }
-    }
-
-    /// Process a batch of assignments
-    @MainActor
-    private func processBatch(_ assignments: [Assignment], courseId: UUID, type: DocumentType) async {
-        for assignment in assignments {
-            guard let text = assignment.extractedText else { continue }
-
-            do {
-                try await RAGService.shared.indexDocument(
-                    documentId: assignment.id,
-                    documentType: type,
-                    courseId: courseId,
-                    text: text
-                )
-                assignment.isVectorIndexed = true
-                print("[Migration] Indexed assignment: \(assignment.name)")
-            } catch {
-                print("[Migration] Failed to index assignment \(assignment.name): \(error)")
-            }
-
-            // Small delay between documents
             try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
         }
     }

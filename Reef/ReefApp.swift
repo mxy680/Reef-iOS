@@ -32,6 +32,6 @@ struct ReefApp: App {
                 PreAuthView(authManager: authManager)
             }
         }
-        .modelContainer(for: [Course.self, Note.self, Assignment.self, ExamAttempt.self, ExamQuestion.self])
+        .modelContainer(for: [Course.self, Note.self, ExamAttempt.self, ExamQuestion.self])
     }
 }
