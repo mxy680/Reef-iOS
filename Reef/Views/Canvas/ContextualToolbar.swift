@@ -489,6 +489,7 @@ struct ContextualToolbar: View {
             customHighlighterColors: .constant([]),
             colorScheme: .light,
             canPaste: true,
+            hasSelection: true,
             onCopy: {},
             onCut: {},
             onDelete: {},
