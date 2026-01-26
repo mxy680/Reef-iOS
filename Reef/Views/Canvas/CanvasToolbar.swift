@@ -78,11 +78,9 @@ struct CanvasToolbar: View {
     let colorScheme: ColorScheme
     let canUndo: Bool
     let canRedo: Bool
-    let canPaste: Bool
     let onHomePressed: () -> Void
     let onUndo: () -> Void
     let onRedo: () -> Void
-    let onPaste: () -> Void
     let onAIPressed: () -> Void
     let onToggleDarkMode: () -> Void
 
