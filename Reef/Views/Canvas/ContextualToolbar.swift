@@ -64,7 +64,7 @@ struct ContextualToolbar: View {
                 case .eraser:
                     eraserOptions
                 case .lasso:
-                    EmptyView()
+                    lassoOptions
                 }
             }
 
