@@ -135,6 +135,7 @@ struct CanvasToolbar: View {
                     customHighlighterColors: $customHighlighterColors,
                     colorScheme: colorScheme,
                     canPaste: canPaste,
+                    hasSelection: hasSelection,
                     onCopy: onCopy,
                     onCut: onCut,
                     onDelete: onDelete,
