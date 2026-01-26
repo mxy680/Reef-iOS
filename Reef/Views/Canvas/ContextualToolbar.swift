@@ -328,6 +328,75 @@ struct ContextualToolbar: View {
         }
     }
 
+    // MARK: - Lasso Options
+
+    @State private var showingTooltip: LassoAction? = nil
+
+    private enum LassoAction: String, CaseIterable {
+        case copy, cut, delete
+    }
+
+    private var lassoOptions: some View {
+        HStack(spacing: 4) {
+            // Copy button (disabled - selection state unknown)
+            LassoActionButton(
+                icon: "doc.on.doc",
+                label: "Copy",
+                isEnabled: false,
+                colorScheme: colorScheme,
+                showingTooltip: $showingTooltip,
+                tooltipAction: .copy,
+                action: { onCopy?() }
+            )
+
+            // Cut button (disabled - selection state unknown)
+            LassoActionButton(
+                icon: "scissors",
+                label: "Cut",
+                isEnabled: false,
+                colorScheme: colorScheme,
+                showingTooltip: $showingTooltip,
+                tooltipAction: .cut,
+                action: { onCut?() }
+            )
+
+            // Divider
+            Rectangle()
+                .fill(Color.adaptiveText(for: colorScheme).opacity(0.2))
+                .frame(width: 1, height: 24)
+                .padding(.horizontal, 4)
+
+            // Paste button (enabled when clipboard has content)
+            LassoActionButton(
+                icon: "doc.on.clipboard",
+                label: "Paste",
+                isEnabled: canPaste,
+                colorScheme: colorScheme,
+                showingTooltip: .constant(nil),
+                tooltipAction: nil,
+                action: { onPaste?() }
+            )
+
+            // Divider
+            Rectangle()
+                .fill(Color.adaptiveText(for: colorScheme).opacity(0.2))
+                .frame(width: 1, height: 24)
+                .padding(.horizontal, 4)
+
+            // Delete button (disabled - selection state unknown)
+            LassoActionButton(
+                icon: "trash",
+                label: "Delete",
+                isEnabled: false,
+                isDestructive: true,
+                colorScheme: colorScheme,
+                showingTooltip: $showingTooltip,
+                tooltipAction: .delete,
+                action: { onDelete?() }
+            )
+        }
+    }
+
     // MARK: - Thickness Slider
 
     private func thicknessSlider(value: Binding<CGFloat>, range: ClosedRange<CGFloat>) -> some View {
