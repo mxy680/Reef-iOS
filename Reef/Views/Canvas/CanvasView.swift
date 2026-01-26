@@ -33,11 +33,11 @@ struct CanvasView: View {
     @State private var canUndo: Bool = false
     @State private var canRedo: Bool = false
 
-    // Clipboard state
-    @State private var canPaste: Bool = false
+    // Lasso selection state
     @State private var hasSelection: Bool = false
+    @State private var canPaste: Bool = false
 
-    // Reference to canvas for undo/redo
+    // Reference to canvas for undo/redo and lasso operations
     @State private var canvasViewRef: CanvasContainerView?
 
     // Drawing persistence
@@ -128,12 +128,12 @@ struct CanvasView: View {
                         // Update pen color to match new theme
                         selectedPenColor = themeManager.isDarkMode ? .white : .black
                     },
-                    canPaste: canPaste,
+                    canPaste: canvasViewRef?.canvasView.canPaste ?? false,
                     hasSelection: hasSelection,
-                    onCopy: { canvasViewRef?.canvasView.performCopy() },
-                    onCut: { canvasViewRef?.canvasView.performCut() },
-                    onDelete: { canvasViewRef?.canvasView.performDelete() },
-                    onPaste: { canvasViewRef?.canvasView.performPaste() }
+                    onCopy: { canvasViewRef?.canvasView.copySelection() },
+                    onCut: { canvasViewRef?.canvasView.cutSelection() },
+                    onDelete: { canvasViewRef?.canvasView.deleteSelection() },
+                    onPaste: { canvasViewRef?.canvasView.pasteFromClipboard() }
                 )
                 .padding(.bottom, 24)
             }
@@ -151,11 +151,6 @@ struct CanvasView: View {
             }
             // Set default pen color based on theme
             selectedPenColor = themeManager.isDarkMode ? .white : .black
-            // Check initial paste state
-            updatePasteState()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIPasteboard.changedNotification)) { _ in
-            updatePasteState()
         }
         .onDisappear {
             // Only manage state if not controlled by parent
@@ -168,22 +163,6 @@ struct CanvasView: View {
             saveTask?.cancel()
             if let drawing = canvasViewRef?.canvasView.drawing {
                 try? DrawingStorageService.shared.saveDrawing(drawing, for: note.id)
-            }
-        }
-    }
-
-    // MARK: - Clipboard Helpers
-
-    private func updatePasteState() {
-        UIPasteboard.general.detectPatterns(
-            for: [.init(rawValue: "com.apple.pencilkit.drawing")]
-        ) { result in
-            DispatchQueue.main.async {
-                if case .success(let patterns) = result {
-                    canPaste = !patterns.isEmpty
-                } else {
-                    canPaste = false
-                }
             }
         }
     }
