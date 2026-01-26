@@ -894,15 +894,15 @@ struct CourseOptionsPopup: View {
     }
 
     private var cardBackgroundColor: Color {
-        Color.cardBackground
+        Color.adaptiveCardBackground(for: colorScheme)
     }
 
     private var headerBackgroundColor: Color {
-        Color.oceanMid
+        Color.adaptiveSecondary(for: colorScheme)
     }
 
     private var textFieldBackgroundColor: Color {
-        Color.lightGrayBackground
+        colorScheme == .dark ? Color.deepOcean : Color.lightGrayBackground
     }
 
     var body: some View {
@@ -961,17 +961,17 @@ struct CourseOptionsPopup: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Course Name")
                             .font(.quicksand(14, weight: .medium))
-                            .foregroundColor(Color.oceanMid)
+                            .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
 
                         TextField("Enter course name", text: $editedName)
                             .font(.quicksand(16, weight: .regular))
-                            .foregroundColor(Color.inkBlack)
+                            .foregroundColor(Color.adaptiveText(for: colorScheme))
                             .padding(12)
                             .background(textFieldBackgroundColor)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.oceanMid.opacity(0.3), lineWidth: 1)
+                                    .stroke(Color.adaptiveSecondary(for: colorScheme).opacity(0.3), lineWidth: 1)
                             )
                     }
 
@@ -979,7 +979,7 @@ struct CourseOptionsPopup: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Icon")
                             .font(.quicksand(14, weight: .medium))
-                            .foregroundColor(Color.oceanMid)
+                            .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
 
                         Button {
                             withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
@@ -988,13 +988,13 @@ struct CourseOptionsPopup: View {
                         } label: {
                             Image(systemName: editedIcon)
                                 .font(.system(size: 24))
-                                .foregroundColor(Color.oceanMid)
+                                .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
                                 .frame(width: 48, height: 48)
                                 .background(textFieldBackgroundColor)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 10)
-                                        .stroke(Color.oceanMid.opacity(0.3), lineWidth: 1)
+                                        .stroke(Color.adaptiveSecondary(for: colorScheme).opacity(0.3), lineWidth: 1)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -1028,14 +1028,14 @@ struct CourseOptionsPopup: View {
                     } label: {
                         Text("Cancel")
                             .font(.quicksand(16, weight: .semiBold))
-                            .foregroundColor(Color.inkBlack)
+                            .foregroundColor(Color.adaptiveText(for: colorScheme))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(Color.lightGrayBackground)
+                            .background(textFieldBackgroundColor)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.oceanMid.opacity(0.3), lineWidth: 1)
+                                    .stroke(Color.adaptiveSecondary(for: colorScheme).opacity(0.3), lineWidth: 1)
                             )
                     }
                     .buttonStyle(.plain)
@@ -1109,13 +1109,13 @@ struct CourseOptionsPopup: View {
                         } label: {
                             Image(systemName: icon)
                                 .font(.system(size: 22))
-                                .foregroundColor(editedIcon == icon ? .white : Color.oceanMid)
+                                .foregroundColor(editedIcon == icon ? .white : Color.adaptiveSecondary(for: colorScheme))
                                 .frame(width: 48, height: 48)
-                                .background(editedIcon == icon ? Color.oceanMid : textFieldBackgroundColor)
+                                .background(editedIcon == icon ? Color.adaptiveSecondary(for: colorScheme) : textFieldBackgroundColor)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 10)
-                                        .stroke(editedIcon == icon ? Color.oceanMid : Color.oceanMid.opacity(0.3), lineWidth: editedIcon == icon ? 2 : 1)
+                                        .stroke(editedIcon == icon ? Color.adaptiveSecondary(for: colorScheme) : Color.adaptiveSecondary(for: colorScheme).opacity(0.3), lineWidth: editedIcon == icon ? 2 : 1)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -1148,7 +1148,7 @@ struct CourseOptionsPopup: View {
             VStack(spacing: 20) {
                 Text("This action cannot be undone. All notes, assignments, quizzes, and exams will be permanently deleted.")
                     .font(.quicksand(15, weight: .regular))
-                    .foregroundColor(Color.inkBlack)
+                    .foregroundColor(Color.adaptiveText(for: colorScheme))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -1161,14 +1161,14 @@ struct CourseOptionsPopup: View {
                     } label: {
                         Text("Cancel")
                             .font(.quicksand(16, weight: .semiBold))
-                            .foregroundColor(Color.inkBlack)
+                            .foregroundColor(Color.adaptiveText(for: colorScheme))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(Color.lightGrayBackground)
+                            .background(textFieldBackgroundColor)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.oceanMid.opacity(0.3), lineWidth: 1)
+                                    .stroke(Color.adaptiveSecondary(for: colorScheme).opacity(0.3), lineWidth: 1)
                             )
                     }
                     .buttonStyle(.plain)
