@@ -8,6 +8,14 @@
 import SwiftUI
 import UIKit
 
+// MARK: - Lasso Action Type
+
+private enum LassoAction: String, CaseIterable {
+    case copy, cut, delete
+}
+
+// MARK: - Contextual Toolbar
+
 struct ContextualToolbar: View {
     let selectedTool: CanvasTool
     @Binding var penWidth: CGFloat
