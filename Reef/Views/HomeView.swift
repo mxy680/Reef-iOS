@@ -65,9 +65,11 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 struct HomeView: View {
     @ObservedObject var authManager: AuthenticationManager
     @StateObject private var themeManager = ThemeManager.shared
+    @StateObject private var navStateManager = NavigationStateManager.shared
     @Environment(\.modelContext) private var modelContext
     @Query private var courses: [Course]
     @State private var selectedItem: SidebarItem?
+    @State private var hasRestoredState = false
     @State private var isCoursesExpanded = true
     @State private var selectedCourse: Course?
     @State private var selectedSection: CourseSection?
