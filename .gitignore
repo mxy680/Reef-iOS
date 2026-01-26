@@ -21,3 +21,6 @@ Carthage/Build/
 .DS_Store
 docs/
 CLAUDE.md
+
+# Worktrees
+.worktrees/
