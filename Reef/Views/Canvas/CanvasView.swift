@@ -26,6 +26,7 @@ struct CanvasView: View {
     @State private var customHighlighterColors: [Color] = []
     @State private var canvasBackgroundMode: CanvasBackgroundMode = .normal
     @State private var canvasBackgroundOpacity: CGFloat = 0.15
+    @State private var canvasBackgroundSpacing: CGFloat = 48
 
     // Undo/Redo state
     @State private var canUndo: Bool = false
@@ -76,6 +77,7 @@ struct CanvasView: View {
                 eraserType: $eraserType,
                 canvasBackgroundMode: canvasBackgroundMode,
                 canvasBackgroundOpacity: canvasBackgroundOpacity,
+                canvasBackgroundSpacing: canvasBackgroundSpacing,
                 isDarkMode: themeManager.isDarkMode,
                 onCanvasReady: { canvasViewRef = $0 },
                 onUndoStateChanged: { canUndo = $0 },
@@ -97,6 +99,7 @@ struct CanvasView: View {
                     customHighlighterColors: $customHighlighterColors,
                     canvasBackgroundMode: $canvasBackgroundMode,
                     canvasBackgroundOpacity: $canvasBackgroundOpacity,
+                    canvasBackgroundSpacing: $canvasBackgroundSpacing,
                     colorScheme: effectiveColorScheme,
                     canUndo: canUndo,
                     canRedo: canRedo,

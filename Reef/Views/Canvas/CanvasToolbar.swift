@@ -76,6 +76,7 @@ struct CanvasToolbar: View {
     @Binding var customHighlighterColors: [Color]
     @Binding var canvasBackgroundMode: CanvasBackgroundMode
     @Binding var canvasBackgroundOpacity: CGFloat
+    @Binding var canvasBackgroundSpacing: CGFloat
     let colorScheme: ColorScheme
     let canUndo: Bool
     let canRedo: Bool
@@ -161,6 +162,7 @@ struct CanvasToolbar: View {
                 BackgroundModeToolbar(
                     canvasBackgroundMode: $canvasBackgroundMode,
                     canvasBackgroundOpacity: $canvasBackgroundOpacity,
+                    canvasBackgroundSpacing: $canvasBackgroundSpacing,
                     colorScheme: colorScheme,
                     onClose: { backgroundModeSelected = false }
                 )
@@ -344,6 +346,7 @@ private struct ToolbarButton: View {
 private struct BackgroundModeToolbar: View {
     @Binding var canvasBackgroundMode: CanvasBackgroundMode
     @Binding var canvasBackgroundOpacity: CGFloat
+    @Binding var canvasBackgroundSpacing: CGFloat
     let colorScheme: ColorScheme
     var onClose: (() -> Void)? = nil
 
@@ -376,18 +379,41 @@ private struct BackgroundModeToolbar: View {
                 .frame(width: 1, height: 24)
                 .padding(.horizontal, 8)
 
-            HStack(spacing: 6) {
-                Image(systemName: "circle.dotted")
-                    .font(.system(size: 12))
+            // Opacity slider
+            HStack(spacing: 4) {
+                Image(systemName: "sun.min")
+                    .font(.system(size: 11))
                     .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(canvasBackgroundMode == .normal ? 0.2 : 0.5))
 
                 Slider(value: $canvasBackgroundOpacity, in: 0.05...0.5)
                     .accentColor(.vibrantTeal)
-                    .frame(width: 80)
+                    .frame(width: 60)
                     .disabled(canvasBackgroundMode == .normal)
 
-                Image(systemName: "circle.fill")
-                    .font(.system(size: 12))
+                Image(systemName: "sun.max")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(canvasBackgroundMode == .normal ? 0.2 : 0.5))
+            }
+            .opacity(canvasBackgroundMode == .normal ? 0.4 : 1.0)
+
+            // Spacing slider
+            Rectangle()
+                .fill(Color.adaptiveText(for: colorScheme).opacity(0.2))
+                .frame(width: 1, height: 24)
+                .padding(.horizontal, 6)
+
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.down.right.and.arrow.up.left")
+                    .font(.system(size: 10))
+                    .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(canvasBackgroundMode == .normal ? 0.2 : 0.5))
+
+                Slider(value: $canvasBackgroundSpacing, in: 24...80)
+                    .accentColor(.vibrantTeal)
+                    .frame(width: 60)
+                    .disabled(canvasBackgroundMode == .normal)
+
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 10))
                     .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(canvasBackgroundMode == .normal ? 0.2 : 0.5))
             }
             .opacity(canvasBackgroundMode == .normal ? 0.4 : 1.0)
@@ -448,6 +474,7 @@ private struct BackgroundModeToolbar: View {
             customHighlighterColors: .constant([]),
             canvasBackgroundMode: .constant(.normal),
             canvasBackgroundOpacity: .constant(0.15),
+            canvasBackgroundSpacing: .constant(48),
             colorScheme: .light,
             canUndo: true,
             canRedo: false,

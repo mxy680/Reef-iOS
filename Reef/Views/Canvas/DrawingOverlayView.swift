@@ -35,6 +35,7 @@ struct DrawingOverlayView: UIViewRepresentable {
     @Binding var eraserType: EraserType
     var canvasBackgroundMode: CanvasBackgroundMode = .normal
     var canvasBackgroundOpacity: CGFloat = 0.15
+    var canvasBackgroundSpacing: CGFloat = 48
     var isDarkMode: Bool = false
     var recognitionEnabled: Bool = false
     var pauseSensitivity: Double = 0.5
@@ -44,7 +45,7 @@ struct DrawingOverlayView: UIViewRepresentable {
     var onRecognitionResult: (RecognitionResult) -> Void = { _ in }
 
     func makeUIView(context: Context) -> CanvasContainerView {
-        let container = CanvasContainerView(documentURL: documentURL, fileType: fileType, backgroundMode: canvasBackgroundMode, backgroundOpacity: canvasBackgroundOpacity, isDarkMode: isDarkMode)
+        let container = CanvasContainerView(documentURL: documentURL, fileType: fileType, backgroundMode: canvasBackgroundMode, backgroundOpacity: canvasBackgroundOpacity, backgroundSpacing: canvasBackgroundSpacing, isDarkMode: isDarkMode)
         container.canvasView.delegate = context.coordinator
         context.coordinator.container = container
         context.coordinator.onUndoStateChanged = onUndoStateChanged
@@ -73,6 +74,7 @@ struct DrawingOverlayView: UIViewRepresentable {
         container.updateDarkMode(isDarkMode)
         container.updateBackgroundMode(canvasBackgroundMode)
         container.updateBackgroundOpacity(canvasBackgroundOpacity)
+        container.updateBackgroundSpacing(canvasBackgroundSpacing)
 
         // Keep recognition settings in sync
         context.coordinator.recognitionEnabled = recognitionEnabled
@@ -427,6 +429,7 @@ class CanvasContainerView: UIView {
     private var fileType: Note.FileType?
     private var backgroundMode: CanvasBackgroundMode = .normal
     private var backgroundOpacity: CGFloat = 0.15
+    private var backgroundSpacing: CGFloat = 48
     private var isDarkMode: Bool = false
 
     /// Light gray background for scroll view in light mode (close to white)
@@ -438,12 +441,13 @@ class CanvasContainerView: UIView {
     /// Lighter background for scroll area in dark mode (lighter than the page)
     private static let scrollBackgroundDark = UIColor(red: 18/255, green: 32/255, blue: 52/255, alpha: 1)
 
-    convenience init(documentURL: URL, fileType: Note.FileType, backgroundMode: CanvasBackgroundMode = .normal, backgroundOpacity: CGFloat = 0.15, isDarkMode: Bool = false) {
+    convenience init(documentURL: URL, fileType: Note.FileType, backgroundMode: CanvasBackgroundMode = .normal, backgroundOpacity: CGFloat = 0.15, backgroundSpacing: CGFloat = 48, isDarkMode: Bool = false) {
         self.init(frame: .zero)
         self.documentURL = documentURL
         self.fileType = fileType
         self.backgroundMode = backgroundMode
         self.backgroundOpacity = backgroundOpacity
+        self.backgroundSpacing = backgroundSpacing
         self.isDarkMode = isDarkMode
         loadDocument()
     }
@@ -491,6 +495,7 @@ class CanvasContainerView: UIView {
         backgroundPatternView.isOpaque = false
         backgroundPatternView.mode = backgroundMode
         backgroundPatternView.opacity = backgroundOpacity
+        backgroundPatternView.spacing = backgroundSpacing
         backgroundPatternView.isDarkMode = isDarkMode
         contentView.addSubview(backgroundPatternView)
 
@@ -553,6 +558,12 @@ class CanvasContainerView: UIView {
         guard newOpacity != backgroundOpacity else { return }
         backgroundOpacity = newOpacity
         backgroundPatternView.opacity = newOpacity
+    }
+
+    func updateBackgroundSpacing(_ newSpacing: CGFloat) {
+        guard newSpacing != backgroundSpacing else { return }
+        backgroundSpacing = newSpacing
+        backgroundPatternView.spacing = newSpacing
     }
 
     private func animateThemeChange() {
@@ -630,6 +641,7 @@ class CanvasContainerView: UIView {
         // Update background pattern view with current settings
         backgroundPatternView.mode = backgroundMode
         backgroundPatternView.opacity = backgroundOpacity
+        backgroundPatternView.spacing = backgroundSpacing
         backgroundPatternView.isDarkMode = isDarkMode
 
         // Update backgrounds based on dark mode
@@ -775,11 +787,12 @@ class CanvasBackgroundPatternView: UIView {
         }
     }
 
-    /// Spacing between grid lines/dots in points
-    private let gridSpacing: CGFloat = 48
-
-    /// Spacing between horizontal lines for lined paper
-    private let lineSpacing: CGFloat = 36
+    /// Spacing between grid lines/dots/lines in points
+    var spacing: CGFloat = 48 {
+        didSet {
+            setNeedsDisplay()
+        }
+    }
 
     /// Pattern color - uses the opacity property
     private var patternColor: UIColor {
@@ -809,19 +822,19 @@ class CanvasBackgroundPatternView: UIView {
         context.setLineWidth(0.5)
 
         // Vertical lines
-        var x = gridSpacing
+        var x = spacing
         while x < rect.width {
             context.move(to: CGPoint(x: x, y: 0))
             context.addLine(to: CGPoint(x: x, y: rect.height))
-            x += gridSpacing
+            x += spacing
         }
 
         // Horizontal lines
-        var y = gridSpacing
+        var y = spacing
         while y < rect.height {
             context.move(to: CGPoint(x: 0, y: y))
             context.addLine(to: CGPoint(x: rect.width, y: y))
-            y += gridSpacing
+            y += spacing
         }
 
         context.strokePath()
@@ -830,9 +843,9 @@ class CanvasBackgroundPatternView: UIView {
     private func drawDots(in rect: CGRect, context: CGContext) {
         let dotRadius: CGFloat = 1.5
 
-        var x = gridSpacing
+        var x = spacing
         while x < rect.width {
-            var y = gridSpacing
+            var y = spacing
             while y < rect.height {
                 context.fillEllipse(in: CGRect(
                     x: x - dotRadius,
@@ -840,20 +853,20 @@ class CanvasBackgroundPatternView: UIView {
                     width: dotRadius * 2,
                     height: dotRadius * 2
                 ))
-                y += gridSpacing
+                y += spacing
             }
-            x += gridSpacing
+            x += spacing
         }
     }
 
     private func drawLines(in rect: CGRect, context: CGContext) {
         context.setLineWidth(0.5)
 
-        var y = lineSpacing
+        var y = spacing
         while y < rect.height {
             context.move(to: CGPoint(x: 0, y: y))
             context.addLine(to: CGPoint(x: rect.width, y: y))
-            y += lineSpacing
+            y += spacing
         }
 
         context.strokePath()
