@@ -41,6 +41,7 @@ struct DrawingOverlayView: UIViewRepresentable {
     var isDarkMode: Bool = false
     var recognitionEnabled: Bool = false
     var pauseSensitivity: Double = 0.5
+    var questionRegions: DocumentQuestionRegions? = nil
     var onCanvasReady: (CanvasContainerView) -> Void = { _ in }
     var onUndoStateChanged: (Bool) -> Void = { _ in }
     var onRedoStateChanged: (Bool) -> Void = { _ in }

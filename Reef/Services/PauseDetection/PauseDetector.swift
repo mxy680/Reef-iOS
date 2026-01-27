@@ -57,6 +57,9 @@ final class PauseDetector {
     /// Called when a pause is detected
     var onPauseDetected: ((PauseContext) -> Void)?
 
+    /// Provides the active question context when a pause is detected
+    var activeQuestionProvider: (() -> ActiveQuestionContext?)?
+
     // MARK: - Initialization
 
     init() {

@@ -70,6 +70,7 @@ struct CanvasView: View {
                 canvasBackgroundOpacity: canvasBackgroundOpacity,
                 canvasBackgroundSpacing: canvasBackgroundSpacing,
                 isDarkMode: themeManager.isDarkMode,
+                questionRegions: note.questionRegions,
                 onCanvasReady: { container in
                     canvasViewRef = container
                     // Drawings are now loaded automatically in CanvasContainerView.loadDocument()
