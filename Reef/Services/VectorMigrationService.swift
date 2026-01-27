@@ -20,6 +20,13 @@ struct VectorMigrationService {
     func migrateIfNeeded(courses: [Course]) async {
         print("[Migration] Starting vector index migration check...")
 
+        // Check if embedding version changed - if so, reset all isVectorIndexed flags
+        let didVersionChange = await VectorStore.shared.didMigrateVersion
+        if didVersionChange {
+            print("[Migration] Embedding version changed - resetting all vector index flags")
+            resetAllVectorIndexFlags(courses: courses)
+        }
+
         var totalMigrated = 0
 
         for course in courses {
@@ -43,6 +50,23 @@ struct VectorMigrationService {
         } else {
             print("[Migration] No documents needed migration")
         }
+    }
+
+    /// Reset isVectorIndexed flag on all notes when embedding version changes
+    @MainActor
+    private func resetAllVectorIndexFlags(courses: [Course]) {
+        var resetCount = 0
+
+        for course in courses {
+            for note in course.notes {
+                if note.isVectorIndexed {
+                    note.isVectorIndexed = false
+                    resetCount += 1
+                }
+            }
+        }
+
+        print("[Migration] Reset vector index flag on \(resetCount) documents")
     }
 
     /// Process a batch of notes

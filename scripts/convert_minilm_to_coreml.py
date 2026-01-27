@@ -2,6 +2,8 @@
 """
 Convert MiniLM-L6-v2 sentence transformer to CoreML format for on-device embeddings.
 
+This script uses a simpler approach with the legacy torch ONNX export API.
+
 Requirements:
     pip install sentence-transformers coremltools numpy
 
@@ -30,8 +32,7 @@ def main():
     print("=" * 60)
 
     import torch
-    # Force CPU
-    torch.set_default_device("cpu")
+    import torch.nn as nn
 
     # Setup paths
     script_dir = Path(__file__).parent
@@ -79,47 +80,40 @@ def main():
     print(f"  Vocabulary saved: {vocab_path}")
     print(f"  Vocab size: {len(vocab_data['vocab'])} tokens")
 
-    # Step 3: Create and trace the model
-    print("\n[3/4] Tracing and converting to CoreML...")
-    import torch.nn as nn
+    # Step 3: Export and convert to CoreML using coremltools' torch converter
+    print("\n[3/4] Converting to CoreML...")
 
-    class SimplifiedMiniLM(nn.Module):
-        """Simplified wrapper that just does embedding lookup and pooling."""
-        def __init__(self, transformer_model):
+    # Create a simplified wrapper model
+    class MiniLMWrapper(nn.Module):
+        def __init__(self, st_model):
             super().__init__()
-            self.transformer = transformer_model[0].auto_model.to("cpu")
+            # Get the transformer model
+            self.encoder = st_model[0].auto_model
 
         def forward(self, input_ids, attention_mask):
-            outputs = self.transformer(input_ids=input_ids, attention_mask=attention_mask)
-            token_embeddings = outputs.last_hidden_state
+            # Get transformer outputs
+            outputs = self.encoder(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                return_dict=True
+            )
+            return outputs.last_hidden_state
 
-            # Mean pooling
-            mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-            sum_embeddings = torch.sum(token_embeddings * mask_expanded, 1)
-            sum_mask = torch.clamp(mask_expanded.sum(1), min=1e-9)
-            embeddings = sum_embeddings / sum_mask
+    wrapper = MiniLMWrapper(model)
+    wrapper.eval()
+    for p in wrapper.parameters():
+        p.requires_grad = False
 
-            # L2 normalize
-            embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
-            return embeddings
-
-    simplified = SimplifiedMiniLM(model).to("cpu")
-
-    # Put in inference mode
-    simplified.train(False)
-    for param in simplified.parameters():
-        param.requires_grad = False
-
-    # Create dummy inputs on CPU
-    dummy_input_ids = torch.zeros((1, MAX_SEQ_LENGTH), dtype=torch.long, device="cpu")
-    dummy_attention_mask = torch.ones((1, MAX_SEQ_LENGTH), dtype=torch.long, device="cpu")
+    # Create example inputs
+    example_input_ids = torch.zeros(1, MAX_SEQ_LENGTH, dtype=torch.int32)
+    example_attention_mask = torch.ones(1, MAX_SEQ_LENGTH, dtype=torch.int32)
 
     # Trace the model
-    print("  Tracing model with TorchScript...")
+    print("  Tracing model...")
     with torch.no_grad():
-        traced = torch.jit.trace(simplified, (dummy_input_ids, dummy_attention_mask))
+        traced = torch.jit.trace(wrapper, (example_input_ids, example_attention_mask))
 
-    # Convert to CoreML
+    # Convert using coremltools
     print("  Converting to CoreML...")
     import coremltools as ct
 
@@ -129,22 +123,19 @@ def main():
             ct.TensorType(name="input_ids", shape=(1, MAX_SEQ_LENGTH), dtype=np.int32),
             ct.TensorType(name="attention_mask", shape=(1, MAX_SEQ_LENGTH), dtype=np.int32),
         ],
-        outputs=[
-            ct.TensorType(name="embeddings"),
-        ],
-        minimum_deployment_target=ct.target.iOS16,
+        outputs=[ct.TensorType(name="last_hidden_state")],
         convert_to="mlprogram",
+        minimum_deployment_target=ct.target.iOS16,
     )
 
-    # Set model metadata
+    # Set metadata
     mlmodel.author = "Reef App"
-    mlmodel.short_description = "MiniLM-L6-v2 sentence embeddings for semantic search"
+    mlmodel.short_description = "MiniLM-L6-v2 transformer for semantic search embeddings"
     mlmodel.version = "1.0"
 
     # Save the model
     model_path = resources_dir / "MiniLM-L6-v2.mlpackage"
     mlmodel.save(str(model_path))
-
     print(f"  CoreML model saved: {model_path}")
 
     # Step 4: Verify
@@ -156,14 +147,15 @@ def main():
         "The weather is nice today."
     ]
 
-    # Get sentence-transformers embeddings
+    # Get sentence-transformers embeddings for reference
     st_embeddings = model.encode(test_sentences, normalize_embeddings=True)
 
     print("\nSentence-Transformers embeddings (first 5 dims):")
     for i, sent in enumerate(test_sentences):
         print(f"  '{sent[:40]}': {st_embeddings[i][:5].round(4)}")
 
-    # Test CoreML (may not work in all environments)
+    # Test CoreML
+    print("\nCoreML verification (with mean pooling + L2 norm):")
     try:
         for i, sent in enumerate(test_sentences):
             encoded = tokenizer(
@@ -173,24 +165,40 @@ def main():
                 max_length=MAX_SEQ_LENGTH,
                 return_tensors="np"
             )
+
+            # Get CoreML output
             coreml_input = {
                 "input_ids": encoded["input_ids"].astype(np.int32),
                 "attention_mask": encoded["attention_mask"].astype(np.int32),
             }
+
             coreml_output = mlmodel.predict(coreml_input)
-            coreml_emb = coreml_output["embeddings"][0]
+            last_hidden_state = coreml_output["last_hidden_state"]
+
+            # Mean pooling
+            mask = encoded["attention_mask"][0]
+            mask_expanded = np.expand_dims(mask, -1)
+            sum_embeddings = np.sum(last_hidden_state[0] * mask_expanded, axis=0)
+            sum_mask = np.sum(mask)
+            mean_embedding = sum_embeddings / max(sum_mask, 1e-9)
+
+            # L2 normalize
+            norm = np.linalg.norm(mean_embedding)
+            coreml_emb = mean_embedding / max(norm, 1e-9)
 
             # Cosine similarity
             cos_sim = np.dot(st_embeddings[i], coreml_emb) / (
                 np.linalg.norm(st_embeddings[i]) * np.linalg.norm(coreml_emb)
             )
-            status = "OK" if cos_sim > 0.99 else "WARN"
-            print(f"\n  CoreML vs ST similarity for sentence {i+1}: {cos_sim:.4f} [{status}]")
+            status = "OK" if cos_sim > 0.99 else ("WARN" if cos_sim > 0.95 else "FAIL")
+            print(f"  Sentence {i+1} similarity: {cos_sim:.4f} [{status}]")
 
         print("\n  SUCCESS: CoreML conversion verified!")
     except Exception as e:
-        print(f"\n  (CoreML prediction not available: {e})")
-        print("  The model should work correctly on iOS/macOS devices.")
+        print(f"\n  (CoreML prediction error: {e})")
+        import traceback
+        traceback.print_exc()
+        print("  The model may still work correctly on iOS/macOS devices.")
 
     print("\n" + "=" * 60)
     print("Conversion complete!")
@@ -198,7 +206,8 @@ def main():
     print(f"\nFiles created:")
     print(f"  1. {model_path}")
     print(f"  2. {vocab_path}")
-    print(f"\nAdd these to your Xcode project.")
+    print(f"\nNote: Mean pooling and L2 normalization must be done in Swift.")
+    print("Add these files to your Xcode project.")
 
 if __name__ == "__main__":
     main()

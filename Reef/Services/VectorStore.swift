@@ -57,6 +57,9 @@ actor VectorStore {
     private var db: OpaquePointer?
     private let dbPath: URL
 
+    /// Track whether a version migration occurred (for triggering re-indexing)
+    private(set) var didMigrateVersion = false
+
     private init() {
         // Store in Application Support/Reef/vectors.sqlite
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -85,6 +88,7 @@ actor VectorStore {
 
         self.db = pointer
         try createTables()
+        try checkAndMigrateVersion()
     }
 
     private func createTables() throws {
@@ -104,15 +108,80 @@ actor VectorStore {
 
             CREATE INDEX IF NOT EXISTS idx_chunks_course ON chunks(course_id);
             CREATE INDEX IF NOT EXISTS idx_chunks_document ON chunks(document_id);
+
+            CREATE TABLE IF NOT EXISTS metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
             """
 
         var errorMessage: UnsafeMutablePointer<CChar>?
-        let result = sqlite3_execute(db, createSQL, nil, nil, &errorMessage)
+        let result = sqlite3_run(db, createSQL, nil, nil, &errorMessage)
 
         if result != SQLITE_OK {
             let error = errorMessage.map { String(cString: $0) } ?? "Unknown error"
             sqlite3_free(errorMessage)
             throw VectorStoreError.databaseError("Failed to create tables: \(error)")
+        }
+    }
+
+    /// Check embedding version and clear chunks if version changed
+    private func checkAndMigrateVersion() throws {
+        guard let db = db else { return }
+
+        let currentVersion = EmbeddingService.embeddingVersion
+
+        // Get stored version
+        let selectSQL = "SELECT value FROM metadata WHERE key = 'embedding_version'"
+        var statement: OpaquePointer?
+
+        guard sqlite3_prepare_v2(db, selectSQL, -1, &statement, nil) == SQLITE_OK else {
+            throw VectorStoreError.databaseError("Failed to prepare version query")
+        }
+        defer { sqlite3_finalize(statement) }
+
+        var storedVersion: Int? = nil
+        if sqlite3_step(statement) == SQLITE_ROW {
+            if let valueCStr = sqlite3_column_text(statement, 0) {
+                storedVersion = Int(String(cString: valueCStr))
+            }
+        }
+
+        // Check if version changed
+        if let stored = storedVersion, stored == currentVersion {
+            print("[VectorStore] Embedding version \(currentVersion) matches stored version")
+            return
+        }
+
+        // Version changed or not set - clear all chunks and update version
+        if let stored = storedVersion {
+            print("[VectorStore] Embedding version changed from \(stored) to \(currentVersion) - clearing all chunks")
+        } else {
+            print("[VectorStore] Setting embedding version to \(currentVersion)")
+        }
+
+        // Clear all chunks
+        var errorMessage: UnsafeMutablePointer<CChar>?
+        sqlite3_run(db, "DELETE FROM chunks", nil, nil, &errorMessage)
+
+        // Update version
+        let updateSQL = "INSERT OR REPLACE INTO metadata (key, value) VALUES ('embedding_version', ?)"
+        var updateStmt: OpaquePointer?
+
+        guard sqlite3_prepare_v2(db, updateSQL, -1, &updateStmt, nil) == SQLITE_OK else {
+            throw VectorStoreError.databaseError("Failed to prepare version update")
+        }
+        defer { sqlite3_finalize(updateStmt) }
+
+        sqlite3_bind_text(updateStmt, 1, String(currentVersion), -1, SQLITE_TRANSIENT)
+
+        if sqlite3_step(updateStmt) != SQLITE_DONE {
+            throw VectorStoreError.databaseError("Failed to update embedding version")
+        }
+
+        // Mark that migration occurred
+        if storedVersion != nil {
+            didMigrateVersion = true
         }
     }
 
@@ -149,7 +218,7 @@ actor VectorStore {
         defer { sqlite3_finalize(statement) }
 
         // Begin transaction for performance
-        sqlite3_execute(db, "BEGIN TRANSACTION", nil, nil, nil)
+        sqlite3_run(db, "BEGIN TRANSACTION", nil, nil, nil)
 
         for (chunk, embedding) in zip(chunks, embeddings) {
             sqlite3_reset(statement)
@@ -185,12 +254,12 @@ actor VectorStore {
 
             let stepResult = sqlite3_step(statement)
             if stepResult != SQLITE_DONE {
-                sqlite3_execute(db, "ROLLBACK", nil, nil, nil)
+                sqlite3_run(db, "ROLLBACK", nil, nil, nil)
                 throw VectorStoreError.databaseError("Failed to insert chunk: \(String(cString: sqlite3_errmsg(db)))")
             }
         }
 
-        sqlite3_execute(db, "COMMIT", nil, nil, nil)
+        sqlite3_run(db, "COMMIT", nil, nil, nil)
     }
 
     // MARK: - Search
@@ -210,6 +279,8 @@ actor VectorStore {
             throw VectorStoreError.databaseError("Database not initialized")
         }
 
+        let expectedDimension = EmbeddingService.embeddingDimension
+
         let selectSQL = """
             SELECT id, document_id, document_type, page_number, heading, text, embedding
             FROM chunks
@@ -225,6 +296,7 @@ actor VectorStore {
         sqlite3_bind_text(statement, 1, courseId.uuidString, -1, SQLITE_TRANSIENT)
 
         var results: [VectorSearchResult] = []
+        var skippedCount = 0
 
         while sqlite3_step(statement) == SQLITE_ROW {
             guard let idCStr = sqlite3_column_text(statement, 0),
@@ -252,6 +324,12 @@ actor VectorStore {
             let blobSize = Int(sqlite3_column_bytes(statement, 6))
             let floatCount = blobSize / MemoryLayout<Float>.size
 
+            // Skip chunks with dimension mismatch (graceful fallback during migration)
+            if floatCount != expectedDimension {
+                skippedCount += 1
+                continue
+            }
+
             let embedding = Array(UnsafeBufferPointer(
                 start: blobPointer.assumingMemoryBound(to: Float.self),
                 count: floatCount
@@ -269,6 +347,10 @@ actor VectorStore {
                 heading: heading,
                 similarity: similarity
             ))
+        }
+
+        if skippedCount > 0 {
+            print("[VectorStore] Skipped \(skippedCount) chunks with dimension mismatch")
         }
 
         // Sort by similarity (descending) and take top K
@@ -317,6 +399,24 @@ actor VectorStore {
         if sqlite3_step(statement) != SQLITE_DONE {
             throw VectorStoreError.databaseError("Failed to delete course chunks")
         }
+    }
+
+    /// Delete all chunks (for migration)
+    func deleteAllChunks() throws {
+        guard let db = db else {
+            throw VectorStoreError.databaseError("Database not initialized")
+        }
+
+        var errorMessage: UnsafeMutablePointer<CChar>?
+        let result = sqlite3_run(db, "DELETE FROM chunks", nil, nil, &errorMessage)
+
+        if result != SQLITE_OK {
+            let error = errorMessage.map { String(cString: $0) } ?? "Unknown error"
+            sqlite3_free(errorMessage)
+            throw VectorStoreError.databaseError("Failed to delete all chunks: \(error)")
+        }
+
+        print("[VectorStore] Deleted all chunks")
     }
 
     /// Get count of indexed chunks for a document
@@ -380,7 +480,7 @@ private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.sel
 
 /// Wrapper for sqlite3_exec to avoid naming conflicts
 @discardableResult
-private func sqlite3_execute(
+private func sqlite3_run(
     _ db: OpaquePointer?,
     _ sql: String,
     _ callback: (@convention(c) (UnsafeMutableRawPointer?, Int32, UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?, UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?) -> Int32)?,

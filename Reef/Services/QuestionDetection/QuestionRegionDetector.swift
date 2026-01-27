@@ -232,7 +232,10 @@ actor QuestionRegionDetector {
         }
     }
 
-    private func callLLMForGrouping(_ observations: [TextObservation]) async throws -> [QuestionGrouping] {
+    private func callLLMForGrouping(_ observations: [TextObservation], retryCount: Int = 0) async throws -> [QuestionGrouping] {
+        let maxRetries = 3
+        let baseDelaySeconds: Double = 2.0
+
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         let observationsJSON = try encoder.encode(observations)
@@ -243,49 +246,36 @@ actor QuestionRegionDetector {
         let isMultiPage = pageNumbers.count > 1
 
         let prompt = """
-        You are analyzing OCR text from a homework/exam document. Each observation has:
-        - id: unique identifier
-        - page: page number (1-indexed)
-        - text: the text content
-        - y: vertical position (higher y = higher on page)
+        Extract question prompts from this OCR text. Each item has id, page, text, y (vertical position).
+        \(isMultiPage ? "Questions may span pages." : "")
 
-        Your task is to identify ONLY the question prompts themselves - the text that asks the student to do something.
+        Input: \(observationsString)
 
-        \(isMultiPage ? "IMPORTANT: Questions may span multiple pages. If a question continues from one page to the next, include all its observations in the same group." : "")
+        Output JSON: {"questions":[{"questionId":"1","questionText":"first line","observationIds":[0,1]}]}
 
-        Text observations (sorted by page, then top to bottom):
-        \(observationsString)
+        INCLUDE: Question numbers (1., Problem 2, Q3a), the question text, sub-parts (a,b,c), math expressions in questions.
+        For problems with subparts: include introductory/context text with the FIRST subpart (part a or part 1).
+        EXCLUDE: Titles, headers, general directions ("Show all work"), answers, page numbers, names, point values.
 
-        Return JSON with this exact structure:
-        {
-          "questions": [
-            {
-              "questionId": "1",
-              "questionText": "first line of question text",
-              "observationIds": [0, 1, 2]
-            }
-          ]
-        }
-
-        Rules:
-        - ONLY include the question prompt text itself (e.g., "Find the derivative of f(x) = x^2")
-        - DO NOT include:
-          - General directions or instructions at the top of the page (e.g., "Show all work", "Answer all questions")
-          - Answer spaces, blank lines, or answer boxes
-          - Student answers or work
-          - Headers, footers, page numbers, or titles
-          - Answer keys or solutions
-        - A question typically starts with a number, letter, or word like "Question", "Problem", "Exercise"
-        - For problems with subparts (e.g., 1a, 1b or 1.1, 1.2): if there is introductory/context text before the first subpart that sets up the problem (e.g., "Consider the function f(x) = ..."), include that text with the FIRST subpart (part a or part 1)
-        - questionId is the question number/letter (e.g., "1", "1a", "2.1") or null if unclear
-        - questionText is just the first line that starts the question
-        - observationIds are the ids of ONLY the text blocks that contain the question prompt itself
-        - If no questions are detected, return {"questions": []}
+        Return {"questions":[]} if no questions found.
         """
 
-        let response = try await GeminiService.shared.generateContent(prompt: prompt, jsonOutput: true)
-        let llmResponse = try JSONDecoder().decode(LLMResponse.self, from: Data(response.utf8))
-        return llmResponse.questions
+        do {
+            let response = try await GeminiService.shared.generateContent(prompt: prompt, jsonOutput: true)
+            let llmResponse = try JSONDecoder().decode(LLMResponse.self, from: Data(response.utf8))
+            return llmResponse.questions
+        } catch let error as GeminiService.GeminiError {
+            // Check if this is a rate limit error and we can retry
+            if case .apiError(let message) = error,
+               message.lowercased().contains("resource exhausted") || message.lowercased().contains("rate limit"),
+               retryCount < maxRetries {
+                let delay = baseDelaySeconds * pow(2.0, Double(retryCount))
+                print("[QuestionDetector] Rate limited, retrying in \(delay)s (attempt \(retryCount + 1)/\(maxRetries))")
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                return try await callLLMForGrouping(observations, retryCount: retryCount + 1)
+            }
+            throw error
+        }
     }
 
     /// Create QuestionRegion objects from LLM groupings

@@ -52,6 +52,8 @@ struct NotesView: View {
     @State private var debouncedSearchText: String = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var sortNewestFirst: Bool = true
+    @State private var semanticSearchResults: [UUID]? = nil  // Ordered by relevance
+    @State private var isSearching: Bool = false
 
     private var effectiveColorScheme: ColorScheme {
         themeManager.isDarkMode ? .dark : .light
@@ -64,7 +66,20 @@ struct NotesView: View {
     private var filteredNotes: [Note] {
         var result = course.notes
 
-        // Filter by search text (searches name and PDF content)
+        // If we have semantic search results, use those (ordered by relevance)
+        if let semanticResults = semanticSearchResults, !debouncedSearchText.isEmpty {
+            // Create a lookup for ordering
+            let orderMap = Dictionary(uniqueKeysWithValues: semanticResults.enumerated().map { ($1, $0) })
+
+            // Filter to only notes in semantic results, maintaining relevance order
+            result = result
+                .filter { orderMap[$0.id] != nil }
+                .sorted { (orderMap[$0.id] ?? Int.max) < (orderMap[$1.id] ?? Int.max) }
+
+            return result
+        }
+
+        // Fallback to text search if semantic search not available
         if !debouncedSearchText.isEmpty {
             result = result.filter { note in
                 note.name.localizedCaseInsensitiveContains(debouncedSearchText) ||
@@ -96,7 +111,7 @@ struct NotesView: View {
             searchTask = Task {
                 try? await Task.sleep(nanoseconds: 300_000_000) // 300ms debounce
                 if !Task.isCancelled {
-                    debouncedSearchText = newValue
+                    await performSearch(query: newValue)
                 }
             }
         }
@@ -195,6 +210,51 @@ struct NotesView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, 100)
+    }
+
+    // MARK: - Search
+
+    @MainActor
+    private func performSearch(query: String) async {
+        debouncedSearchText = query
+
+        // Clear semantic results if query is empty
+        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            semanticSearchResults = nil
+            isSearching = false
+            return
+        }
+
+        isSearching = true
+
+        do {
+            // Perform semantic search via RAG
+            let context = try await RAGService.shared.getContext(
+                query: query,
+                courseId: course.id,
+                topK: 20,  // Get more results for better coverage
+                maxTokens: 8000
+            )
+
+            // Extract unique document IDs in order of relevance
+            var seenIds = Set<UUID>()
+            var orderedIds: [UUID] = []
+            for source in context.sources {
+                if !seenIds.contains(source.documentId) {
+                    seenIds.insert(source.documentId)
+                    orderedIds.append(source.documentId)
+                }
+            }
+
+            print("[NotesView] Semantic search found \(orderedIds.count) relevant documents")
+            semanticSearchResults = orderedIds
+
+        } catch {
+            print("[NotesView] Semantic search failed: \(error), falling back to text search")
+            semanticSearchResults = nil
+        }
+
+        isSearching = false
     }
 
     // MARK: - Actions

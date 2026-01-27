@@ -60,6 +60,10 @@ actor RAGService {
 
     /// Initialize the RAG system (call on app launch)
     func initialize() async throws {
+        // Initialize embedding service first (loads tokenizer + CoreML model)
+        try await EmbeddingService.shared.initialize()
+
+        // Then initialize vector store (checks embedding version and clears if changed)
         try await VectorStore.shared.initialize()
     }
 
@@ -157,9 +161,15 @@ actor RAGService {
         var totalChars = 0
         var sources: [RAGSource] = []
 
+        // Debug: log similarity scores
+        print("[RAG] Search returned \(results.count) results:")
+        for (i, r) in results.prefix(5).enumerated() {
+            print("[RAG]   \(i+1). similarity=\(r.similarity) - \(r.text.prefix(50))...")
+        }
+
         for result in results {
-            // Skip low-similarity results
-            guard result.similarity > 0.3 else { continue }
+            // Skip low-similarity results (lowered threshold for MiniLM)
+            guard result.similarity > 0.15 else { continue }
 
             // Check token budget
             let chunkChars = result.text.count + 50 // Extra for formatting

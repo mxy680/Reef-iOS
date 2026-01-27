@@ -2,18 +2,19 @@
 //  EmbeddingService.swift
 //  Reef
 //
-//  Provides sentence embeddings using Apple's NaturalLanguage framework
-//  for on-device semantic search without external model dependencies.
+//  Provides sentence embeddings using MiniLM-L6-v2 via CoreML
+//  for high-quality on-device semantic search.
 //
 
 import Foundation
-import NaturalLanguage
+import Accelerate
 
 /// Errors that can occur during embedding generation
 enum EmbeddingError: Error, LocalizedError {
     case embeddingNotAvailable
     case emptyInput
     case embeddingFailed(String)
+    case notInitialized
 
     var errorDescription: String? {
         switch self {
@@ -23,54 +24,97 @@ enum EmbeddingError: Error, LocalizedError {
             return "Cannot generate embedding for empty text"
         case .embeddingFailed(let reason):
             return "Failed to generate embedding: \(reason)"
+        case .notInitialized:
+            return "Embedding service not initialized - call initialize() first"
         }
     }
 }
 
-/// Service for generating text embeddings using Apple's NaturalLanguage framework
+/// Service for generating text embeddings using MiniLM-L6-v2
 actor EmbeddingService {
     static let shared = EmbeddingService()
 
-    /// Embedding dimension (Apple's sentence embedding produces 512-dimensional vectors)
-    static let embeddingDimension = 512
+    /// Embedding dimension (MiniLM-L6-v2 produces 384-dimensional vectors)
+    static let embeddingDimension = 384
 
-    /// The sentence embedding model (lazy loaded)
-    private var embedding: NLEmbedding?
+    /// Embedding model version - increment when changing models to trigger re-indexing
+    static let embeddingVersion = 2  // v1 = NLEmbedding (512d), v2 = MiniLM (384d)
+
+    /// The tokenizer
+    private let tokenizer = WordPieceTokenizer()
+
+    /// The MiniLM inference service
+    private let miniLM = MiniLMService()
+
+    /// Whether the service has been initialized
+    private var isInitialized = false
 
     private init() {}
 
+    // MARK: - Initialization
+
+    /// Initialize the embedding service (load tokenizer vocab and CoreML model)
+    func initialize() async throws {
+        guard !isInitialized else { return }
+
+        do {
+            // Load tokenizer vocabulary
+            try await tokenizer.loadVocabulary()
+
+            // Load CoreML model
+            try await miniLM.loadModel()
+
+            isInitialized = true
+            print("[EmbeddingService] Initialized with MiniLM-L6-v2 (v\(Self.embeddingVersion))")
+        } catch {
+            print("[EmbeddingService] Initialization failed: \(error)")
+            throw error
+        }
+    }
+
     // MARK: - Public API
 
-    /// Check if embedding is available on this device
+    /// Check if embedding is available (service is initialized)
     func isAvailable() -> Bool {
-        return NLEmbedding.sentenceEmbedding(for: .english) != nil
+        return isInitialized
     }
 
     /// Generate an embedding for a single text
     /// - Parameter text: The text to embed
-    /// - Returns: A 512-dimensional normalized vector
+    /// - Returns: A 384-dimensional normalized vector
     func embed(_ text: String) async throws -> [Float] {
+        guard isInitialized else {
+            throw EmbeddingError.notInitialized
+        }
+
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             throw EmbeddingError.emptyInput
         }
 
-        let embedding = try getEmbedding()
+        do {
+            // Tokenize
+            let tokenized = try await tokenizer.tokenize(trimmed)
 
-        guard let vector = embedding.vector(for: trimmed) else {
-            throw EmbeddingError.embeddingFailed("Could not generate vector for text")
+            // Generate embedding
+            let embedding = try await miniLM.embed(
+                inputIds: tokenized.inputIds,
+                attentionMask: tokenized.attentionMask
+            )
+
+            return embedding
+        } catch {
+            throw EmbeddingError.embeddingFailed(error.localizedDescription)
         }
-
-        // Convert to Float array and normalize
-        let floatVector = vector.map { Float($0) }
-        return normalize(floatVector)
     }
 
     /// Generate embeddings for multiple texts (batch processing)
     /// - Parameter texts: Array of texts to embed
-    /// - Returns: Array of 512-dimensional normalized vectors
+    /// - Returns: Array of 384-dimensional normalized vectors
     func embedBatch(_ texts: [String]) async throws -> [[Float]] {
-        let embedding = try getEmbedding()
+        guard isInitialized else {
+            throw EmbeddingError.notInitialized
+        }
 
         var results: [[Float]] = []
         results.reserveCapacity(texts.count)
@@ -83,11 +127,16 @@ actor EmbeddingService {
                 continue
             }
 
-            if let vector = embedding.vector(for: trimmed) {
-                let floatVector = vector.map { Float($0) }
-                results.append(normalize(floatVector))
-            } else {
+            do {
+                let tokenized = try await tokenizer.tokenize(trimmed)
+                let embedding = try await miniLM.embed(
+                    inputIds: tokenized.inputIds,
+                    attentionMask: tokenized.attentionMask
+                )
+                results.append(embedding)
+            } catch {
                 // Return zero vector if embedding fails
+                print("[EmbeddingService] Failed to embed text: \(error)")
                 results.append(Array(repeating: 0.0, count: Self.embeddingDimension))
             }
         }
@@ -107,44 +156,14 @@ actor EmbeddingService {
         var normA: Float = 0
         var normB: Float = 0
 
-        for i in 0..<a.count {
-            dotProduct += a[i] * b[i]
-            normA += a[i] * a[i]
-            normB += b[i] * b[i]
-        }
+        // Use Accelerate for SIMD-optimized computation
+        vDSP_dotpr(a, 1, b, 1, &dotProduct, vDSP_Length(a.count))
+        vDSP_svesq(a, 1, &normA, vDSP_Length(a.count))
+        vDSP_svesq(b, 1, &normB, vDSP_Length(b.count))
 
         let denominator = sqrt(normA) * sqrt(normB)
         guard denominator > 0 else { return 0 }
 
         return dotProduct / denominator
-    }
-
-    // MARK: - Private Helpers
-
-    /// Get or create the embedding model
-    private func getEmbedding() throws -> NLEmbedding {
-        if let existing = embedding {
-            return existing
-        }
-
-        guard let newEmbedding = NLEmbedding.sentenceEmbedding(for: .english) else {
-            throw EmbeddingError.embeddingNotAvailable
-        }
-
-        self.embedding = newEmbedding
-        return newEmbedding
-    }
-
-    /// L2 normalize a vector
-    private func normalize(_ vector: [Float]) -> [Float] {
-        var sumSquares: Float = 0
-        for v in vector {
-            sumSquares += v * v
-        }
-
-        let magnitude = sqrt(sumSquares)
-        guard magnitude > 0 else { return vector }
-
-        return vector.map { $0 / magnitude }
     }
 }
