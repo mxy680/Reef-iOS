@@ -718,7 +718,11 @@ struct HomeView: View {
 
                     // Run text extraction and question detection in parallel
                     async let textExtractionTask = DocumentTextExtractor.shared.extractText(from: fileURL)
-                    async let questionDetectionTask = QuestionRegionDetector.shared.detectQuestions(in: fileURL)
+                    async let questionDetectionTask = QuestionRegionDetector.shared.detectQuestions(in: fileURL) { progress in
+                        await MainActor.run {
+                            note.questionDetectionProgress = progress
+                        }
+                    }
 
                     let (result, questionRegions) = await (textExtractionTask, questionDetectionTask)
 

@@ -34,6 +34,9 @@ class Note: Hashable {
     var questionDetectionStatusRaw: String = QuestionDetectionStatus.pending.rawValue
     var questionRegionsData: Data?  // JSON-encoded DocumentQuestionRegions
 
+    // Transient progress tracking (not persisted)
+    @Transient var questionDetectionProgress: Double = 0.0
+
     var extractionStatus: ExtractionStatus {
         get { ExtractionStatus(rawValue: extractionStatusRaw) ?? .pending }
         set { extractionStatusRaw = newValue.rawValue }

@@ -46,17 +46,22 @@ actor QuestionRegionDetector {
 
     // MARK: - Public API
 
+    /// Progress handler type (0.0 to 1.0)
+    typealias ProgressHandler = @Sendable (Double) async -> Void
+
     /// Detect question regions in a document
-    /// - Parameter url: URL to the document file (PDF or image)
+    /// - Parameters:
+    ///   - url: URL to the document file (PDF or image)
+    ///   - onProgress: Optional callback for progress updates (0.0 to 1.0)
     /// - Returns: Detected question regions, or nil if detection failed
-    func detectQuestions(in url: URL) async -> DocumentQuestionRegions? {
+    func detectQuestions(in url: URL, onProgress: ProgressHandler? = nil) async -> DocumentQuestionRegions? {
         let fileExtension = url.pathExtension.lowercased()
 
         switch fileExtension {
         case "pdf":
-            return await detectQuestionsInPDF(at: url)
+            return await detectQuestionsInPDF(at: url, onProgress: onProgress)
         case "jpg", "jpeg", "png", "heic", "tiff", "gif":
-            return await detectQuestionsInImage(at: url)
+            return await detectQuestionsInImage(at: url, onProgress: onProgress)
         default:
             return nil
         }
@@ -64,11 +69,15 @@ actor QuestionRegionDetector {
 
     // MARK: - PDF Processing (Two-Pass Approach)
 
-    private func detectQuestionsInPDF(at url: URL) async -> DocumentQuestionRegions? {
+    private func detectQuestionsInPDF(at url: URL, onProgress: ProgressHandler? = nil) async -> DocumentQuestionRegions? {
         guard let document = PDFDocument(url: url) else { return nil }
 
         let pageCount = document.pageCount
         guard pageCount > 0 else { return nil }
+
+        // Progress: 0-80% for OCR, 80-100% for LLM
+        let ocrProgressWeight = 0.8
+        var pagesCompleted = 0
 
         // PASS 1: OCR all pages in parallel
         let allPagedObservations = await withTaskGroup(of: (Int, [VNRecognizedTextObservation]).self) { group in
@@ -82,6 +91,9 @@ actor QuestionRegionDetector {
             var results: [(Int, [VNRecognizedTextObservation])] = []
             for await result in group {
                 results.append(result)
+                pagesCompleted += 1
+                let progress = Double(pagesCompleted) / Double(pageCount) * ocrProgressWeight
+                await onProgress?(progress)
             }
 
             // Sort by page index to maintain order
@@ -99,9 +111,13 @@ actor QuestionRegionDetector {
         guard !pagedObservations.isEmpty else { return nil }
 
         // PASS 2: Single LLM call to group all observations into questions
+        await onProgress?(0.85)  // Starting LLM analysis
         let regions = await groupAllObservationsIntoQuestions(pagedObservations)
 
-        guard !regions.isEmpty else { return nil }
+        guard !regions.isEmpty else {
+            await onProgress?(1.0)
+            return nil
+        }
 
         // Sort regions by page index, then by Y position (top to bottom)
         let sortedRegions = regions.sorted { lhs, rhs in
@@ -111,6 +127,7 @@ actor QuestionRegionDetector {
             return lhs.textBoundingBox.origin.y > rhs.textBoundingBox.origin.y
         }
 
+        await onProgress?(1.0)  // Complete
         print("[QuestionDetector] Detected \(sortedRegions.count) question region(s) in PDF")
 
         return DocumentQuestionRegions(
@@ -143,20 +160,26 @@ actor QuestionRegionDetector {
 
     // MARK: - Image Processing
 
-    private func detectQuestionsInImage(at url: URL) async -> DocumentQuestionRegions? {
+    private func detectQuestionsInImage(at url: URL, onProgress: ProgressHandler? = nil) async -> DocumentQuestionRegions? {
         guard let data = try? Data(contentsOf: url),
               let image = UIImage(data: data),
               let cgImage = image.cgImage else {
             return nil
         }
 
+        await onProgress?(0.3)  // Loading complete
         let observations = await performTextRecognition(on: cgImage)
         guard !observations.isEmpty else { return nil }
+
+        await onProgress?(0.6)  // OCR complete
 
         // Wrap as paged observations (single page)
         let pagedObservations = observations.map { PagedObservation(observation: $0, pageIndex: 0) }
 
+        await onProgress?(0.85)  // Starting LLM
         let regions = await groupAllObservationsIntoQuestions(pagedObservations)
+
+        await onProgress?(1.0)  // Complete
         guard !regions.isEmpty else { return nil }
 
         print("[QuestionDetector] Detected \(regions.count) question(s) in image")
@@ -246,54 +269,17 @@ actor QuestionRegionDetector {
         let isMultiPage = pageNumbers.count > 1
 
         let prompt = """
-        You are analyzing OCR text from a homework/exam document to identify ONLY the question prompts themselves.
+        Extract question prompts from this OCR text. Each item has id, page, text, y (vertical position).
+        \(isMultiPage ? "Questions may span pages." : "")
 
-        Each observation has:
-        - id: unique identifier
-        - page: page number (1-indexed)
-        - text: the text content
-        - y: vertical position (higher y = higher on page)
+        Input: \(observationsString)
 
-        Your task: Identify and group text that forms the QUESTION PROMPT ONLY - the part asking what to solve/answer.
+        Output JSON: {"questions":[{"questionId":"1","questionText":"first line","observationIds":[0,1]}]}
 
-        \(isMultiPage ? "IMPORTANT: Questions may span multiple pages. If a question continues from one page to the next, include all its observations in the same group." : "")
+        INCLUDE: Question numbers (1., Problem 2, Q3a), the question text, sub-parts (a,b,c), math expressions in questions.
+        EXCLUDE: Titles, headers, directions, answers, page numbers, names, point values.
 
-        Text observations (sorted by page, then top to bottom):
-        \(observationsString)
-
-        Return JSON with this exact structure:
-        {
-          "questions": [
-            {
-              "questionId": "1",
-              "questionText": "first line of question text",
-              "observationIds": [0, 1, 2]
-            }
-          ]
-        }
-
-        INCLUDE in a question group:
-        - The question number/label (e.g., "1.", "Problem 2", "Question 3a")
-        - The question prompt text (what is being asked)
-        - Sub-parts of the same question (a, b, c, etc.)
-        - Mathematical expressions that are part of the question
-
-        EXCLUDE (do NOT include in any question group):
-        - Document titles (e.g., "Homework 1", "Math 101 Exam")
-        - Course names or headers
-        - General directions/instructions (e.g., "Show all work", "Answer all questions", "Due Friday")
-        - Answers or solutions (handwritten or printed)
-        - Blank space or workspace areas
-        - Page numbers
-        - Student name/date fields
-        - Point values (e.g., "(10 pts)")
-
-        Rules:
-        - questionId is the question number/letter (e.g., "1", "a", "2.1") or null if unclear
-        - questionText is just the first line that starts the question
-        - observationIds should ONLY include IDs of text that is part of the question prompt itself
-        - If no questions are detected, return {"questions": []}
-        - When in doubt, exclude the observation - only include clear question prompts
+        Return {"questions":[]} if no questions found.
         """
 
         do {
