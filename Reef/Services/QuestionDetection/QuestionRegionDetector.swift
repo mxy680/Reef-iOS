@@ -46,22 +46,17 @@ actor QuestionRegionDetector {
 
     // MARK: - Public API
 
-    /// Progress handler type (0.0 to 1.0)
-    typealias ProgressHandler = @Sendable (Double) async -> Void
-
     /// Detect question regions in a document
-    /// - Parameters:
-    ///   - url: URL to the document file (PDF or image)
-    ///   - onProgress: Optional callback for progress updates (0.0 to 1.0)
+    /// - Parameter url: URL to the document file (PDF or image)
     /// - Returns: Detected question regions, or nil if detection failed
-    func detectQuestions(in url: URL, onProgress: ProgressHandler? = nil) async -> DocumentQuestionRegions? {
+    func detectQuestions(in url: URL) async -> DocumentQuestionRegions? {
         let fileExtension = url.pathExtension.lowercased()
 
         switch fileExtension {
         case "pdf":
-            return await detectQuestionsInPDF(at: url, onProgress: onProgress)
+            return await detectQuestionsInPDF(at: url)
         case "jpg", "jpeg", "png", "heic", "tiff", "gif":
-            return await detectQuestionsInImage(at: url, onProgress: onProgress)
+            return await detectQuestionsInImage(at: url)
         default:
             return nil
         }
@@ -69,15 +64,11 @@ actor QuestionRegionDetector {
 
     // MARK: - PDF Processing (Two-Pass Approach)
 
-    private func detectQuestionsInPDF(at url: URL, onProgress: ProgressHandler? = nil) async -> DocumentQuestionRegions? {
+    private func detectQuestionsInPDF(at url: URL) async -> DocumentQuestionRegions? {
         guard let document = PDFDocument(url: url) else { return nil }
 
         let pageCount = document.pageCount
         guard pageCount > 0 else { return nil }
-
-        // Progress: 0-80% for OCR, 80-100% for LLM
-        let ocrProgressWeight = 0.8
-        var pagesCompleted = 0
 
         // PASS 1: OCR all pages in parallel
         let allPagedObservations = await withTaskGroup(of: (Int, [VNRecognizedTextObservation]).self) { group in
@@ -91,9 +82,6 @@ actor QuestionRegionDetector {
             var results: [(Int, [VNRecognizedTextObservation])] = []
             for await result in group {
                 results.append(result)
-                pagesCompleted += 1
-                let progress = Double(pagesCompleted) / Double(pageCount) * ocrProgressWeight
-                await onProgress?(progress)
             }
 
             // Sort by page index to maintain order
@@ -111,13 +99,9 @@ actor QuestionRegionDetector {
         guard !pagedObservations.isEmpty else { return nil }
 
         // PASS 2: Single LLM call to group all observations into questions
-        await onProgress?(0.85)  // Starting LLM analysis
         let regions = await groupAllObservationsIntoQuestions(pagedObservations)
 
-        guard !regions.isEmpty else {
-            await onProgress?(1.0)
-            return nil
-        }
+        guard !regions.isEmpty else { return nil }
 
         // Sort regions by page index, then by Y position (top to bottom)
         let sortedRegions = regions.sorted { lhs, rhs in
@@ -127,7 +111,6 @@ actor QuestionRegionDetector {
             return lhs.textBoundingBox.origin.y > rhs.textBoundingBox.origin.y
         }
 
-        await onProgress?(1.0)  // Complete
         print("[QuestionDetector] Detected \(sortedRegions.count) question region(s) in PDF")
 
         return DocumentQuestionRegions(
@@ -160,26 +143,20 @@ actor QuestionRegionDetector {
 
     // MARK: - Image Processing
 
-    private func detectQuestionsInImage(at url: URL, onProgress: ProgressHandler? = nil) async -> DocumentQuestionRegions? {
+    private func detectQuestionsInImage(at url: URL) async -> DocumentQuestionRegions? {
         guard let data = try? Data(contentsOf: url),
               let image = UIImage(data: data),
               let cgImage = image.cgImage else {
             return nil
         }
 
-        await onProgress?(0.3)  // Loading complete
         let observations = await performTextRecognition(on: cgImage)
         guard !observations.isEmpty else { return nil }
-
-        await onProgress?(0.6)  // OCR complete
 
         // Wrap as paged observations (single page)
         let pagedObservations = observations.map { PagedObservation(observation: $0, pageIndex: 0) }
 
-        await onProgress?(0.85)  // Starting LLM
         let regions = await groupAllObservationsIntoQuestions(pagedObservations)
-
-        await onProgress?(1.0)  // Complete
         guard !regions.isEmpty else { return nil }
 
         print("[QuestionDetector] Detected \(regions.count) question(s) in image")

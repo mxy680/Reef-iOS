@@ -29,7 +29,6 @@ protocol DocumentItem: AnyObject {
     var documentFileType: DocumentFileType { get }
     var extractionStatus: ExtractionStatus { get }
     var questionDetectionStatus: QuestionDetectionStatus { get }
-    var questionDetectionProgress: Double { get }
 }
 
 // Conform Note to DocumentItem
@@ -101,37 +100,25 @@ struct DocumentGridItem<T: DocumentItem>: View {
                     .frame(height: 60)
                 }
 
-                // Processing status indicator
+                // Processing status indicator - pulsing teal dot when extracting or detecting questions
                 if document.extractionStatus == .extracting || document.questionDetectionStatus == .detecting {
-                    VStack(alignment: .trailing, spacing: 4) {
-                        // Progress bar
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                // Background track
-                                RoundedRectangle(cornerRadius: 3)
-                                    .fill(Color.white.opacity(0.3))
-                                    .frame(height: 6)
-
-                                // Progress fill
-                                RoundedRectangle(cornerRadius: 3)
-                                    .fill(Color.vibrantTeal)
-                                    .frame(width: max(6, geo.size.width * document.questionDetectionProgress), height: 6)
-                                    .animation(.easeInOut(duration: 0.3), value: document.questionDetectionProgress)
+                    Circle()
+                        .fill(Color.vibrantTeal)
+                        .frame(width: 10, height: 10)
+                        .scaleEffect(extractionPulseScale)
+                        .shadow(color: Color.vibrantTeal.opacity(0.5), radius: 4)
+                        .padding(8)
+                        .onAppear {
+                            withAnimation(
+                                .easeInOut(duration: 0.8)
+                                .repeatForever(autoreverses: true)
+                            ) {
+                                extractionPulseScale = 1.3
                             }
                         }
-                        .frame(width: 60, height: 6)
-
-                        // Percentage text
-                        Text("\(Int(document.questionDetectionProgress * 100))%")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.white)
-                    }
-                    .padding(8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.black.opacity(0.5))
-                    )
-                    .padding(6)
+                        .onDisappear {
+                            extractionPulseScale = 1.0
+                        }
                 }
             }
             .frame(maxWidth: .infinity)
