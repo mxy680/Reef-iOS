@@ -133,12 +133,50 @@ struct DrawingOverlayView: UIViewRepresentable {
         var pauseSensitivity: Double = 0.5
 
         // Tool state
-        var currentTool: CanvasTool = .pen
+        var currentTool: CanvasTool = .pen {
+            didSet {
+                updatePauseDetectorState()
+            }
+        }
         var currentPenColor: UIColor = .black
         var currentPenWidth: CGFloat = 4.0
 
+        // Pause detection
+        private let pauseDetector = PauseDetector()
+        private var previousStrokeCount: Int = 0
+
+        override init() {
+            super.init()
+            setupPauseDetector()
+        }
+
+        private func setupPauseDetector() {
+            pauseDetector.onPauseDetected = { [weak self] context in
+                self?.handlePauseDetected(context)
+            }
+        }
+
+        private func handlePauseDetected(_ context: PauseContext) {
+            print("[PauseDetector] Pause detected: \(String(format: "%.1f", context.duration))s after \(context.strokeCount) strokes (tool: \(context.lastTool), velocity: \(String(format: "%.1f", context.lastStrokeVelocity)) pts/s)")
+        }
+
+        private func updatePauseDetectorState() {
+            let isScrolling = container?.scrollView.isDragging == true ||
+                              container?.scrollView.isDecelerating == true ||
+                              container?.scrollView.isZooming == true
+            pauseDetector.update(currentTool: currentTool, isScrolling: isScrolling)
+        }
+
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
             updateUndoRedoState(canvasView)
+
+            // Detect new strokes for pause detection
+            let currentStrokeCount = canvasView.drawing.strokes.count
+            if currentStrokeCount > previousStrokeCount,
+               let latestStroke = canvasView.drawing.strokes.last {
+                pauseDetector.recordStrokeCompleted(stroke: latestStroke)
+            }
+            previousStrokeCount = currentStrokeCount
 
             // Debounced save callback (500ms)
             drawingChangeTask?.cancel()
@@ -151,11 +189,12 @@ struct DrawingOverlayView: UIViewRepresentable {
         }
 
         func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
-            // No-op for now
+            updatePauseDetectorState()
         }
 
         func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
             updateUndoRedoState(canvasView)
+            pauseDetector.recordToolEnded()
         }
 
         private func updateUndoRedoState(_ canvasView: PKCanvasView) {
