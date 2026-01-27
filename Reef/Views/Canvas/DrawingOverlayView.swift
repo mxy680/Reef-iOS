@@ -49,7 +49,7 @@ struct DrawingOverlayView: UIViewRepresentable {
     var onDrawingChanged: (PKDrawing) -> Void = { _ in }
 
     func makeUIView(context: Context) -> CanvasContainerView {
-        let container = CanvasContainerView(documentID: documentID, documentURL: documentURL, fileType: fileType, backgroundMode: canvasBackgroundMode, backgroundOpacity: canvasBackgroundOpacity, backgroundSpacing: canvasBackgroundSpacing, isDarkMode: isDarkMode)
+        let container = CanvasContainerView(documentID: documentID, documentURL: documentURL, fileType: fileType, backgroundMode: canvasBackgroundMode, backgroundOpacity: canvasBackgroundOpacity, backgroundSpacing: canvasBackgroundSpacing, isDarkMode: isDarkMode, questionRegions: questionRegions)
         context.coordinator.container = container
         context.coordinator.onUndoStateChanged = onUndoStateChanged
         context.coordinator.onRedoStateChanged = onRedoStateChanged
@@ -253,6 +253,7 @@ class CanvasContainerView: UIView {
     private var backgroundOpacity: CGFloat = 0.15
     private var backgroundSpacing: CGFloat = 48
     private var isDarkMode: Bool = false
+    private var questionRegions: DocumentQuestionRegions?
 
     /// Light gray background for scroll view in light mode (close to white)
     private static let scrollBackgroundLight = UIColor(red: 245/255, green: 245/255, blue: 245/255, alpha: 1)
@@ -269,7 +270,7 @@ class CanvasContainerView: UIView {
     /// Separator views between pages
     private var separatorViews: [UIView] = []
 
-    convenience init(documentID: UUID, documentURL: URL, fileType: Note.FileType, backgroundMode: CanvasBackgroundMode = .normal, backgroundOpacity: CGFloat = 0.15, backgroundSpacing: CGFloat = 48, isDarkMode: Bool = false) {
+    convenience init(documentID: UUID, documentURL: URL, fileType: Note.FileType, backgroundMode: CanvasBackgroundMode = .normal, backgroundOpacity: CGFloat = 0.15, backgroundSpacing: CGFloat = 48, isDarkMode: Bool = false, questionRegions: DocumentQuestionRegions? = nil) {
         self.init(frame: .zero)
         self.documentID = documentID
         self.documentURL = documentURL
@@ -278,6 +279,7 @@ class CanvasContainerView: UIView {
         self.backgroundOpacity = backgroundOpacity
         self.backgroundSpacing = backgroundSpacing
         self.isDarkMode = isDarkMode
+        self.questionRegions = questionRegions
         loadDocument()
     }
 
@@ -732,14 +734,27 @@ class CanvasContainerView: UIView {
         }
 
         // Create page containers
+        // Map structure pages to original page indices for question region lookup
         for (index, image) in images.enumerated() {
+            // Determine the original page index for question region lookup
+            let structurePage = structure.pages[index]
+            let regionPageIndex: Int
+            if structurePage.type == .original, let origIdx = structurePage.originalIndex {
+                regionPageIndex = origIdx
+            } else {
+                regionPageIndex = -1 // Blank pages have no question regions
+            }
+
+            let pageRegions = regionPageIndex >= 0 ? (questionRegions?.regions(forPage: regionPageIndex) ?? []) : []
+
             let container = PageContainerView(
                 pageImage: image,
                 pageIndex: index,
                 backgroundMode: backgroundMode,
                 backgroundOpacity: backgroundOpacity,
                 backgroundSpacing: backgroundSpacing,
-                isDarkMode: isDarkMode
+                isDarkMode: isDarkMode,
+                questionRegions: pageRegions
             )
 
             pageContainers.append(container)
@@ -815,13 +830,17 @@ class CanvasContainerView: UIView {
 
         // Create a page container for each image with separators between them
         for (index, image) in images.enumerated() {
+            // Get question regions for this page
+            let pageRegions = questionRegions?.regions(forPage: index) ?? []
+
             let container = PageContainerView(
                 pageImage: image,
                 pageIndex: index,
                 backgroundMode: backgroundMode,
                 backgroundOpacity: backgroundOpacity,
                 backgroundSpacing: backgroundSpacing,
-                isDarkMode: isDarkMode
+                isDarkMode: isDarkMode,
+                questionRegions: pageRegions
             )
 
             pageContainers.append(container)
@@ -930,12 +949,119 @@ class CanvasContainerView: UIView {
     }
 }
 
+// MARK: - Question Bounding Box Overlay View
+
+/// Draws bounding boxes around detected questions
+class QuestionBoundingBoxView: UIView {
+    var regions: [QuestionRegion] = [] {
+        didSet {
+            setNeedsDisplay()
+        }
+    }
+
+    var isDarkMode: Bool = false {
+        didSet {
+            setNeedsDisplay()
+        }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isOpaque = false
+        isUserInteractionEnabled = false
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func draw(_ rect: CGRect) {
+        guard !regions.isEmpty else { return }
+        guard let context = UIGraphicsGetCurrentContext() else { return }
+
+        // Vibrant Teal for main questions
+        let tealBoxColor = UIColor(red: 17/255, green: 157/255, blue: 164/255, alpha: 0.3)
+        let tealBorderColor = UIColor(red: 17/255, green: 157/255, blue: 164/255, alpha: 0.8)
+
+        // Green for sub-questions (a, b, c, etc.)
+        let greenBoxColor = UIColor(red: 34/255, green: 139/255, blue: 34/255, alpha: 0.3)
+        let greenBorderColor = UIColor(red: 34/255, green: 139/255, blue: 34/255, alpha: 0.8)
+
+        context.setLineWidth(2.0)
+
+        for region in regions {
+            // Determine if this is a sub-question (contains letter like "1a", "2b", etc.)
+            let isSubQuestion = region.questionIdentifier?.contains(where: { $0.isLetter }) ?? false
+
+            let boxColor = isSubQuestion ? greenBoxColor : tealBoxColor
+            let borderColor = isSubQuestion ? greenBorderColor : tealBorderColor
+
+            context.setFillColor(boxColor.cgColor)
+            context.setStrokeColor(borderColor.cgColor)
+
+            // Convert Vision coordinates (normalized, bottom-left origin)
+            // to UIKit coordinates (pixel, top-left origin)
+            let box = region.textBoundingBox
+            let uiRect = CGRect(
+                x: box.origin.x * bounds.width,
+                y: (1 - box.origin.y - box.height) * bounds.height,
+                width: box.width * bounds.width,
+                height: box.height * bounds.height
+            )
+
+            // Draw filled rectangle with border
+            let path = UIBezierPath(roundedRect: uiRect, cornerRadius: 4)
+            context.addPath(path.cgPath)
+            context.drawPath(using: .fillStroke)
+
+            // Draw question identifier label if available
+            if let identifier = region.questionIdentifier {
+                let labelText = "Q\(identifier)"
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 14, weight: .semibold),
+                    .foregroundColor: UIColor.white
+                ]
+
+                let textSize = labelText.size(withAttributes: attributes)
+                let labelPadding: CGFloat = 6
+                let labelRect = CGRect(
+                    x: uiRect.minX,
+                    y: uiRect.minY - textSize.height - labelPadding * 2,
+                    width: textSize.width + labelPadding * 2,
+                    height: textSize.height + labelPadding
+                )
+
+                // Draw label background
+                context.setFillColor(borderColor.cgColor)
+                let labelPath = UIBezierPath(
+                    roundedRect: labelRect,
+                    byRoundingCorners: [.topLeft, .topRight],
+                    cornerRadii: CGSize(width: 4, height: 4)
+                )
+                context.addPath(labelPath.cgPath)
+                context.fillPath()
+
+                // Draw label text
+                let textRect = CGRect(
+                    x: labelRect.minX + labelPadding,
+                    y: labelRect.minY + labelPadding / 2,
+                    width: textSize.width,
+                    height: textSize.height
+                )
+                labelText.draw(in: textRect, withAttributes: attributes)
+            }
+        }
+    }
+}
+
 // MARK: - Page Container View
 
 /// A container view for a single page with its canvas overlay
 class PageContainerView: UIView {
     let documentImageView = UIImageView()
     let backgroundPatternView = CanvasBackgroundPatternView()
+    let questionBoundingBoxView = QuestionBoundingBoxView()
     let canvasView = ReefCanvasView()
     let pageIndex: Int
 
@@ -944,7 +1070,7 @@ class PageContainerView: UIView {
     /// Deep Ocean (#0A1628) for document page background in dark mode
     private static let pageBackgroundDark = UIColor(red: 10/255, green: 22/255, blue: 40/255, alpha: 1)
 
-    init(pageImage: UIImage, pageIndex: Int, backgroundMode: CanvasBackgroundMode, backgroundOpacity: CGFloat, backgroundSpacing: CGFloat, isDarkMode: Bool) {
+    init(pageImage: UIImage, pageIndex: Int, backgroundMode: CanvasBackgroundMode, backgroundOpacity: CGFloat, backgroundSpacing: CGFloat, isDarkMode: Bool, questionRegions: [QuestionRegion] = []) {
         self.pageIndex = pageIndex
         self.isDarkMode = isDarkMode
         super.init(frame: .zero)
@@ -957,6 +1083,10 @@ class PageContainerView: UIView {
         backgroundPatternView.opacity = backgroundOpacity
         backgroundPatternView.spacing = backgroundSpacing
         backgroundPatternView.isDarkMode = isDarkMode
+
+        // Configure question bounding boxes
+        questionBoundingBoxView.regions = questionRegions
+        questionBoundingBoxView.isDarkMode = isDarkMode
 
         // Set background colors
         let pageBg: UIColor = isDarkMode ? Self.pageBackgroundDark : .white
@@ -985,6 +1115,10 @@ class PageContainerView: UIView {
         backgroundPatternView.isOpaque = false
         addSubview(backgroundPatternView)
 
+        // Question bounding box overlay (between background and canvas)
+        questionBoundingBoxView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(questionBoundingBoxView)
+
         // Canvas view
         canvasView.translatesAutoresizingMaskIntoConstraints = false
         canvasView.backgroundColor = .clear
@@ -1002,6 +1136,11 @@ class PageContainerView: UIView {
             backgroundPatternView.leadingAnchor.constraint(equalTo: leadingAnchor),
             backgroundPatternView.trailingAnchor.constraint(equalTo: trailingAnchor),
             backgroundPatternView.bottomAnchor.constraint(equalTo: bottomAnchor),
+
+            questionBoundingBoxView.topAnchor.constraint(equalTo: topAnchor),
+            questionBoundingBoxView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            questionBoundingBoxView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            questionBoundingBoxView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
             canvasView.topAnchor.constraint(equalTo: topAnchor),
             canvasView.leadingAnchor.constraint(equalTo: leadingAnchor),
