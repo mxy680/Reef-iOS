@@ -83,8 +83,12 @@ actor MiniLMService {
             throw MiniLMError.invalidOutput
         }
 
+        // Debug: print shape to verify tensor layout
+        let shape = lastHiddenState.shape.map { $0.intValue }
+        print("[MiniLMService] Output shape: \(shape)")
+
         // Apply mean pooling with attention mask
-        let embedding = meanPool(lastHiddenState: lastHiddenState, attentionMask: attentionMask)
+        let embedding = meanPool(lastHiddenState: lastHiddenState, attentionMask: attentionMask, shape: shape)
 
         // L2 normalize
         return l2Normalize(embedding)
@@ -104,15 +108,40 @@ actor MiniLMService {
     }
 
     /// Apply mean pooling to token embeddings using attention mask
-    private func meanPool(lastHiddenState: MLMultiArray, attentionMask: [Int32]) -> [Float] {
-        let seqLen = Self.maxSequenceLength
+    private func meanPool(lastHiddenState: MLMultiArray, attentionMask: [Int32], shape: [Int]) -> [Float] {
         let embDim = Self.embeddingDimension
+
+        // Determine tensor layout from shape
+        // Expected: [1, seq_len, 384] or [1, 384, seq_len]
+        let seqLen: Int
+        let seqFirst: Bool  // Is sequence dimension before embedding dimension?
+
+        if shape.count == 3 {
+            if shape[2] == embDim {
+                // Shape is [batch, seq_len, emb_dim]
+                seqLen = shape[1]
+                seqFirst = true
+            } else if shape[1] == embDim {
+                // Shape is [batch, emb_dim, seq_len]
+                seqLen = shape[2]
+                seqFirst = false
+            } else {
+                print("[MiniLMService] Warning: Unexpected shape \(shape), using default layout")
+                seqLen = Self.maxSequenceLength
+                seqFirst = true
+            }
+        } else {
+            print("[MiniLMService] Warning: Expected 3D tensor, got \(shape.count)D")
+            seqLen = Self.maxSequenceLength
+            seqFirst = true
+        }
 
         var sumEmbedding = [Float](repeating: 0, count: embDim)
         var tokenCount: Float = 0
 
         // Iterate over sequence positions
-        for seqIdx in 0..<seqLen {
+        let actualSeqLen = min(seqLen, attentionMask.count)
+        for seqIdx in 0..<actualSeqLen {
             // Skip padding tokens
             guard attentionMask[seqIdx] == 1 else { continue }
 
@@ -120,8 +149,14 @@ actor MiniLMService {
 
             // Add this token's embedding to the sum
             for embIdx in 0..<embDim {
-                // MLMultiArray index: [batch=0, seq, emb]
-                let index = seqIdx * embDim + embIdx
+                let index: Int
+                if seqFirst {
+                    // [batch, seq, emb] - row-major: index = seq * emb_dim + emb
+                    index = seqIdx * embDim + embIdx
+                } else {
+                    // [batch, emb, seq] - row-major: index = emb * seq_len + seq
+                    index = embIdx * seqLen + seqIdx
+                }
                 let value = lastHiddenState[index].floatValue
                 sumEmbedding[embIdx] += value
             }
