@@ -43,7 +43,7 @@ struct FilterBar: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(effectiveColorScheme == .dark ? Color.deepOcean : Color.lightGrayBackground)
+            .background(Color.adaptiveCardBackground(for: effectiveColorScheme))
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)

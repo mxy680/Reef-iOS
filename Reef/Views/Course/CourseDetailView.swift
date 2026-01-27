@@ -103,7 +103,7 @@ struct CourseDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.vibrantTeal.opacity(0.25), lineWidth: 1)
+                .stroke(Color.adaptiveText(for: colorScheme).opacity(0.15), lineWidth: 1)
         )
     }
 
@@ -191,7 +191,7 @@ struct CourseDetailView: View {
                                 if let lastOpened = note.lastOpenedAt {
                                     Text(lastOpened.relativeFormatted)
                                         .font(.quicksand(13, weight: .regular))
-                                        .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
+                                        .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.5))
                                 }
                             }
 
@@ -199,7 +199,7 @@ struct CourseDetailView: View {
 
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color.adaptiveSecondary(for: colorScheme).opacity(0.5))
+                                .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.3))
                         }
                         .padding(12)
                         .contentShape(Rectangle())
@@ -312,7 +312,7 @@ struct ContentCard: View {
                 // Count
                 Text("\(count) items")
                     .font(.quicksand(14, weight: .regular))
-                    .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
+                    .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.5))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 32)
@@ -359,7 +359,7 @@ struct SearchResultRow: View {
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(Color.adaptiveSecondary(for: colorScheme).opacity(0.5))
+                .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.3))
         }
         .padding(12)
         .background(Color.adaptiveCardBackground(for: colorScheme))

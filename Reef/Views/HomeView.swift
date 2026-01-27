@@ -498,7 +498,7 @@ struct HomeView: View {
 
                 // Separator
                 Divider()
-                    .background(Color.adaptiveSecondary(for: effectiveColorScheme).opacity(0.3))
+                    .background(Color.adaptiveText(for: effectiveColorScheme).opacity(0.15))
 
                 // User footer
                 userFooterView
