@@ -118,6 +118,7 @@ struct CanvasView: View {
                         // Update pen color to match new theme
                         selectedPenColor = themeManager.isDarkMode ? .white : .black
                     },
+                    isDocumentAIReady: note.isAIReady,
                     onAddPageAfterCurrent: {
                         canvasViewRef?.addPageAfterCurrent()
                     },

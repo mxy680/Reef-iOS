@@ -91,6 +91,7 @@ struct CanvasToolbar: View {
     let onRedo: () -> Void
     let onAIPressed: () -> Void
     let onToggleDarkMode: () -> Void
+    var isDocumentAIReady: Bool = true
     var onAddPageAfterCurrent: () -> Void = {}
     var onAddPageToEnd: () -> Void = {}
     var onDeleteCurrentPage: () -> Void = {}
@@ -343,6 +344,8 @@ struct CanvasToolbar: View {
             ToolbarButton(
                 icon: "sparkles",
                 isSelected: aiModeSelected,
+                isDisabled: !isDocumentAIReady,
+                showProcessingIndicator: !isDocumentAIReady,
                 colorScheme: colorScheme,
                 action: selectAIMode
             )
@@ -392,21 +395,47 @@ private struct ToolbarButton: View {
     let icon: String
     let isSelected: Bool
     var isDisabled: Bool = false
+    var showProcessingIndicator: Bool = false
     let colorScheme: ColorScheme
     let action: () -> Void
 
+    @State private var processingPulseScale: CGFloat = 1.0
+
     var body: some View {
         Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 20, weight: .medium))
-                .foregroundColor(foregroundColor)
-                .frame(width: 44, height: 44)
-                .background(
-                    isSelected ?
-                        Color.vibrantTeal.opacity(0.15) :
-                        Color.clear
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(foregroundColor)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        isSelected ?
+                            Color.vibrantTeal.opacity(0.15) :
+                            Color.clear
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                // Yellow pulsing indicator when processing
+                if showProcessingIndicator {
+                    Circle()
+                        .fill(Color.yellow)
+                        .frame(width: 8, height: 8)
+                        .scaleEffect(processingPulseScale)
+                        .shadow(color: Color.yellow.opacity(0.5), radius: 2)
+                        .offset(x: -4, y: 4)
+                        .onAppear {
+                            withAnimation(
+                                .easeInOut(duration: 0.8)
+                                .repeatForever(autoreverses: true)
+                            ) {
+                                processingPulseScale = 1.3
+                            }
+                        }
+                        .onDisappear {
+                            processingPulseScale = 1.0
+                        }
+                }
+            }
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
@@ -839,7 +868,8 @@ private struct DocumentOperationsToolbar: View {
             onUndo: {},
             onRedo: {},
             onAIPressed: {},
-            onToggleDarkMode: {}
+            onToggleDarkMode: {},
+            isDocumentAIReady: false  // Shows processing indicator in preview
         )
     }
     .padding()

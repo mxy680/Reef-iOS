@@ -79,6 +79,20 @@ class Note: Hashable {
         case pdf, image, document
     }
 
+    /// True if any background processing for AI features is still in progress
+    var isProcessingForAI: Bool {
+        extractionStatus == .extracting ||
+        questionDetectionStatus == .detecting ||
+        (extractionStatus == .completed && !isVectorIndexed)
+    }
+
+    /// True when all AI processing is complete and AI features are ready to use
+    var isAIReady: Bool {
+        extractionStatus == .completed &&
+        questionDetectionStatus != .detecting &&
+        isVectorIndexed
+    }
+
     init(name: String, fileName: String, fileExtension: String, course: Course? = nil) {
         self.name = name
         self.fileName = fileName

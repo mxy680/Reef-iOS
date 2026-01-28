@@ -29,6 +29,9 @@ protocol DocumentItem: AnyObject {
     var documentFileType: DocumentFileType { get }
     var extractionStatus: ExtractionStatus { get }
     var questionDetectionStatus: QuestionDetectionStatus { get }
+    var isVectorIndexed: Bool { get }
+    var isProcessingForAI: Bool { get }
+    var isAIReady: Bool { get }
 }
 
 // Conform Note to DocumentItem
@@ -100,13 +103,13 @@ struct DocumentGridItem<T: DocumentItem>: View {
                     .frame(height: 60)
                 }
 
-                // Processing status indicator - pulsing teal dot when extracting or detecting questions
-                if document.extractionStatus == .extracting || document.questionDetectionStatus == .detecting {
+                // Processing status indicator - pulsing yellow dot when processing for AI
+                if document.isProcessingForAI {
                     Circle()
-                        .fill(Color.vibrantTeal)
+                        .fill(Color.yellow)
                         .frame(width: 10, height: 10)
                         .scaleEffect(extractionPulseScale)
-                        .shadow(color: Color.vibrantTeal.opacity(0.5), radius: 4)
+                        .shadow(color: Color.yellow.opacity(0.5), radius: 4)
                         .padding(8)
                         .onAppear {
                             withAnimation(
