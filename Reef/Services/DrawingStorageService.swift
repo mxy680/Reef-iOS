@@ -8,6 +8,19 @@
 import Foundation
 import PencilKit
 
+// MARK: - Assignment Structure Model
+
+/// Tracks multi-page state per question in assignment mode
+struct AssignmentStructure: Codable {
+    /// Number of pages for each question (indexed by question index)
+    var pageCounts: [Int]
+
+    /// Creates a default structure where every question has 1 page
+    static func defaultStructure(questionCount: Int) -> AssignmentStructure {
+        AssignmentStructure(pageCounts: Array(repeating: 1, count: questionCount))
+    }
+}
+
 // MARK: - Document Structure Model
 
 /// Represents the structure of a multi-page document with modifications
@@ -128,6 +141,115 @@ class DrawingStorageService {
         }
     }
 
+    // MARK: - Assignment Mode (Per-Question) API
+
+    /// Saves a drawing for a specific question in assignment mode
+    func saveQuestionDrawing(_ drawing: PKDrawing, for documentID: UUID, questionIndex: Int) throws {
+        let url = getQuestionDrawingURL(for: documentID, questionIndex: questionIndex)
+        let data = drawing.dataRepresentation()
+        try data.write(to: url)
+    }
+
+    /// Loads a drawing for a specific question in assignment mode
+    func loadQuestionDrawing(for documentID: UUID, questionIndex: Int) -> PKDrawing? {
+        let url = getQuestionDrawingURL(for: documentID, questionIndex: questionIndex)
+        guard fileManager.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url),
+              let drawing = try? PKDrawing(data: data) else {
+            return nil
+        }
+        return drawing
+    }
+
+    /// Saves all question drawings for assignment mode
+    func saveAllQuestionDrawings(_ drawings: [PKDrawing], for documentID: UUID) throws {
+        for (index, drawing) in drawings.enumerated() {
+            try saveQuestionDrawing(drawing, for: documentID, questionIndex: index)
+        }
+    }
+
+    /// Loads all question drawings for assignment mode
+    func loadAllQuestionDrawings(for documentID: UUID, questionCount: Int) -> [PKDrawing] {
+        return (0..<questionCount).map { index in
+            loadQuestionDrawing(for: documentID, questionIndex: index) ?? PKDrawing()
+        }
+    }
+
+    // MARK: - Assignment Mode (Per-Question, Per-Page) API
+
+    /// Saves a drawing for a specific page within a specific question in assignment mode
+    func saveQuestionPageDrawing(_ drawing: PKDrawing, for documentID: UUID, questionIndex: Int, pageIndex: Int) throws {
+        let url = getQuestionPageDrawingURL(for: documentID, questionIndex: questionIndex, pageIndex: pageIndex)
+        let data = drawing.dataRepresentation()
+        try data.write(to: url)
+    }
+
+    /// Loads a drawing for a specific page within a specific question in assignment mode.
+    /// Falls back to legacy single-page question drawing for page 0 if new format doesn't exist.
+    func loadQuestionPageDrawing(for documentID: UUID, questionIndex: Int, pageIndex: Int) -> PKDrawing? {
+        let url = getQuestionPageDrawingURL(for: documentID, questionIndex: questionIndex, pageIndex: pageIndex)
+        if fileManager.fileExists(atPath: url.path),
+           let data = try? Data(contentsOf: url),
+           let drawing = try? PKDrawing(data: data) {
+            return drawing
+        }
+        // Legacy fallback: for page 0, try the old single-page question drawing
+        if pageIndex == 0 {
+            return loadQuestionDrawing(for: documentID, questionIndex: questionIndex)
+        }
+        return nil
+    }
+
+    /// Saves all page drawings for a specific question
+    func saveAllQuestionPageDrawings(_ drawings: [PKDrawing], for documentID: UUID, questionIndex: Int) throws {
+        for (pageIndex, drawing) in drawings.enumerated() {
+            try saveQuestionPageDrawing(drawing, for: documentID, questionIndex: questionIndex, pageIndex: pageIndex)
+        }
+    }
+
+    /// Loads all page drawings for a specific question
+    func loadAllQuestionPageDrawings(for documentID: UUID, questionIndex: Int, pageCount: Int) -> [PKDrawing] {
+        return (0..<pageCount).map { pageIndex in
+            loadQuestionPageDrawing(for: documentID, questionIndex: questionIndex, pageIndex: pageIndex) ?? PKDrawing()
+        }
+    }
+
+    /// Cleans up orphaned question-page drawings after page deletion (indices shifted)
+    func cleanupQuestionPageDrawings(for documentID: UUID, questionIndex: Int, keepingCount: Int) {
+        let prefix = "\(documentID.uuidString)_question\(questionIndex)_page"
+        if let files = try? fileManager.contentsOfDirectory(atPath: drawingsDirectory.path) {
+            for file in files where file.hasPrefix(prefix) && file.hasSuffix(".drawing") {
+                // Extract page index from filename: {UUID}_question{q}_page{p}.drawing
+                let withoutPrefix = String(file.dropFirst(prefix.count))
+                if let dotIndex = withoutPrefix.firstIndex(of: "."),
+                   let pageIndex = Int(withoutPrefix[withoutPrefix.startIndex..<dotIndex]),
+                   pageIndex >= keepingCount {
+                    try? fileManager.removeItem(at: drawingsDirectory.appendingPathComponent(file))
+                }
+            }
+        }
+    }
+
+    // MARK: - Assignment Structure API
+
+    /// Saves the assignment structure (per-question page counts)
+    func saveAssignmentStructure(_ structure: AssignmentStructure, for documentID: UUID) throws {
+        let url = getAssignmentStructureURL(for: documentID)
+        let data = try JSONEncoder().encode(structure)
+        try data.write(to: url)
+    }
+
+    /// Loads the assignment structure
+    func loadAssignmentStructure(for documentID: UUID) -> AssignmentStructure? {
+        let url = getAssignmentStructureURL(for: documentID)
+        guard fileManager.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url),
+              let structure = try? JSONDecoder().decode(AssignmentStructure.self, from: data) else {
+            return nil
+        }
+        return structure
+    }
+
     // MARK: - Document Structure API
 
     /// Saves the document structure
@@ -154,8 +276,20 @@ class DrawingStorageService {
         drawingsDirectory.appendingPathComponent("\(documentID.uuidString)_page\(pageIndex).drawing")
     }
 
+    private func getQuestionDrawingURL(for documentID: UUID, questionIndex: Int) -> URL {
+        drawingsDirectory.appendingPathComponent("\(documentID.uuidString)_question\(questionIndex).drawing")
+    }
+
+    private func getQuestionPageDrawingURL(for documentID: UUID, questionIndex: Int, pageIndex: Int) -> URL {
+        drawingsDirectory.appendingPathComponent("\(documentID.uuidString)_question\(questionIndex)_page\(pageIndex).drawing")
+    }
+
     private func getStructureURL(for documentID: UUID) -> URL {
         structuresDirectory.appendingPathComponent("\(documentID.uuidString).structure")
+    }
+
+    private func getAssignmentStructureURL(for documentID: UUID) -> URL {
+        structuresDirectory.appendingPathComponent("\(documentID.uuidString)_assignment.structure")
     }
 
     private func cleanupExtraDrawings(for documentID: UUID, keepingCount: Int) {
