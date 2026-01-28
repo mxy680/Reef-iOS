@@ -196,7 +196,7 @@ struct QuizGenerationView: View {
                 .cornerRadius(10)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.oceanMid.opacity(0.3), lineWidth: 1)
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                 )
         }
     }
@@ -386,7 +386,7 @@ struct QuizGenerationView: View {
                 .cornerRadius(10)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.oceanMid.opacity(0.3), lineWidth: 1)
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                 )
             }
         }
@@ -425,7 +425,7 @@ struct QuizGenerationView: View {
                 .cornerRadius(10)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.oceanMid.opacity(0.3), lineWidth: 1)
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                 )
         }
     }

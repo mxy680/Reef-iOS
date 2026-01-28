@@ -28,8 +28,9 @@ private struct TextObservation: Codable {
 
 /// Question grouping returned by LLM
 private struct QuestionGrouping: Codable {
-    let questionId: String?
-    let questionText: String
+    let type: String           // "question" or "subquestion"
+    let questionId: String     // e.g., "1", "1-a", "2", "2-b"
+    let questionText: String   // First line or summary of content
     let observationIds: [Int]
 }
 
@@ -246,23 +247,48 @@ actor QuestionRegionDetector {
         let isMultiPage = pageNumbers.count > 1
 
         let prompt = """
-        Extract question prompts from this OCR text. Each item has id, page, text, y (vertical position).
+        Detect questions and subquestions in this document. Each OCR item has id, page, text, y position.
         \(isMultiPage ? "Questions may span pages." : "")
 
         Input: \(observationsString)
 
-        Output JSON: {"questions":[{"questionId":"1","questionText":"first line","observationIds":[0,1]}]}
-
-        INCLUDE: Question numbers (1., Problem 2, Q3a), the question text, sub-parts (a,b,c), math expressions in questions.
-        For problems with subparts: include introductory/context text with the FIRST subpart (part a or part 1).
-        EXCLUDE: Titles, headers, general directions ("Show all work"), answers, page numbers, names, point values.
-
-        Return {"questions":[]} if no questions found.
+        RULES:
+        1. "question" = main numbered questions (1, 2, 3, Problem 1, etc.). Set questionId to "1", "2", "3", etc.
+        2. "subquestion" = sub-parts (a, b, c, i, ii). Set questionId to "1-a", "1-b", "2-a", etc.
+        3. Each question/subquestion gets its OWN entry - never combine multiple questions
+        4. INCLUDE in the question's bounding box:
+           - The question/problem statement
+           - Examples with FULL content (Input, Output, Explanation sections)
+           - Given values, constants, formulas, definitions
+           - Notes, hints, bullet points that are part of the problem
+        5. STOP the bounding box when you see:
+           - Text that looks like a SOLUTION or ANSWER (solving the problem, not stating it)
+           - Unstructured text that doesn't follow the document's formatting
+           - Text that explains HOW to solve rather than WHAT to solve
+           - Variables being computed/derived rather than given
+           - Phrases like "We will...", "First...", "The answer is...", "Therefore..."
+        6. EXCLUDE: page numbers, headers, footers, document titles
         """
 
+        // Define the response schema for structured output
+        let questionSchema = GeminiService.JSONSchema.object([
+            "type": .enum(["question", "subquestion"]),
+            "questionId": .string,
+            "questionText": .string,
+            "observationIds": .array(of: .integer)
+        ], required: ["type", "questionId", "questionText", "observationIds"])
+
+        let responseSchema = GeminiService.JSONSchema.object([
+            "questions": .array(of: questionSchema)
+        ], required: ["questions"])
+
         do {
-            let response = try await GeminiService.shared.generateContent(prompt: prompt, jsonOutput: true)
-            let llmResponse = try JSONDecoder().decode(LLMResponse.self, from: Data(response.utf8))
+            let response = try await GeminiService.shared.generateContent(
+                prompt: prompt,
+                schema: responseSchema
+            )
+            let data = Data(response.utf8)
+            let llmResponse = try JSONDecoder().decode(LLMResponse.self, from: data)
             return llmResponse.questions
         } catch let error as GeminiService.GeminiError {
             // Check if this is a rate limit error and we can retry
@@ -295,6 +321,9 @@ actor QuestionRegionDetector {
 
             guard !relevantPaged.isEmpty else { continue }
 
+            // Determine region type from LLM response
+            let regionType: RegionType = grouping.type.lowercased() == "subquestion" ? .subquestion : .question
+
             // Group observations by page
             let observationsByPage = Dictionary(grouping: relevantPaged) { $0.pageIndex }
 
@@ -322,6 +351,7 @@ actor QuestionRegionDetector {
 
                 regions.append(QuestionRegion(
                     pageIndex: pageIndex,
+                    regionType: regionType,
                     questionIdentifier: grouping.questionId,
                     questionText: grouping.questionText,
                     textBoundingBox: CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY),

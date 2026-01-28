@@ -259,9 +259,6 @@ class CanvasContainerView: UIView {
     private var isDarkMode: Bool = false
     private var questionRegions: DocumentQuestionRegions?
 
-    /// Detected question regions for the document
-    private var questionRegions: DocumentQuestionRegions?
-
     /// Light gray background for scroll view in light mode (close to white)
     private static let scrollBackgroundLight = UIColor(red: 245/255, green: 245/255, blue: 245/255, alpha: 1)
 
@@ -351,23 +348,59 @@ class CanvasContainerView: UIView {
         guard newDarkMode != isDarkMode else { return }
         isDarkMode = newDarkMode
 
-        // Update scroll background and separators
-        let newScrollBg = isDarkMode ? Self.scrollBackgroundDark : Self.scrollBackgroundLight
-        UIView.animate(withDuration: 0.3) {
-            self.scrollView.backgroundColor = newScrollBg
-            // Update separator colors to match background
-            for separator in self.separatorViews {
-                separator.backgroundColor = newScrollBg
+        // Pre-render the new page images BEFORE starting any animations
+        // This ensures all visual changes happen simultaneously
+        Task { [weak self] in
+            guard let self = self else { return }
+            guard let url = self.documentURL, let fileType = self.fileType else { return }
+
+            // Render new images in background
+            var newImages: [UIImage] = []
+            switch fileType {
+            case .pdf:
+                newImages = await self.renderPDFPages(url: url)
+            case .image:
+                if let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
+                    let processedImage = self.isDarkMode ? self.applyDarkModeFilter(to: image) : image
+                    if let img = processedImage {
+                        newImages = [img]
+                    }
+                }
+            case .document:
+                break
+            }
+
+            // Now perform ALL visual updates together on main thread
+            await MainActor.run {
+                let newScrollBg = self.isDarkMode ? Self.scrollBackgroundDark : Self.scrollBackgroundLight
+
+                UIView.animate(withDuration: 0.3) {
+                    // Update scroll background
+                    self.scrollView.backgroundColor = newScrollBg
+
+                    // Update separator colors
+                    for separator in self.separatorViews {
+                        separator.backgroundColor = newScrollBg
+                    }
+                }
+
+                // Update all page containers and images simultaneously
+                for (index, container) in self.pageContainers.enumerated() {
+                    container.updateDarkMode(newDarkMode)
+
+                    // Update document image with crossfade if we have new images
+                    if index < newImages.count {
+                        UIView.transition(
+                            with: container.documentImageView,
+                            duration: 0.3,
+                            options: .transitionCrossDissolve
+                        ) {
+                            container.documentImageView.image = newImages[index]
+                        }
+                    }
+                }
             }
         }
-
-        // Update all page containers
-        for container in pageContainers {
-            container.updateDarkMode(newDarkMode)
-        }
-
-        // Reload document to re-render pages with new theme
-        reloadDocument()
     }
 
     func updateBackgroundMode(_ newMode: CanvasBackgroundMode) {
@@ -732,8 +765,48 @@ class CanvasContainerView: UIView {
 
                 // Distribute question regions to pages
                 self.distributeQuestionRegionsToPages()
+
+                // Center and fit document after layout completes
+                DispatchQueue.main.async {
+                    self.centerAndFitDocument()
+                }
             }
         }
+    }
+
+    /// Centers the document and zooms to fit the viewport width
+    private func centerAndFitDocument() {
+        // Wait for layout to complete
+        layoutIfNeeded()
+
+        // Get the content size and viewport size
+        let viewportSize = scrollView.bounds.size
+        guard viewportSize.width > 0, viewportSize.height > 0 else { return }
+
+        // Get the content size (from the widest page)
+        guard let contentWidth = pageContainers.first?.bounds.width, contentWidth > 0 else { return }
+
+        // Calculate zoom scale to fit width with some padding
+        let horizontalPadding: CGFloat = 40
+        let availableWidth = viewportSize.width - horizontalPadding
+        let zoomToFitWidth = availableWidth / contentWidth
+
+        // Clamp to min/max zoom scales
+        let targetZoom = min(max(zoomToFitWidth, scrollView.minimumZoomScale), scrollView.maximumZoomScale)
+
+        // Set the zoom scale - this will trigger layoutSubviews which sets content insets for centering
+        scrollView.zoomScale = targetZoom
+
+        // Force layout update to recalculate content insets
+        setNeedsLayout()
+        layoutIfNeeded()
+
+        // Scroll to top with a small padding (content insets handle horizontal centering)
+        let topPadding: CGFloat = 20
+        scrollView.contentOffset = CGPoint(
+            x: -scrollView.contentInset.left,
+            y: -scrollView.contentInset.top - topPadding
+        )
     }
 
     /// Sets up page containers based on saved document structure
@@ -1011,22 +1084,30 @@ class QuestionBoundingBoxView: UIView {
         guard !regions.isEmpty else { return }
         guard let context = UIGraphicsGetCurrentContext() else { return }
 
+        // Colors for region types
         // Vibrant Teal for main questions
-        let tealBoxColor = UIColor(red: 17/255, green: 157/255, blue: 164/255, alpha: 0.3)
+        let tealBoxColor = UIColor(red: 17/255, green: 157/255, blue: 164/255, alpha: 0.25)
         let tealBorderColor = UIColor(red: 17/255, green: 157/255, blue: 164/255, alpha: 0.8)
 
-        // Green for sub-questions (a, b, c, etc.)
-        let greenBoxColor = UIColor(red: 34/255, green: 139/255, blue: 34/255, alpha: 0.3)
+        // Green for sub-questions
+        let greenBoxColor = UIColor(red: 34/255, green: 139/255, blue: 34/255, alpha: 0.25)
         let greenBorderColor = UIColor(red: 34/255, green: 139/255, blue: 34/255, alpha: 0.8)
 
         context.setLineWidth(2.0)
 
         for region in regions {
-            // Determine if this is a sub-question (contains letter like "1a", "2b", etc.)
-            let isSubQuestion = region.questionIdentifier?.contains(where: { $0.isLetter }) ?? false
+            // Determine colors based on region type
+            let boxColor: UIColor
+            let borderColor: UIColor
 
-            let boxColor = isSubQuestion ? greenBoxColor : tealBoxColor
-            let borderColor = isSubQuestion ? greenBorderColor : tealBorderColor
+            switch region.regionType {
+            case .question:
+                boxColor = tealBoxColor
+                borderColor = tealBorderColor
+            case .subquestion:
+                boxColor = greenBoxColor
+                borderColor = greenBorderColor
+            }
 
             context.setFillColor(boxColor.cgColor)
             context.setStrokeColor(borderColor.cgColor)
@@ -1046,42 +1127,47 @@ class QuestionBoundingBoxView: UIView {
             context.addPath(path.cgPath)
             context.drawPath(using: .fillStroke)
 
-            // Draw question identifier label if available
-            if let identifier = region.questionIdentifier {
-                let labelText = "Q\(identifier)"
-                let attributes: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: 14, weight: .semibold),
-                    .foregroundColor: UIColor.white
-                ]
-
-                let textSize = labelText.size(withAttributes: attributes)
-                let labelPadding: CGFloat = 6
-                let labelRect = CGRect(
-                    x: uiRect.minX,
-                    y: uiRect.minY - textSize.height - labelPadding * 2,
-                    width: textSize.width + labelPadding * 2,
-                    height: textSize.height + labelPadding
-                )
-
-                // Draw label background
-                context.setFillColor(borderColor.cgColor)
-                let labelPath = UIBezierPath(
-                    roundedRect: labelRect,
-                    byRoundingCorners: [.topLeft, .topRight],
-                    cornerRadii: CGSize(width: 4, height: 4)
-                )
-                context.addPath(labelPath.cgPath)
-                context.fillPath()
-
-                // Draw label text
-                let textRect = CGRect(
-                    x: labelRect.minX + labelPadding,
-                    y: labelRect.minY + labelPadding / 2,
-                    width: textSize.width,
-                    height: textSize.height
-                )
-                labelText.draw(in: textRect, withAttributes: attributes)
+            // Generate label: "Question (Q1)" or "SubQuestion (Q1-a)"
+            let labelText: String
+            let qId = region.questionIdentifier ?? ""
+            switch region.regionType {
+            case .question:
+                labelText = "Question (Q\(qId))"
+            case .subquestion:
+                labelText = "SubQuestion (Q\(qId))"
             }
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 14, weight: .semibold),
+                .foregroundColor: UIColor.white
+            ]
+
+            let textSize = labelText.size(withAttributes: attributes)
+            let labelPadding: CGFloat = 6
+            let labelRect = CGRect(
+                x: uiRect.minX,
+                y: uiRect.minY - textSize.height - labelPadding * 2,
+                width: textSize.width + labelPadding * 2,
+                height: textSize.height + labelPadding
+            )
+
+            // Draw label background
+            context.setFillColor(borderColor.cgColor)
+            let labelPath = UIBezierPath(
+                roundedRect: labelRect,
+                byRoundingCorners: [.topLeft, .topRight],
+                cornerRadii: CGSize(width: 4, height: 4)
+            )
+            context.addPath(labelPath.cgPath)
+            context.fillPath()
+
+            // Draw label text
+            let textRect = CGRect(
+                x: labelRect.minX + labelPadding,
+                y: labelRect.minY + labelPadding / 2,
+                width: textSize.width,
+                height: textSize.height
+            )
+            labelText.draw(in: textRect, withAttributes: attributes)
         }
     }
 }
@@ -1229,144 +1315,6 @@ class PageContainerView: UIView {
         layer.shadowOpacity = shadowOpacity
         layer.shadowOffset = CGSize(width: 0, height: 4)
         layer.shadowRadius = shadowRadius
-    }
-}
-
-// MARK: - Question Bounding Box View
-
-/// Displays visual bounding boxes for detected question regions on a page
-class QuestionBoundingBoxView: UIView {
-    /// Question regions to display (only regions for this page)
-    var regions: [QuestionRegion] = [] {
-        didSet {
-            setNeedsDisplay()
-        }
-    }
-
-    /// Whether dark mode is active
-    var isDarkMode: Bool = false {
-        didSet {
-            setNeedsDisplay()
-        }
-    }
-
-    // MARK: - Colors (from Reef color palette)
-
-    /// Vibrant Teal for main questions
-    private static let mainQuestionColor = UIColor(red: 17/255, green: 157/255, blue: 164/255, alpha: 1) // #119DA4
-
-    /// Ocean Mid for sub-questions
-    private static let subQuestionColor = UIColor(red: 12/255, green: 116/255, blue: 137/255, alpha: 1) // #0C7489
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        backgroundColor = .clear
-        isOpaque = false
-        isUserInteractionEnabled = false
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func draw(_ rect: CGRect) {
-        guard !regions.isEmpty else { return }
-        guard let context = UIGraphicsGetCurrentContext() else { return }
-
-        for region in regions {
-            drawRegion(region, in: context)
-        }
-    }
-
-    private func drawRegion(_ region: QuestionRegion, in context: CGContext) {
-        // Convert from Vision coordinates (bottom-left origin, 0-1 normalized)
-        // to UIKit coordinates (top-left origin, pixel values)
-        let box = region.textBoundingBox
-        let uiRect = CGRect(
-            x: box.origin.x * bounds.width,
-            y: (1 - box.origin.y - box.height) * bounds.height,
-            width: box.width * bounds.width,
-            height: box.height * bounds.height
-        )
-
-        // Determine if this is a main question or sub-question
-        let isSubQuestion = isSubQuestionIdentifier(region.questionIdentifier)
-        let baseColor = isSubQuestion ? Self.subQuestionColor : Self.mainQuestionColor
-
-        // Draw filled rectangle with transparency
-        let fillColor = baseColor.withAlphaComponent(0.15)
-        context.setFillColor(fillColor.cgColor)
-
-        let path = UIBezierPath(roundedRect: uiRect, cornerRadius: 4)
-        context.addPath(path.cgPath)
-        context.fillPath()
-
-        // Draw border
-        let borderColor = baseColor.withAlphaComponent(0.6)
-        context.setStrokeColor(borderColor.cgColor)
-        context.setLineWidth(2.0)
-        context.addPath(path.cgPath)
-        context.strokePath()
-
-        // Draw label if we have a question identifier
-        if let identifier = region.questionIdentifier {
-            drawLabel(identifier, at: uiRect, color: baseColor, in: context)
-        }
-    }
-
-    private func isSubQuestionIdentifier(_ identifier: String?) -> Bool {
-        guard let id = identifier else { return false }
-        // Sub-questions typically have letters (1a, 1b, 2a) or are just letters (a, b, c)
-        let hasLetter = id.contains(where: { $0.isLetter && $0.isLowercase })
-        let hasNumber = id.contains(where: { $0.isNumber })
-        // If it has both a number and a lowercase letter, it's a sub-question
-        // Or if it's just a letter
-        return (hasNumber && hasLetter) || (!hasNumber && hasLetter)
-    }
-
-    private func drawLabel(_ identifier: String, at rect: CGRect, color: UIColor, in context: CGContext) {
-        let labelText = "Q\(identifier)"
-        let font = UIFont.systemFont(ofSize: 12, weight: .semibold)
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: UIColor.white
-        ]
-
-        let textSize = (labelText as NSString).size(withAttributes: attributes)
-        let labelPadding: CGFloat = 6
-        let labelHeight: CGFloat = textSize.height + labelPadding
-        let labelWidth: CGFloat = textSize.width + labelPadding * 2
-
-        // Position label at top-left of the bounding box
-        let labelRect = CGRect(
-            x: rect.minX,
-            y: rect.minY - labelHeight,
-            width: labelWidth,
-            height: labelHeight
-        )
-
-        // Only draw if label is within bounds
-        guard labelRect.minY >= 0 else { return }
-
-        // Draw label background with rounded top corners
-        let labelPath = UIBezierPath(
-            roundedRect: labelRect,
-            byRoundingCorners: [.topLeft, .topRight],
-            cornerRadii: CGSize(width: 4, height: 4)
-        )
-        context.setFillColor(color.cgColor)
-        context.addPath(labelPath.cgPath)
-        context.fillPath()
-
-        // Draw text
-        let textRect = CGRect(
-            x: labelRect.minX + labelPadding,
-            y: labelRect.minY + labelPadding / 2,
-            width: textSize.width,
-            height: textSize.height
-        )
-        (labelText as NSString).draw(in: textRect, withAttributes: attributes)
     }
 }
 

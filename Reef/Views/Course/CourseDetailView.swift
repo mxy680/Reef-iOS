@@ -216,7 +216,7 @@ struct CourseDetailView: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.vibrantTeal.opacity(0.25), lineWidth: 1)
+                    .stroke(Color.gray.opacity(0.25), lineWidth: 1)
             )
         }
     }
@@ -320,7 +320,7 @@ struct ContentCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.vibrantTeal.opacity(0.25), lineWidth: 1)
+                    .stroke(Color.gray.opacity(0.25), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

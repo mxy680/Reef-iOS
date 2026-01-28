@@ -182,7 +182,6 @@ struct NotesView: View {
                                 )
                             }
                             .buttonStyle(.plain)
-                            .disabled(note.extractionStatus == .extracting || note.questionDetectionStatus == .detecting)
                         }
                     }
                     .padding(32)

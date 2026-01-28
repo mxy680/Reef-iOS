@@ -287,22 +287,41 @@ struct HomeView: View {
             }
             .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 8, trailing: 16))
 
-            // Course list
-            ForEach(courses) { course in
-                Button {
-                    selectedCourse = course
-                    selectedCourseSubPage = nil
-                    selectedItem = nil
-                } label: {
-                    HStack {
+            // Course list (pinned courses first, then alphabetical)
+            ForEach(courses.sorted { course1, course2 in
+                let pinned1 = userPrefsManager.isPinned(id: course1.id)
+                let pinned2 = userPrefsManager.isPinned(id: course2.id)
+                if pinned1 != pinned2 {
+                    return pinned1 // pinned courses come first
+                }
+                return course1.name.localizedCaseInsensitiveCompare(course2.name) == .orderedAscending
+            }) { course in
+                HStack {
+                    Button {
+                        selectedCourse = course
+                        selectedCourseSubPage = nil
+                        selectedItem = nil
+                    } label: {
                         Label(course.name, systemImage: course.icon)
                             .font(.quicksand(17, weight: .medium))
                             .foregroundColor(selectedCourse?.id == course.id ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
-                        Spacer()
                     }
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
+                    if userPrefsManager.isPinned(id: course.id) {
+                        Button {
+                            userPrefsManager.togglePin(id: course.id)
+                        } label: {
+                            Image(systemName: "pin.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(selectedCourse?.id == course.id ? .vibrantTeal : Color.adaptiveText(for: effectiveColorScheme))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .buttonStyle(.plain)
+                .contentShape(Rectangle())
                 .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
             }
 
@@ -430,16 +449,6 @@ struct HomeView: View {
             }
 
             Spacer()
-
-            // Dark mode toggle
-            Button {
-                themeManager.toggle()
-            } label: {
-                Image(systemName: themeManager.isDarkMode ? "sun.max.fill" : "moon.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
-            }
-            .buttonStyle(.plain)
 
             Button {
                 authManager.signOut()
@@ -897,7 +906,7 @@ struct CourseOptionsPopup: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.adaptiveSecondary(for: colorScheme).opacity(0.3), lineWidth: 1)
+                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                             )
                     }
 
@@ -920,7 +929,7 @@ struct CourseOptionsPopup: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 10)
-                                        .stroke(Color.adaptiveSecondary(for: colorScheme).opacity(0.3), lineWidth: 1)
+                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -961,7 +970,7 @@ struct CourseOptionsPopup: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.adaptiveSecondary(for: colorScheme).opacity(0.3), lineWidth: 1)
+                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                             )
                     }
                     .buttonStyle(.plain)
@@ -1037,11 +1046,11 @@ struct CourseOptionsPopup: View {
                                 .font(.system(size: 22))
                                 .foregroundColor(editedIcon == icon ? .white : Color.adaptiveSecondary(for: colorScheme))
                                 .frame(width: 48, height: 48)
-                                .background(editedIcon == icon ? Color.adaptiveSecondary(for: colorScheme) : textFieldBackgroundColor)
+                                .background(editedIcon == icon ? Color.gray : textFieldBackgroundColor)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 10)
-                                        .stroke(editedIcon == icon ? Color.adaptiveSecondary(for: colorScheme) : Color.adaptiveSecondary(for: colorScheme).opacity(0.3), lineWidth: editedIcon == icon ? 2 : 1)
+                                        .stroke(editedIcon == icon ? Color.gray : Color.gray.opacity(0.3), lineWidth: editedIcon == icon ? 2 : 1)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -1094,7 +1103,7 @@ struct CourseOptionsPopup: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.adaptiveSecondary(for: colorScheme).opacity(0.3), lineWidth: 1)
+                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                             )
                     }
                     .buttonStyle(.plain)

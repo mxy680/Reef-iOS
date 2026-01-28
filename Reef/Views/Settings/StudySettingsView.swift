@@ -223,7 +223,7 @@ struct StudySettingsView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(effectiveColorScheme == .dark ? Color.clear : Color.oceanMid.opacity(0.3), lineWidth: 1)
+                .stroke(effectiveColorScheme == .dark ? Color.clear : Color.gray.opacity(0.3), lineWidth: 1)
         )
     }
 

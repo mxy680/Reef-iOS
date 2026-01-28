@@ -17,12 +17,19 @@ enum QuestionDetectionStatus: String, Codable {
     case notApplicable   // Document doesn't appear to contain questions
 }
 
+/// Type of detected region
+enum RegionType: String, Codable {
+    case question        // A main question (1, 2, 3, etc.)
+    case subquestion     // A sub-part of a question (a, b, c, i, ii, etc.)
+}
+
 /// A detected question region within a document page
 struct QuestionRegion: Codable, Identifiable {
     let id: UUID
     let pageIndex: Int
-    let questionIdentifier: String?  // "1", "a", "Q3", etc.
-    let questionText: String
+    let regionType: RegionType       // question or subquestion
+    let questionIdentifier: String?  // "1", "1-a", "2", etc.
+    let questionText: String         // Full text content
     let textBoundingBox: CGRect      // Normalized coords (0-1), bottom-left origin (Vision format)
     let workspaceBoundingBox: CGRect? // Adjacent whitespace area for working
     let confidence: Double
@@ -38,6 +45,7 @@ struct QuestionRegion: Codable, Identifiable {
     init(
         id: UUID = UUID(),
         pageIndex: Int,
+        regionType: RegionType = .question,
         questionIdentifier: String?,
         questionText: String,
         textBoundingBox: CGRect,
@@ -46,6 +54,7 @@ struct QuestionRegion: Codable, Identifiable {
     ) {
         self.id = id
         self.pageIndex = pageIndex
+        self.regionType = regionType
         self.questionIdentifier = questionIdentifier
         self.questionText = questionText
         self.textBoundingBox = textBoundingBox

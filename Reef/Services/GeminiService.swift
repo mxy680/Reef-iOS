@@ -35,7 +35,55 @@ actor GeminiService {
 
         struct GenerationConfig: Encodable {
             let responseMimeType: String?
+            let responseSchema: JSONSchema?
             let temperature: Double?
+        }
+    }
+
+    /// JSON Schema for structured outputs (uses class to allow recursive definitions)
+    final class JSONSchema: Encodable {
+        let type: String
+        let properties: [String: JSONSchema]?
+        let items: JSONSchema?
+        let required: [String]?
+        let `enum`: [String]?
+        let description: String?
+
+        init(
+            type: String,
+            properties: [String: JSONSchema]? = nil,
+            items: JSONSchema? = nil,
+            required: [String]? = nil,
+            enumValues: [String]? = nil,
+            description: String? = nil
+        ) {
+            self.type = type
+            self.properties = properties
+            self.items = items
+            self.required = required
+            self.`enum` = enumValues
+            self.description = description
+        }
+
+        /// Convenience for string type
+        static var string: JSONSchema { JSONSchema(type: "string") }
+
+        /// Convenience for integer type
+        static var integer: JSONSchema { JSONSchema(type: "integer") }
+
+        /// Convenience for array of items
+        static func array(of items: JSONSchema) -> JSONSchema {
+            JSONSchema(type: "array", items: items)
+        }
+
+        /// Convenience for enum strings
+        static func `enum`(_ values: [String]) -> JSONSchema {
+            JSONSchema(type: "string", enumValues: values)
+        }
+
+        /// Convenience for object with properties
+        static func object(_ properties: [String: JSONSchema], required: [String]? = nil) -> JSONSchema {
+            JSONSchema(type: "object", properties: properties, required: required)
         }
     }
 
@@ -66,8 +114,9 @@ actor GeminiService {
     /// - Parameters:
     ///   - prompt: The prompt to send to Gemini
     ///   - jsonOutput: If true, request JSON output format with temperature 0
+    ///   - schema: Optional JSON schema for structured outputs
     /// - Returns: The generated text response
-    func generateContent(prompt: String, jsonOutput: Bool = false) async throws -> String {
+    func generateContent(prompt: String, jsonOutput: Bool = false, schema: JSONSchema? = nil) async throws -> String {
         guard let url = URL(string: "\(baseURL)/\(model):generateContent?key=\(apiKey)") else {
             throw GeminiError.invalidURL
         }
@@ -76,9 +125,18 @@ actor GeminiService {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
+        let generationConfig: GeminiRequest.GenerationConfig?
+        if let schema = schema {
+            generationConfig = .init(responseMimeType: "application/json", responseSchema: schema, temperature: 0)
+        } else if jsonOutput {
+            generationConfig = .init(responseMimeType: "application/json", responseSchema: nil, temperature: 0)
+        } else {
+            generationConfig = nil
+        }
+
         let geminiRequest = GeminiRequest(
             contents: [.init(parts: [.init(text: prompt)])],
-            generationConfig: jsonOutput ? .init(responseMimeType: "application/json", temperature: 0) : nil
+            generationConfig: generationConfig
         )
 
         request.httpBody = try JSONEncoder().encode(geminiRequest)
