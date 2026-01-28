@@ -94,6 +94,116 @@ struct DocumentQuestionRegions: Codable {
     }
 }
 
+// MARK: - Question Grouping for Assignment Mode
+
+/// A group of related questions (parent + subquestions) for assignment mode display
+struct QuestionGroup: Identifiable {
+    let id: String                      // e.g. "0-1" (pageIndex-identifier)
+    let parentQuestion: QuestionRegion?
+    let subquestions: [QuestionRegion]
+    let pageIndex: Int
+    let unionBoundingBox: CGRect        // Vision coords (normalized, bottom-left origin), padded
+
+    /// All regions in visual top-to-bottom order: parent first, then subquestions
+    /// sorted by Vision Y descending (higher Y = higher on page).
+    var orderedRegions: [QuestionRegion] {
+        var regions: [QuestionRegion] = []
+        if let parent = parentQuestion {
+            regions.append(parent)
+        }
+        let sortedSubs = subquestions.sorted { a, b in
+            let aTop = a.textBoundingBox.origin.y + a.textBoundingBox.height
+            let bTop = b.textBoundingBox.origin.y + b.textBoundingBox.height
+            return aTop > bTop
+        }
+        regions.append(contentsOf: sortedSubs)
+        return regions
+    }
+}
+
+extension DocumentQuestionRegions {
+    /// Groups regions by top-level question, combining each parent with its subquestions.
+    /// Returns groups sorted by page index ascending, then by Vision Y descending (top of page first).
+    func groupedByTopLevelQuestion() -> [QuestionGroup] {
+        var groups: [QuestionGroup] = []
+        var usedSubquestionIDs = Set<UUID>()
+
+        // Separate by type
+        let questions = regions.filter { $0.regionType == .question }
+        let subquestions = regions.filter { $0.regionType == .subquestion }
+
+        for question in questions {
+            let parentId = question.questionIdentifier ?? ""
+
+            // Find subquestions whose identifier starts with parentId + "-"
+            let matchingSubs = subquestions.filter { sub in
+                guard let subId = sub.questionIdentifier else { return false }
+                return subId.hasPrefix(parentId + "-")
+            }
+            matchingSubs.forEach { usedSubquestionIDs.insert($0.id) }
+
+            // Compute union bounding box of all regions in this group
+            let allRegions = [question] + matchingSubs
+            let union = Self.computeUnionBoundingBox(for: allRegions)
+
+            let groupId = "\(question.pageIndex)-\(parentId)"
+            groups.append(QuestionGroup(
+                id: groupId,
+                parentQuestion: question,
+                subquestions: matchingSubs,
+                pageIndex: question.pageIndex,
+                unionBoundingBox: union
+            ))
+        }
+
+        // Handle orphaned subquestions (no matching parent)
+        let orphanedSubs = subquestions.filter { !usedSubquestionIDs.contains($0.id) }
+        for orphan in orphanedSubs {
+            let orphanId = orphan.questionIdentifier ?? UUID().uuidString
+            let union = Self.computeUnionBoundingBox(for: [orphan])
+
+            groups.append(QuestionGroup(
+                id: "\(orphan.pageIndex)-orphan-\(orphanId)",
+                parentQuestion: nil,
+                subquestions: [orphan],
+                pageIndex: orphan.pageIndex,
+                unionBoundingBox: union
+            ))
+        }
+
+        // Sort by pageIndex ascending, then by Vision Y descending (top of page = higher Y in Vision coords)
+        groups.sort { a, b in
+            if a.pageIndex != b.pageIndex {
+                return a.pageIndex < b.pageIndex
+            }
+            // Higher Vision Y means higher on the page (top-first)
+            return a.unionBoundingBox.origin.y + a.unionBoundingBox.height
+                > b.unionBoundingBox.origin.y + b.unionBoundingBox.height
+        }
+
+        return groups
+    }
+
+    /// Computes the union bounding box of all regions with 2% padding, clamped to 0–1
+    private static func computeUnionBoundingBox(for regions: [QuestionRegion]) -> CGRect {
+        guard let first = regions.first else { return .zero }
+
+        var union = first.totalBoundingBox
+        for region in regions.dropFirst() {
+            union = union.union(region.totalBoundingBox)
+        }
+
+        // Add 2% padding on each side, clamped to 0–1
+        let padding: CGFloat = 0.02
+        let x = max(union.origin.x - padding, 0)
+        let y = max(union.origin.y - padding, 0)
+        let maxX = min(union.origin.x + union.width + padding, 1)
+        let maxY = min(union.origin.y + union.height + padding, 1)
+
+        return CGRect(x: x, y: y, width: maxX - x, height: maxY - y)
+    }
+}
+
 /// Context about the currently active question for AI feedback
 struct ActiveQuestionContext: Codable {
     let questionId: UUID

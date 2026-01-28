@@ -35,6 +35,7 @@ struct DrawingOverlayView: UIViewRepresentable {
     @Binding var eraserSize: CGFloat
     @Binding var eraserType: EraserType
     @Binding var diagramWidth: CGFloat
+    @Binding var diagramAutosnap: Bool
     var canvasBackgroundMode: CanvasBackgroundMode = .normal
     var canvasBackgroundOpacity: CGFloat = 0.15
     var canvasBackgroundSpacing: CGFloat = 48
@@ -80,6 +81,7 @@ struct DrawingOverlayView: UIViewRepresentable {
         context.coordinator.currentTool = selectedTool
         context.coordinator.currentPenColor = UIColor(selectedPenColor)
         context.coordinator.currentPenWidth = penWidth
+        context.coordinator.diagramAutosnap = diagramAutosnap
 
         // Update tool for all page canvases
         for pageContainer in container.pageContainers {
@@ -159,6 +161,7 @@ struct DrawingOverlayView: UIViewRepresentable {
         }
         var currentPenColor: UIColor = .black
         var currentPenWidth: CGFloat = 4.0
+        var diagramAutosnap: Bool = true
 
         // Pause detection
         private let pauseDetector = PauseDetector()
@@ -195,9 +198,10 @@ struct DrawingOverlayView: UIViewRepresentable {
             // Skip if we triggered this via shape replacement
             guard !isReplacingStroke else { return }
 
-            // Shape detection — only for Diagram tool
+            // Line autosnap — only for Diagram tool with autosnap enabled
             let currentStrokeCount = canvasView.drawing.strokes.count
             if currentTool == .diagram,
+               diagramAutosnap,
                currentStrokeCount > previousStrokeCount,
                let newStroke = canvasView.drawing.strokes.last,
                let replacement = ShapeDetector.detect(stroke: newStroke) {
@@ -293,7 +297,7 @@ class CanvasContainerView: UIView {
     // MARK: - Assignment Mode State
     private(set) var isInAssignmentMode: Bool = false
     private var questionGroups: [QuestionGroup] = []
-    private var questionCroppedImages: [UIImage] = []
+    private var questionCroppedImages: [[UIImage]] = []
     private var currentQuestionIndex: Int = 0
     private var originalPageImages: [UIImage] = []
     var onQuestionCountReady: ((Int) -> Void)?
@@ -500,17 +504,16 @@ class CanvasContainerView: UIView {
                     let pageSize = self.originalPageImages.first?.size ?? CGSize(width: 1224, height: 1584)
                     // Re-crop and recompose all question pages with new dark mode rendering
                     self.questionCroppedImages = self.questionGroups.map { group in
-                        guard group.pageIndex < newImages.count,
-                              let cropped = self.cropImage(newImages[group.pageIndex], toRegion: group.unionBoundingBox)
-                        else { return self.createBlankPageImage() }
-                        return self.composeQuestionPage(croppedQuestion: cropped, pageSize: pageSize)
+                        self.composeGroupImage(group: group, sourceImages: newImages, pageSize: pageSize)
                     }
-                    // Update ALL page containers: page 0 gets re-composed question image, pages 1+ get fresh blank image
+                    // Update ALL page containers using composed images for this question
+                    let composedImages = self.currentQuestionIndex < self.questionCroppedImages.count
+                        ? self.questionCroppedImages[self.currentQuestionIndex] : []
                     for (pageIdx, container) in self.pageContainers.enumerated() {
                         container.updateDarkMode(newDarkMode)
                         let img: UIImage
-                        if pageIdx == 0, self.currentQuestionIndex < self.questionCroppedImages.count {
-                            img = self.questionCroppedImages[self.currentQuestionIndex]
+                        if pageIdx < composedImages.count {
+                            img = composedImages[pageIdx]
                         } else {
                             img = self.createBlankPageImage()
                         }
@@ -784,6 +787,102 @@ class CanvasContainerView: UIView {
         }
     }
 
+    /// Adds normalized padding to a Vision bounding box so text doesn't touch crop edges
+    private func paddedRegion(_ rect: CGRect, padding: CGFloat = 0.01) -> CGRect {
+        let x = max(rect.origin.x - padding, 0)
+        let y = max(rect.origin.y - padding, 0)
+        let maxX = min(rect.origin.x + rect.width + padding, 1)
+        let maxY = min(rect.origin.y + rect.height + padding, 1)
+        return CGRect(x: x, y: y, width: maxX - x, height: maxY - y)
+    }
+
+    /// Lays out multiple full-width cropped images vertically with spacing,
+    /// returning multiple page images if content overflows a single page.
+    private func composeQuestionPageFromParts(
+        croppedParts: [UIImage],
+        pageSize: CGSize,
+        spacing: CGFloat = 300
+    ) -> [UIImage] {
+        let topPadding: CGFloat = 40
+        let bgColor = isDarkMode ? Self.pageBackgroundDark : UIColor.white
+
+        var pages: [UIImage] = []
+        var partsForCurrentPage: [(image: UIImage, y: CGFloat)] = []
+        var currentY = topPadding
+
+        for part in croppedParts {
+            // Draw at 1:1 pixel size — no scaling — to preserve original text size
+            let drawHeight = part.size.height
+
+            // If this part doesn't fit and we already have content, start a new page
+            if currentY + drawHeight > pageSize.height && !partsForCurrentPage.isEmpty {
+                let renderer = UIGraphicsImageRenderer(size: pageSize)
+                let page = renderer.image { ctx in
+                    bgColor.setFill()
+                    ctx.fill(CGRect(origin: .zero, size: pageSize))
+                    for (img, y) in partsForCurrentPage {
+                        img.draw(at: CGPoint(x: 0, y: y))
+                    }
+                }
+                pages.append(page)
+                partsForCurrentPage.removeAll()
+                currentY = topPadding
+            }
+
+            partsForCurrentPage.append((image: part, y: currentY))
+            currentY += drawHeight + spacing
+        }
+
+        // Render final page
+        if !partsForCurrentPage.isEmpty {
+            let renderer = UIGraphicsImageRenderer(size: pageSize)
+            let page = renderer.image { ctx in
+                bgColor.setFill()
+                ctx.fill(CGRect(origin: .zero, size: pageSize))
+                for (img, y) in partsForCurrentPage {
+                    img.draw(at: CGPoint(x: 0, y: y))
+                }
+            }
+            pages.append(page)
+        }
+
+        return pages.isEmpty ? [createBlankPageImage()] : pages
+    }
+
+    /// Composes page image(s) for a question group. Single-region groups use the existing
+    /// single-crop path. Multi-region groups crop each sub-question as a full-width strip
+    /// (preserving original text size) and lay them out with spacing, adding pages as needed.
+    private func composeGroupImage(
+        group: QuestionGroup,
+        sourceImages: [UIImage],
+        pageSize: CGSize
+    ) -> [UIImage] {
+        guard group.pageIndex < sourceImages.count else {
+            return [createBlankPageImage()]
+        }
+        let sourceImage = sourceImages[group.pageIndex]
+        let regions = group.orderedRegions
+
+        if regions.count <= 1 {
+            guard let region = regions.first,
+                  let cropped = cropImage(sourceImage, toRegion: paddedRegion(region.textBoundingBox))
+            else { return [createBlankPageImage()] }
+            return [composeQuestionPage(croppedQuestion: cropped, pageSize: pageSize)]
+        }
+
+        // Crop each region as a full-width horizontal strip to preserve original text size
+        let padding: CGFloat = 0.01
+        let croppedParts: [UIImage] = regions.compactMap { region in
+            let box = region.textBoundingBox
+            let y = max(box.origin.y - padding, 0)
+            let maxY = min(box.origin.y + box.height + padding, 1)
+            let fullWidthBox = CGRect(x: 0, y: y, width: 1.0, height: maxY - y)
+            return cropImage(sourceImage, toRegion: fullWidthBox)
+        }
+        guard !croppedParts.isEmpty else { return [createBlankPageImage()] }
+        return composeQuestionPageFromParts(croppedParts: croppedParts, pageSize: pageSize)
+    }
+
     /// Builds page containers for a given question index in assignment mode.
     /// Tears down existing containers, creates N pages (page 0 = question image, pages 1+ = blank),
     /// loads drawings from per-question-per-page storage with legacy fallback for page 0.
@@ -802,14 +901,15 @@ class CanvasContainerView: UIView {
         }
         separatorViews.removeAll()
 
-        let pageSize = questionCroppedImages[questionIndex].size
+        let composedImages = questionCroppedImages[questionIndex]
+        let pageSize = composedImages.first?.size ?? CGSize(width: 1224, height: 1584)
         let separatorColor = isDarkMode ? Self.scrollBackgroundDark : Self.scrollBackgroundLight
 
         for pageIdx in 0..<pageCount {
             let image: UIImage
-            if pageIdx == 0 {
-                // First page: the question image
-                image = questionCroppedImages[questionIndex]
+            if pageIdx < composedImages.count {
+                // Composed question image page
+                image = composedImages[pageIdx]
             } else {
                 // Additional pages: blank workspace
                 image = createBlankPageImage()
@@ -883,23 +983,24 @@ class CanvasContainerView: UIView {
         // Get full page dimensions from original images
         let pageSize = originalPageImages.first?.size ?? CGSize(width: 1224, height: 1584)
 
-        // Crop question regions, then compose onto full pages
+        // Crop each sub-question individually and compose with spacing
         questionCroppedImages = groups.map { group in
-            guard group.pageIndex < originalPageImages.count,
-                  let cropped = cropImage(originalPageImages[group.pageIndex], toRegion: group.unionBoundingBox)
-            else { return createBlankPageImage() }
-            return composeQuestionPage(croppedQuestion: cropped, pageSize: pageSize)
+            composeGroupImage(group: group, sourceImages: originalPageImages, pageSize: pageSize)
         }
 
         guard !questionCroppedImages.isEmpty else { return }
 
-        // Initialize page counts from saved assignment structure or defaults
+        // Initialize page counts from saved assignment structure or defaults,
+        // ensuring at least enough pages for composed question images
         if let documentID = documentID,
            let savedStructure = DrawingStorageService.shared.loadAssignmentStructure(for: documentID),
            savedStructure.pageCounts.count == groups.count {
             questionPageCounts = savedStructure.pageCounts
+            for i in 0..<questionPageCounts.count {
+                questionPageCounts[i] = max(questionPageCounts[i], questionCroppedImages[i].count)
+            }
         } else {
-            questionPageCounts = Array(repeating: 1, count: groups.count)
+            questionPageCounts = questionCroppedImages.map { max(1, $0.count) }
         }
 
         isInAssignmentMode = true
@@ -1911,6 +2012,7 @@ extension CanvasContainerView: UIScrollViewDelegate {
         eraserSize: .constant(StrokeWidthRange.eraserDefault),
         eraserType: .constant(.stroke),
         diagramWidth: .constant(StrokeWidthRange.diagramDefault),
+        diagramAutosnap: .constant(true),
         canvasBackgroundMode: .grid
     )
     .background(Color.gray.opacity(0.2))
