@@ -30,7 +30,43 @@ actor GeminiService {
         }
 
         struct Part: Encodable {
-            let text: String
+            let text: String?
+            let inlineData: InlineData?
+
+            init(text: String) {
+                self.text = text
+                self.inlineData = nil
+            }
+
+            init(inlineData: InlineData) {
+                self.text = nil
+                self.inlineData = inlineData
+            }
+
+            func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                if let text = text {
+                    try container.encode(text, forKey: .text)
+                }
+                if let inlineData = inlineData {
+                    try container.encode(inlineData, forKey: .inlineData)
+                }
+            }
+
+            private enum CodingKeys: String, CodingKey {
+                case text
+                case inlineData = "inline_data"
+            }
+        }
+
+        struct InlineData: Encodable {
+            let mimeType: String
+            let data: String  // base64 encoded
+
+            private enum CodingKeys: String, CodingKey {
+                case mimeType = "mime_type"
+                case data
+            }
         }
 
         struct GenerationConfig: Encodable {
@@ -70,6 +106,9 @@ actor GeminiService {
 
         /// Convenience for integer type
         static var integer: JSONSchema { JSONSchema(type: "integer") }
+
+        /// Convenience for number type (floating point)
+        static var number: JSONSchema { JSONSchema(type: "number") }
 
         /// Convenience for array of items
         static func array(of items: JSONSchema) -> JSONSchema {
@@ -136,6 +175,80 @@ actor GeminiService {
 
         let geminiRequest = GeminiRequest(
             contents: [.init(parts: [.init(text: prompt)])],
+            generationConfig: generationConfig
+        )
+
+        request.httpBody = try JSONEncoder().encode(geminiRequest)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw GeminiError.requestFailed
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            // Try to extract error message from response
+            if let errorResponse = try? JSONDecoder().decode(GeminiResponse.self, from: data),
+               let errorMessage = errorResponse.error?.message {
+                throw GeminiError.apiError(errorMessage)
+            }
+            throw GeminiError.httpError(httpResponse.statusCode)
+        }
+
+        let geminiResponse = try JSONDecoder().decode(GeminiResponse.self, from: data)
+
+        if let error = geminiResponse.error {
+            throw GeminiError.apiError(error.message)
+        }
+
+        guard let text = geminiResponse.candidates?.first?.content.parts.first?.text else {
+            throw GeminiError.noContent
+        }
+
+        return text
+    }
+
+    /// Generate content using Gemini with images (multimodal)
+    /// - Parameters:
+    ///   - prompt: The prompt to send to Gemini
+    ///   - images: Array of image data with MIME types
+    ///   - jsonOutput: If true, request JSON output format with temperature 0
+    ///   - schema: Optional JSON schema for structured outputs
+    /// - Returns: The generated text response
+    func generateContentWithImages(
+        prompt: String,
+        images: [(data: Data, mimeType: String)],
+        jsonOutput: Bool = false,
+        schema: JSONSchema? = nil
+    ) async throws -> String {
+        guard let url = URL(string: "\(baseURL)/\(model):generateContent?key=\(apiKey)") else {
+            throw GeminiError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // Build parts array with images first, then text prompt
+        var parts: [GeminiRequest.Part] = images.map { imageData in
+            GeminiRequest.Part(inlineData: GeminiRequest.InlineData(
+                mimeType: imageData.mimeType,
+                data: imageData.data.base64EncodedString()
+            ))
+        }
+        parts.append(GeminiRequest.Part(text: prompt))
+
+        let generationConfig: GeminiRequest.GenerationConfig?
+        if let schema = schema {
+            generationConfig = .init(responseMimeType: "application/json", responseSchema: schema, temperature: 0)
+        } else if jsonOutput {
+            generationConfig = .init(responseMimeType: "application/json", responseSchema: nil, temperature: 0)
+        } else {
+            generationConfig = nil
+        }
+
+        let geminiRequest = GeminiRequest(
+            contents: [.init(parts: parts)],
             generationConfig: generationConfig
         )
 

@@ -24,22 +24,17 @@ struct PauseContext {
     /// Average velocity of the last stroke (points per second)
     let lastStrokeVelocity: Double
 
-    /// Context about the question the user is currently working on (if detected)
-    let activeQuestion: ActiveQuestionContext?
-
     init(
         duration: TimeInterval,
         strokeCount: Int,
         lastTool: CanvasTool,
         timestamp: Date = Date(),
-        lastStrokeVelocity: Double = 0,
-        activeQuestion: ActiveQuestionContext? = nil
+        lastStrokeVelocity: Double = 0
     ) {
         self.duration = duration
         self.strokeCount = strokeCount
         self.lastTool = lastTool
         self.timestamp = timestamp
         self.lastStrokeVelocity = lastStrokeVelocity
-        self.activeQuestion = activeQuestion
     }
 }

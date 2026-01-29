@@ -24,17 +24,14 @@ struct CanvasView: View {
     @State private var eraserSize: CGFloat = StrokeWidthRange.eraserDefault
     @State private var eraserType: EraserType = .stroke
     @State private var diagramWidth: CGFloat = StrokeWidthRange.diagramDefault
+    @State private var diagramAutosnap: Bool = true
     @State private var customPenColors: [Color] = []
     @State private var customHighlighterColors: [Color] = []
     @State private var canvasBackgroundMode: CanvasBackgroundMode = .normal
     @State private var canvasBackgroundOpacity: CGFloat = 0.15
     @State private var canvasBackgroundSpacing: CGFloat = 48
 
-    // Undo/Redo state
-    @State private var canUndo: Bool = false
-    @State private var canRedo: Bool = false
-
-    // Reference to canvas for undo/redo
+    // Reference to canvas
     @State private var canvasViewRef: CanvasContainerView?
 
     // Drawing persistence
@@ -66,17 +63,14 @@ struct CanvasView: View {
                 eraserSize: $eraserSize,
                 eraserType: $eraserType,
                 diagramWidth: $diagramWidth,
+                diagramAutosnap: $diagramAutosnap,
                 canvasBackgroundMode: canvasBackgroundMode,
                 canvasBackgroundOpacity: canvasBackgroundOpacity,
                 canvasBackgroundSpacing: canvasBackgroundSpacing,
                 isDarkMode: themeManager.isDarkMode,
-                questionRegions: note.questionRegions,
                 onCanvasReady: { container in
                     canvasViewRef = container
-                    // Drawings are now loaded automatically in CanvasContainerView.loadDocument()
-                },
-                onUndoStateChanged: { canUndo = $0 },
-                onRedoStateChanged: { canRedo = $0 }
+                }
             )
 
             // Floating toolbar at bottom
@@ -91,14 +85,13 @@ struct CanvasView: View {
                     eraserSize: $eraserSize,
                     eraserType: $eraserType,
                     diagramWidth: $diagramWidth,
+                    diagramAutosnap: $diagramAutosnap,
                     customPenColors: $customPenColors,
                     customHighlighterColors: $customHighlighterColors,
                     canvasBackgroundMode: $canvasBackgroundMode,
                     canvasBackgroundOpacity: $canvasBackgroundOpacity,
                     canvasBackgroundSpacing: $canvasBackgroundSpacing,
                     colorScheme: effectiveColorScheme,
-                    canUndo: canUndo,
-                    canRedo: canRedo,
                     onHomePressed: {
                         if let onDismiss = onDismiss {
                             // Use parent-controlled animation
@@ -108,8 +101,6 @@ struct CanvasView: View {
                             dismiss()
                         }
                     },
-                    onUndo: { canvasViewRef?.performUndo() },
-                    onRedo: { canvasViewRef?.performRedo() },
                     onAIPressed: { /* TODO: Implement AI assistant */ },
                     onToggleDarkMode: {
                         withAnimation(.easeInOut(duration: 0.3)) {
@@ -157,6 +148,7 @@ struct CanvasView: View {
             }
         }
     }
+
 }
 
 // MARK: - PDF View

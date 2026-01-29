@@ -17,6 +17,7 @@ struct ContextualToolbar: View {
     @Binding var eraserSize: CGFloat
     @Binding var eraserType: EraserType
     @Binding var diagramWidth: CGFloat
+    @Binding var diagramAutosnap: Bool
     @Binding var selectedPenColor: Color
     @Binding var selectedHighlighterColor: Color
     @Binding var customPenColors: [Color]
@@ -330,6 +331,27 @@ struct ContextualToolbar: View {
 
     private var diagramOptions: some View {
         HStack(spacing: 12) {
+            // Autosnap toggle
+            Button {
+                diagramAutosnap.toggle()
+            } label: {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(diagramAutosnap ? .vibrantTeal : Color.adaptiveText(for: colorScheme))
+                    .frame(width: 36, height: 36)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(diagramAutosnap ? Color.vibrantTeal.opacity(0.15) : Color.clear)
+                    )
+            }
+            .buttonStyle(.plain)
+
+            // Divider
+            Rectangle()
+                .fill(Color.adaptiveText(for: colorScheme).opacity(0.2))
+                .frame(width: 1, height: 24)
+                .padding(.horizontal, 4)
+
             // Thickness slider
             thicknessSlider(
                 value: $diagramWidth,
@@ -436,6 +458,7 @@ struct ContextualToolbar: View {
             eraserSize: .constant(StrokeWidthRange.eraserDefault),
             eraserType: .constant(.stroke),
             diagramWidth: .constant(StrokeWidthRange.diagramDefault),
+            diagramAutosnap: .constant(true),
             selectedPenColor: .constant(.black),
             selectedHighlighterColor: .constant(Color(red: 1.0, green: 0.92, blue: 0.23)),
             customPenColors: .constant([]),
@@ -451,6 +474,7 @@ struct ContextualToolbar: View {
             eraserSize: .constant(StrokeWidthRange.eraserDefault),
             eraserType: .constant(.stroke),
             diagramWidth: .constant(StrokeWidthRange.diagramDefault),
+            diagramAutosnap: .constant(true),
             selectedPenColor: .constant(.black),
             selectedHighlighterColor: .constant(Color(red: 1.0, green: 0.92, blue: 0.23)),
             customPenColors: .constant([]),
@@ -466,6 +490,7 @@ struct ContextualToolbar: View {
             eraserSize: .constant(StrokeWidthRange.eraserDefault),
             eraserType: .constant(.bitmap),
             diagramWidth: .constant(StrokeWidthRange.diagramDefault),
+            diagramAutosnap: .constant(true),
             selectedPenColor: .constant(.black),
             selectedHighlighterColor: .constant(Color(red: 1.0, green: 0.92, blue: 0.23)),
             customPenColors: .constant([]),

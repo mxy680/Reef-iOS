@@ -42,7 +42,6 @@ struct DrawingOverlayView: UIViewRepresentable {
     var isDarkMode: Bool = false
     var recognitionEnabled: Bool = false
     var pauseSensitivity: Double = 0.5
-    var questionRegions: DocumentQuestionRegions? = nil
     var onCanvasReady: (CanvasContainerView) -> Void = { _ in }
     var onUndoStateChanged: (Bool) -> Void = { _ in }
     var onRedoStateChanged: (Bool) -> Void = { _ in }
@@ -50,7 +49,7 @@ struct DrawingOverlayView: UIViewRepresentable {
     var onDrawingChanged: (PKDrawing) -> Void = { _ in }
 
     func makeUIView(context: Context) -> CanvasContainerView {
-        let container = CanvasContainerView(documentID: documentID, documentURL: documentURL, fileType: fileType, backgroundMode: canvasBackgroundMode, backgroundOpacity: canvasBackgroundOpacity, backgroundSpacing: canvasBackgroundSpacing, isDarkMode: isDarkMode, questionRegions: questionRegions)
+        let container = CanvasContainerView(documentID: documentID, documentURL: documentURL, fileType: fileType, backgroundMode: canvasBackgroundMode, backgroundOpacity: canvasBackgroundOpacity, backgroundSpacing: canvasBackgroundSpacing, isDarkMode: isDarkMode)
         context.coordinator.container = container
         context.coordinator.onUndoStateChanged = onUndoStateChanged
         context.coordinator.onRedoStateChanged = onRedoStateChanged
@@ -62,15 +61,12 @@ struct DrawingOverlayView: UIViewRepresentable {
         // Set up delegates for all page canvases after a brief delay
         let initialColor = UIColor(selectedPenColor)
         let width = penWidth
-        let regions = questionRegions
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             // Set delegate and tool for all page canvases
             for pageContainer in container.pageContainers {
                 pageContainer.canvasView.delegate = context.coordinator
                 pageContainer.canvasView.tool = PKInkingTool(.pen, color: initialColor, width: width)
             }
-            // Update question regions after pages are loaded
-            container.updateQuestionRegions(regions)
             self.onCanvasReady(container)
         }
 
@@ -96,7 +92,6 @@ struct DrawingOverlayView: UIViewRepresentable {
         container.updateBackgroundMode(canvasBackgroundMode)
         container.updateBackgroundOpacity(canvasBackgroundOpacity)
         container.updateBackgroundSpacing(canvasBackgroundSpacing)
-        container.updateQuestionRegions(questionRegions)
 
         // Keep recognition settings in sync
         context.coordinator.recognitionEnabled = recognitionEnabled
@@ -198,7 +193,7 @@ struct DrawingOverlayView: UIViewRepresentable {
             // Skip if we triggered this via shape replacement
             guard !isReplacingStroke else { return }
 
-            // Line autosnap — only for Diagram tool with autosnap enabled
+            // Shape autosnap — only for Diagram tool with autosnap enabled
             let currentStrokeCount = canvasView.drawing.strokes.count
             if currentTool == .diagram,
                diagramAutosnap,
@@ -292,23 +287,7 @@ class CanvasContainerView: UIView {
     private var backgroundOpacity: CGFloat = 0.15
     private var backgroundSpacing: CGFloat = 48
     private var isDarkMode: Bool = false
-    private var questionRegions: DocumentQuestionRegions?
-
-    // MARK: - Assignment Mode State
-    private(set) var isInAssignmentMode: Bool = false
-    private var questionGroups: [QuestionGroup] = []
-    private var questionCroppedImages: [[UIImage]] = []
-    private var currentQuestionIndex: Int = 0
     private var originalPageImages: [UIImage] = []
-    var onQuestionCountReady: ((Int) -> Void)?
-    var onCurrentQuestionChanged: ((Int) -> Void)?
-
-    /// Number of pages per question in assignment mode
-    private var questionPageCounts: [Int] = []
-    /// Currently visible page within the current question (0-indexed)
-    private var currentQuestionPageIndex: Int = 0
-    /// Maximum pages allowed per question
-    private static let maxPagesPerQuestion: Int = 20
 
     /// Light gray background for scroll view in light mode (close to white)
     private static let scrollBackgroundLight = UIColor(red: 245/255, green: 245/255, blue: 245/255, alpha: 1)
@@ -330,7 +309,7 @@ class CanvasContainerView: UIView {
     private var redoGestureRecognizer: UITapGestureRecognizer?
     private let hapticGenerator = UIImpactFeedbackGenerator(style: .light)
 
-    convenience init(documentID: UUID, documentURL: URL, fileType: Note.FileType, backgroundMode: CanvasBackgroundMode = .normal, backgroundOpacity: CGFloat = 0.15, backgroundSpacing: CGFloat = 48, isDarkMode: Bool = false, questionRegions: DocumentQuestionRegions? = nil) {
+    convenience init(documentID: UUID, documentURL: URL, fileType: Note.FileType, backgroundMode: CanvasBackgroundMode = .normal, backgroundOpacity: CGFloat = 0.15, backgroundSpacing: CGFloat = 48, isDarkMode: Bool = false) {
         self.init(frame: .zero)
         self.documentID = documentID
         self.documentURL = documentURL
@@ -339,7 +318,6 @@ class CanvasContainerView: UIView {
         self.backgroundOpacity = backgroundOpacity
         self.backgroundSpacing = backgroundSpacing
         self.isDarkMode = isDarkMode
-        self.questionRegions = questionRegions
         loadDocument()
     }
 
@@ -499,31 +477,6 @@ class CanvasContainerView: UIView {
                 // Update stored original images
                 self.originalPageImages = newImages
 
-                // Handle assignment mode separately
-                if self.isInAssignmentMode {
-                    let pageSize = self.originalPageImages.first?.size ?? CGSize(width: 1224, height: 1584)
-                    // Re-crop and recompose all question pages with new dark mode rendering
-                    self.questionCroppedImages = self.questionGroups.map { group in
-                        self.composeGroupImage(group: group, sourceImages: newImages, pageSize: pageSize)
-                    }
-                    // Update ALL page containers using composed images for this question
-                    let composedImages = self.currentQuestionIndex < self.questionCroppedImages.count
-                        ? self.questionCroppedImages[self.currentQuestionIndex] : []
-                    for (pageIdx, container) in self.pageContainers.enumerated() {
-                        container.updateDarkMode(newDarkMode)
-                        let img: UIImage
-                        if pageIdx < composedImages.count {
-                            img = composedImages[pageIdx]
-                        } else {
-                            img = self.createBlankPageImage()
-                        }
-                        UIView.transition(with: container.documentImageView, duration: 0.3, options: .transitionCrossDissolve) {
-                            container.documentImageView.image = img
-                        }
-                    }
-                    return
-                }
-
                 for (index, container) in self.pageContainers.enumerated() {
                     container.updateDarkMode(newDarkMode)
 
@@ -565,27 +518,6 @@ class CanvasContainerView: UIView {
         }
     }
 
-    func updateQuestionRegions(_ regions: DocumentQuestionRegions?) {
-        questionRegions = regions
-        distributeQuestionRegionsToPages()
-    }
-
-    /// Distributes question regions to their respective page containers
-    private func distributeQuestionRegionsToPages() {
-        guard let regions = questionRegions else {
-            // Clear all page containers
-            for container in pageContainers {
-                container.updateQuestionRegions([])
-            }
-            return
-        }
-
-        for (index, container) in pageContainers.enumerated() {
-            let pageRegions = regions.regions(forPage: index)
-            container.updateQuestionRegions(pageRegions)
-        }
-    }
-
     // MARK: - Page Operations
 
     /// Returns the index of the currently visible page (0-indexed)
@@ -595,19 +527,6 @@ class CanvasContainerView: UIView {
 
     /// Adds a blank page after the currently visible page
     func addPageAfterCurrent() {
-        if isInAssignmentMode {
-            guard questionPageCounts[currentQuestionIndex] < Self.maxPagesPerQuestion else {
-                print("Cannot add more pages: maximum \(Self.maxPagesPerQuestion) pages per question reached")
-                return
-            }
-            let insertIndex = currentVisiblePage + 1
-            insertBlankPage(at: insertIndex)
-            questionPageCounts[currentQuestionIndex] += 1
-            saveAllDrawings()
-            print("Assignment mode: added blank page after page \(currentVisiblePage + 1) for question \(currentQuestionIndex + 1)")
-            return
-        }
-
         let insertIndex = currentVisiblePage + 1
         insertBlankPage(at: insertIndex)
 
@@ -623,19 +542,6 @@ class CanvasContainerView: UIView {
 
     /// Adds a blank page at the end of the document
     func addPageToEnd() {
-        if isInAssignmentMode {
-            guard questionPageCounts[currentQuestionIndex] < Self.maxPagesPerQuestion else {
-                print("Cannot add more pages: maximum \(Self.maxPagesPerQuestion) pages per question reached")
-                return
-            }
-            let insertIndex = pageContainers.count
-            insertBlankPage(at: insertIndex)
-            questionPageCounts[currentQuestionIndex] += 1
-            saveAllDrawings()
-            print("Assignment mode: added blank page at end for question \(currentQuestionIndex + 1)")
-            return
-        }
-
         let insertIndex = pageContainers.count
         insertBlankPage(at: insertIndex)
 
@@ -652,40 +558,6 @@ class CanvasContainerView: UIView {
     /// Returns false if this is the only page (cannot delete)
     @discardableResult
     func deleteCurrentPage() -> Bool {
-        if isInAssignmentMode {
-            // Cannot delete page 0 (the question image page)
-            guard currentVisiblePage > 0 else {
-                print("Cannot delete the question image page (page 0)")
-                return false
-            }
-            // Must have more than 1 page
-            guard pageContainers.count > 1 else {
-                print("Cannot delete the only page")
-                return false
-            }
-
-            let deleteIndex = currentVisiblePage
-            deletePage(at: deleteIndex)
-            questionPageCounts[currentQuestionIndex] -= 1
-
-            // Re-save all drawings at new indices (shifted after deletion) and clean up orphan
-            if let documentID = documentID {
-                let drawings = pageContainers.map { $0.canvasView.drawing }
-                try? DrawingStorageService.shared.saveAllQuestionPageDrawings(
-                    drawings, for: documentID, questionIndex: currentQuestionIndex
-                )
-                DrawingStorageService.shared.cleanupQuestionPageDrawings(
-                    for: documentID, questionIndex: currentQuestionIndex,
-                    keepingCount: questionPageCounts[currentQuestionIndex]
-                )
-                let structure = AssignmentStructure(pageCounts: questionPageCounts)
-                try? DrawingStorageService.shared.saveAssignmentStructure(structure, for: documentID)
-            }
-
-            print("Assignment mode: deleted page \(deleteIndex + 1) for question \(currentQuestionIndex + 1)")
-            return true
-        }
-
         guard pageContainers.count > 1 else {
             print("Cannot delete the only page in the document")
             return false
@@ -708,367 +580,14 @@ class CanvasContainerView: UIView {
         let container = pageContainers[currentVisiblePage]
         container.canvasView.drawing = PKDrawing()
         saveAllDrawings()
-        if isInAssignmentMode {
-            print("Assignment mode: cleared drawing on page \(currentVisiblePage + 1) of question \(currentQuestionIndex + 1)")
-        } else {
-            print("Cleared drawing on page \(currentVisiblePage + 1)")
-        }
+        print("Cleared drawing on page \(currentVisiblePage + 1)")
     }
 
     /// Saves all drawings for all pages
     func saveAllDrawings() {
         guard let documentID = documentID else { return }
-        if isInAssignmentMode {
-            // Save ALL page containers' drawings for the current question
-            guard !pageContainers.isEmpty else { return }
-            let drawings = pageContainers.map { $0.canvasView.drawing }
-            try? DrawingStorageService.shared.saveAllQuestionPageDrawings(
-                drawings, for: documentID, questionIndex: currentQuestionIndex
-            )
-            // Persist assignment structure
-            let structure = AssignmentStructure(pageCounts: questionPageCounts)
-            try? DrawingStorageService.shared.saveAssignmentStructure(structure, for: documentID)
-        } else {
-            let drawings = pageContainers.map { $0.canvasView.drawing }
-            try? DrawingStorageService.shared.saveAllDrawings(drawings, for: documentID)
-        }
-    }
-
-    // MARK: - Assignment Mode
-
-    /// Crops a UIImage to a Vision-normalized region (bottom-left origin) and returns the cropped UIImage
-    private func cropImage(_ image: UIImage, toRegion region: CGRect) -> UIImage? {
-        guard let cgImage = image.cgImage else { return nil }
-
-        let imageWidth = CGFloat(cgImage.width)
-        let imageHeight = CGFloat(cgImage.height)
-
-        // Convert Vision coords (bottom-left origin) to pixel coords (top-left origin)
-        let pixelX = region.origin.x * imageWidth
-        let pixelY = (1 - region.origin.y - region.height) * imageHeight
-        let pixelW = region.width * imageWidth
-        let pixelH = region.height * imageHeight
-
-        // Clamp to image bounds
-        let clampedX = max(pixelX, 0)
-        let clampedY = max(pixelY, 0)
-        let clampedW = min(pixelW, imageWidth - clampedX)
-        let clampedH = min(pixelH, imageHeight - clampedY)
-
-        let cropRect = CGRect(x: clampedX, y: clampedY, width: clampedW, height: clampedH)
-        guard cropRect.width > 0, cropRect.height > 0 else { return nil }
-
-        guard let croppedCG = cgImage.cropping(to: cropRect) else { return nil }
-        return UIImage(cgImage: croppedCG, scale: image.scale, orientation: image.imageOrientation)
-    }
-
-    /// Composes a full 8.5×11 page with the cropped question at the top and blank workspace below
-    private func composeQuestionPage(croppedQuestion: UIImage, pageSize: CGSize) -> UIImage {
-        let renderer = UIGraphicsImageRenderer(size: pageSize)
-        return renderer.image { context in
-            // Fill with white or dark background
-            let bgColor = isDarkMode ? Self.pageBackgroundDark : UIColor.white
-            bgColor.setFill()
-            context.fill(CGRect(origin: .zero, size: pageSize))
-
-            // Draw cropped question at the top, full-width, preserving aspect ratio
-            let topPadding: CGFloat = 40
-            let horizontalPadding: CGFloat = 0
-            let availableWidth = pageSize.width - horizontalPadding * 2
-            let scale = availableWidth / croppedQuestion.size.width
-            let drawHeight = croppedQuestion.size.height * scale
-            let drawRect = CGRect(
-                x: horizontalPadding,
-                y: topPadding,
-                width: availableWidth,
-                height: drawHeight
-            )
-            croppedQuestion.draw(in: drawRect)
-        }
-    }
-
-    /// Adds normalized padding to a Vision bounding box so text doesn't touch crop edges
-    private func paddedRegion(_ rect: CGRect, padding: CGFloat = 0.01) -> CGRect {
-        let x = max(rect.origin.x - padding, 0)
-        let y = max(rect.origin.y - padding, 0)
-        let maxX = min(rect.origin.x + rect.width + padding, 1)
-        let maxY = min(rect.origin.y + rect.height + padding, 1)
-        return CGRect(x: x, y: y, width: maxX - x, height: maxY - y)
-    }
-
-    /// Lays out multiple full-width cropped images vertically with spacing,
-    /// returning multiple page images if content overflows a single page.
-    private func composeQuestionPageFromParts(
-        croppedParts: [UIImage],
-        pageSize: CGSize,
-        spacing: CGFloat = 300
-    ) -> [UIImage] {
-        let topPadding: CGFloat = 40
-        let bgColor = isDarkMode ? Self.pageBackgroundDark : UIColor.white
-
-        var pages: [UIImage] = []
-        var partsForCurrentPage: [(image: UIImage, y: CGFloat)] = []
-        var currentY = topPadding
-
-        for part in croppedParts {
-            // Draw at 1:1 pixel size — no scaling — to preserve original text size
-            let drawHeight = part.size.height
-
-            // If this part doesn't fit and we already have content, start a new page
-            if currentY + drawHeight > pageSize.height && !partsForCurrentPage.isEmpty {
-                let renderer = UIGraphicsImageRenderer(size: pageSize)
-                let page = renderer.image { ctx in
-                    bgColor.setFill()
-                    ctx.fill(CGRect(origin: .zero, size: pageSize))
-                    for (img, y) in partsForCurrentPage {
-                        img.draw(at: CGPoint(x: 0, y: y))
-                    }
-                }
-                pages.append(page)
-                partsForCurrentPage.removeAll()
-                currentY = topPadding
-            }
-
-            partsForCurrentPage.append((image: part, y: currentY))
-            currentY += drawHeight + spacing
-        }
-
-        // Render final page
-        if !partsForCurrentPage.isEmpty {
-            let renderer = UIGraphicsImageRenderer(size: pageSize)
-            let page = renderer.image { ctx in
-                bgColor.setFill()
-                ctx.fill(CGRect(origin: .zero, size: pageSize))
-                for (img, y) in partsForCurrentPage {
-                    img.draw(at: CGPoint(x: 0, y: y))
-                }
-            }
-            pages.append(page)
-        }
-
-        return pages.isEmpty ? [createBlankPageImage()] : pages
-    }
-
-    /// Composes page image(s) for a question group. Single-region groups use the existing
-    /// single-crop path. Multi-region groups crop **segments** between consecutive regions
-    /// (preserving images/diagrams between sub-questions) and lay them out with spacing.
-    private func composeGroupImage(
-        group: QuestionGroup,
-        sourceImages: [UIImage],
-        pageSize: CGSize
-    ) -> [UIImage] {
-        guard group.pageIndex < sourceImages.count else {
-            return [createBlankPageImage()]
-        }
-        let sourceImage = sourceImages[group.pageIndex]
-        let regions = group.orderedRegions
-
-        if regions.count <= 1 {
-            guard let region = regions.first,
-                  let cropped = cropImage(sourceImage, toRegion: paddedRegion(region.textBoundingBox))
-            else { return [createBlankPageImage()] }
-            return [composeQuestionPage(croppedQuestion: cropped, pageSize: pageSize)]
-        }
-
-        // Crop segments between consecutive regions so that images/diagrams
-        // sitting between detected text regions are included with the preceding region.
-        // Segment i spans from region[i]'s top down to region[i+1]'s top (Vision Y).
-        // The first segment's top and last segment's bottom use the group's union bounding
-        // box to avoid bleeding content from adjacent questions and to capture any trailing
-        // content below the last detected region.
-        let unionBox = group.unionBoundingBox
-        let unionTop = unionBox.origin.y + unionBox.height   // Vision top of union
-        let unionBottom = unionBox.origin.y                    // Vision bottom of union
-        var croppedParts: [UIImage] = []
-
-        for i in 0..<regions.count {
-            let regionTop = regions[i].textBoundingBox.origin.y + regions[i].textBoundingBox.height
-
-            // Top of segment: union top for first region, exact text top for others
-            let segmentTop: CGFloat = (i == 0) ? unionTop : regionTop
-
-            // Bottom of segment: next region's text top, or union bottom for last
-            let segmentBottom: CGFloat
-            if i < regions.count - 1 {
-                let nextTop = regions[i + 1].textBoundingBox.origin.y + regions[i + 1].textBoundingBox.height
-                segmentBottom = nextTop
-            } else {
-                segmentBottom = unionBottom
-            }
-
-            guard segmentTop > segmentBottom else { continue }
-            let fullWidthBox = CGRect(x: 0, y: segmentBottom, width: 1.0, height: segmentTop - segmentBottom)
-            if let cropped = cropImage(sourceImage, toRegion: fullWidthBox) {
-                croppedParts.append(cropped)
-            }
-        }
-
-        guard !croppedParts.isEmpty else { return [createBlankPageImage()] }
-        return composeQuestionPageFromParts(croppedParts: croppedParts, pageSize: pageSize)
-    }
-
-    /// Builds page containers for a given question index in assignment mode.
-    /// Tears down existing containers, creates N pages (page 0 = question image, pages 1+ = blank),
-    /// loads drawings from per-question-per-page storage with legacy fallback for page 0.
-    private func buildPagesForQuestion(_ questionIndex: Int) {
-        guard questionIndex < questionCroppedImages.count else { return }
-        let pageCount = questionPageCounts[questionIndex]
-
-        // Tear down existing page containers and separators
-        for container in pageContainers {
-            container.removeFromSuperview()
-        }
-        pageContainers.removeAll()
-
-        for separator in separatorViews {
-            separator.removeFromSuperview()
-        }
-        separatorViews.removeAll()
-
-        let composedImages = questionCroppedImages[questionIndex]
-        let pageSize = composedImages.first?.size ?? CGSize(width: 1224, height: 1584)
-        let separatorColor = isDarkMode ? Self.scrollBackgroundDark : Self.scrollBackgroundLight
-
-        for pageIdx in 0..<pageCount {
-            let image: UIImage
-            if pageIdx < composedImages.count {
-                // Composed question image page
-                image = composedImages[pageIdx]
-            } else {
-                // Additional pages: blank workspace
-                image = createBlankPageImage()
-            }
-
-            let container = PageContainerView(
-                pageImage: image,
-                pageIndex: pageIdx,
-                backgroundMode: backgroundMode,
-                backgroundOpacity: backgroundOpacity,
-                backgroundSpacing: backgroundSpacing,
-                isDarkMode: isDarkMode
-            )
-
-            pageContainers.append(container)
-            pagesStackView.addArrangedSubview(container)
-
-            let heightConstraint = container.heightAnchor.constraint(equalToConstant: pageSize.height)
-            container.heightConstraint = heightConstraint
-            NSLayoutConstraint.activate([
-                container.widthAnchor.constraint(equalToConstant: pageSize.width),
-                heightConstraint
-            ])
-
-            // Add separator between pages
-            if pageIdx < pageCount - 1 {
-                let separator = createSeparator(color: separatorColor)
-                separatorViews.append(separator)
-                pagesStackView.addArrangedSubview(separator)
-                NSLayoutConstraint.activate([
-                    separator.widthAnchor.constraint(equalTo: pagesStackView.widthAnchor)
-                ])
-            }
-        }
-
-        // Update content width
-        contentWidthConstraint?.isActive = false
-        contentWidthConstraint = contentView.widthAnchor.constraint(equalToConstant: pageSize.width)
-        contentWidthConstraint?.isActive = true
-
-        // Load drawings from per-question-per-page storage (with legacy fallback for page 0)
-        if let documentID = documentID {
-            let drawings = DrawingStorageService.shared.loadAllQuestionPageDrawings(
-                for: documentID, questionIndex: questionIndex, pageCount: pageCount
-            )
-            for (idx, drawing) in drawings.enumerated() where idx < pageContainers.count {
-                pageContainers[idx].canvasView.drawing = drawing
-            }
-        }
-
-        currentQuestionPageIndex = 0
-        currentVisiblePage = 0
-
-        layoutIfNeeded()
-    }
-
-    /// Enters assignment mode: each question gets a full 8.5×11 page with the question at the top
-    func enterAssignmentMode() {
-        guard !isInAssignmentMode else { return }
-        guard let regions = questionRegions else { return }
-
-        // Save current full-page drawings before switching
-        saveAllDrawings()
-
-        // Compute question groups
-        let groups = regions.groupedByTopLevelQuestion()
-        guard !groups.isEmpty else { return }
-
-        self.questionGroups = groups
-
-        // Get full page dimensions from original images
-        let pageSize = originalPageImages.first?.size ?? CGSize(width: 1224, height: 1584)
-
-        // Crop each sub-question individually and compose with spacing
-        questionCroppedImages = groups.map { group in
-            composeGroupImage(group: group, sourceImages: originalPageImages, pageSize: pageSize)
-        }
-
-        guard !questionCroppedImages.isEmpty else { return }
-
-        // Initialize page counts from saved assignment structure or defaults,
-        // ensuring at least enough pages for composed question images
-        if let documentID = documentID,
-           let savedStructure = DrawingStorageService.shared.loadAssignmentStructure(for: documentID),
-           savedStructure.pageCounts.count == groups.count {
-            questionPageCounts = savedStructure.pageCounts
-            for i in 0..<questionPageCounts.count {
-                questionPageCounts[i] = max(questionPageCounts[i], questionCroppedImages[i].count)
-            }
-        } else {
-            questionPageCounts = questionCroppedImages.map { max(1, $0.count) }
-        }
-
-        isInAssignmentMode = true
-        currentQuestionIndex = 0
-
-        // Build pages for the first question
-        buildPagesForQuestion(0)
-
-        onQuestionCountReady?(questionGroups.count)
-        onCurrentQuestionChanged?(0)
-
-        // Fit to viewport after layout
-        DispatchQueue.main.async {
-            self.centerAndFitDocument()
-        }
-    }
-
-    /// Navigates to a specific question index in assignment mode
-    func navigateToQuestion(_ index: Int) {
-        guard isInAssignmentMode else { return }
-        guard index >= 0 && index < questionGroups.count else { return }
-
-        // Save all current question's page drawings to disk
-        if let documentID = documentID {
-            let drawings = pageContainers.map { $0.canvasView.drawing }
-            try? DrawingStorageService.shared.saveAllQuestionPageDrawings(
-                drawings, for: documentID, questionIndex: currentQuestionIndex
-            )
-            // Save assignment structure
-            let structure = AssignmentStructure(pageCounts: questionPageCounts)
-            try? DrawingStorageService.shared.saveAssignmentStructure(structure, for: documentID)
-        }
-
-        currentQuestionIndex = index
-
-        // Build pages for the new question
-        buildPagesForQuestion(index)
-
-        onCurrentQuestionChanged?(index)
-
-        // Re-fit viewport
-        DispatchQueue.main.async {
-            self.centerAndFitDocument()
-        }
+        let drawings = pageContainers.map { $0.canvasView.drawing }
+        try? DrawingStorageService.shared.saveAllDrawings(drawings, for: documentID)
     }
 
     /// Saves document structure and all drawings
@@ -1319,9 +838,6 @@ class CanvasContainerView: UIView {
                 // Load drawings for all pages
                 self.loadAllDrawings()
 
-                // Distribute question regions to pages
-                self.distributeQuestionRegionsToPages()
-
                 // Center and fit document after layout completes
                 DispatchQueue.main.async {
                     self.centerAndFitDocument()
@@ -1394,27 +910,14 @@ class CanvasContainerView: UIView {
         }
 
         // Create page containers
-        // Map structure pages to original page indices for question region lookup
         for (index, image) in images.enumerated() {
-            // Determine the original page index for question region lookup
-            let structurePage = structure.pages[index]
-            let regionPageIndex: Int
-            if structurePage.type == .original, let origIdx = structurePage.originalIndex {
-                regionPageIndex = origIdx
-            } else {
-                regionPageIndex = -1 // Blank pages have no question regions
-            }
-
-            let pageRegions = regionPageIndex >= 0 ? (questionRegions?.regions(forPage: regionPageIndex) ?? []) : []
-
             let container = PageContainerView(
                 pageImage: image,
                 pageIndex: index,
                 backgroundMode: backgroundMode,
                 backgroundOpacity: backgroundOpacity,
                 backgroundSpacing: backgroundSpacing,
-                isDarkMode: isDarkMode,
-                questionRegions: pageRegions
+                isDarkMode: isDarkMode
             )
 
             pageContainers.append(container)
@@ -1493,17 +996,13 @@ class CanvasContainerView: UIView {
 
         // Create a page container for each image with separators between them
         for (index, image) in images.enumerated() {
-            // Get question regions for this page
-            let pageRegions = questionRegions?.regions(forPage: index) ?? []
-
             let container = PageContainerView(
                 pageImage: image,
                 pageIndex: index,
                 backgroundMode: backgroundMode,
                 backgroundOpacity: backgroundOpacity,
                 backgroundSpacing: backgroundSpacing,
-                isDarkMode: isDarkMode,
-                questionRegions: pageRegions
+                isDarkMode: isDarkMode
             )
 
             pageContainers.append(container)
@@ -1614,132 +1113,12 @@ class CanvasContainerView: UIView {
     }
 }
 
-// MARK: - Question Bounding Box Overlay View
-
-/// Draws bounding boxes around detected questions
-class QuestionBoundingBoxView: UIView {
-    var regions: [QuestionRegion] = [] {
-        didSet {
-            setNeedsDisplay()
-        }
-    }
-
-    var isDarkMode: Bool = false {
-        didSet {
-            setNeedsDisplay()
-        }
-    }
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        backgroundColor = .clear
-        isOpaque = false
-        isUserInteractionEnabled = false
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func draw(_ rect: CGRect) {
-        guard !regions.isEmpty else { return }
-        guard let context = UIGraphicsGetCurrentContext() else { return }
-
-        // Colors for region types
-        // Vibrant Teal for main questions
-        let tealBoxColor = UIColor(red: 17/255, green: 157/255, blue: 164/255, alpha: 0.25)
-        let tealBorderColor = UIColor(red: 17/255, green: 157/255, blue: 164/255, alpha: 0.8)
-
-        // Green for sub-questions
-        let greenBoxColor = UIColor(red: 34/255, green: 139/255, blue: 34/255, alpha: 0.25)
-        let greenBorderColor = UIColor(red: 34/255, green: 139/255, blue: 34/255, alpha: 0.8)
-
-        context.setLineWidth(2.0)
-
-        for region in regions {
-            // Determine colors based on region type
-            let boxColor: UIColor
-            let borderColor: UIColor
-
-            switch region.regionType {
-            case .question:
-                boxColor = tealBoxColor
-                borderColor = tealBorderColor
-            case .subquestion:
-                boxColor = greenBoxColor
-                borderColor = greenBorderColor
-            }
-
-            context.setFillColor(boxColor.cgColor)
-            context.setStrokeColor(borderColor.cgColor)
-
-            // Convert Vision coordinates (normalized, bottom-left origin)
-            // to UIKit coordinates (pixel, top-left origin)
-            let box = region.textBoundingBox
-            let uiRect = CGRect(
-                x: box.origin.x * bounds.width,
-                y: (1 - box.origin.y - box.height) * bounds.height,
-                width: box.width * bounds.width,
-                height: box.height * bounds.height
-            )
-
-            // Draw filled rectangle with border
-            let path = UIBezierPath(roundedRect: uiRect, cornerRadius: 4)
-            context.addPath(path.cgPath)
-            context.drawPath(using: .fillStroke)
-
-            // Generate label: "Question (Q1)" or "SubQuestion (Q1-a)"
-            let labelText: String
-            let qId = region.questionIdentifier ?? ""
-            switch region.regionType {
-            case .question:
-                labelText = "Question (Q\(qId))"
-            case .subquestion:
-                labelText = "SubQuestion (Q\(qId))"
-            }
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 14, weight: .semibold),
-                .foregroundColor: UIColor.white
-            ]
-
-            let textSize = labelText.size(withAttributes: attributes)
-            let labelPadding: CGFloat = 6
-            let labelRect = CGRect(
-                x: uiRect.minX,
-                y: uiRect.minY - textSize.height - labelPadding * 2,
-                width: textSize.width + labelPadding * 2,
-                height: textSize.height + labelPadding
-            )
-
-            // Draw label background
-            context.setFillColor(borderColor.cgColor)
-            let labelPath = UIBezierPath(
-                roundedRect: labelRect,
-                byRoundingCorners: [.topLeft, .topRight],
-                cornerRadii: CGSize(width: 4, height: 4)
-            )
-            context.addPath(labelPath.cgPath)
-            context.fillPath()
-
-            // Draw label text
-            let textRect = CGRect(
-                x: labelRect.minX + labelPadding,
-                y: labelRect.minY + labelPadding / 2,
-                width: textSize.width,
-                height: textSize.height
-            )
-            labelText.draw(in: textRect, withAttributes: attributes)
-        }
-    }
-}
-
 // MARK: - Page Container View
 
 /// A container view for a single page with its canvas overlay
 class PageContainerView: UIView {
     let documentImageView = UIImageView()
     let backgroundPatternView = CanvasBackgroundPatternView()
-    let questionBoundingBoxView = QuestionBoundingBoxView()
     let canvasView = ReefCanvasView()
     let pageIndex: Int
 
@@ -1751,7 +1130,7 @@ class PageContainerView: UIView {
     /// Deep Ocean (#0A1628) for document page background in dark mode
     private static let pageBackgroundDark = UIColor(red: 10/255, green: 22/255, blue: 40/255, alpha: 1)
 
-    init(pageImage: UIImage, pageIndex: Int, backgroundMode: CanvasBackgroundMode, backgroundOpacity: CGFloat, backgroundSpacing: CGFloat, isDarkMode: Bool, questionRegions: [QuestionRegion] = []) {
+    init(pageImage: UIImage, pageIndex: Int, backgroundMode: CanvasBackgroundMode, backgroundOpacity: CGFloat, backgroundSpacing: CGFloat, isDarkMode: Bool) {
         self.pageIndex = pageIndex
         self.isDarkMode = isDarkMode
         super.init(frame: .zero)
@@ -1764,10 +1143,6 @@ class PageContainerView: UIView {
         backgroundPatternView.opacity = backgroundOpacity
         backgroundPatternView.spacing = backgroundSpacing
         backgroundPatternView.isDarkMode = isDarkMode
-
-        // Configure question bounding boxes
-        questionBoundingBoxView.regions = questionRegions
-        questionBoundingBoxView.isDarkMode = isDarkMode
 
         // Set background colors
         let pageBg: UIColor = isDarkMode ? Self.pageBackgroundDark : .white
@@ -1795,10 +1170,6 @@ class PageContainerView: UIView {
         backgroundPatternView.backgroundColor = .clear
         backgroundPatternView.isOpaque = false
         addSubview(backgroundPatternView)
-
-        // Question bounding box overlay disabled - keeping for future use
-        // questionBoundingBoxView.translatesAutoresizingMaskIntoConstraints = false
-        // addSubview(questionBoundingBoxView)
 
         // Canvas view
         canvasView.translatesAutoresizingMaskIntoConstraints = false
@@ -1828,7 +1199,6 @@ class PageContainerView: UIView {
     func updateDarkMode(_ newDarkMode: Bool) {
         isDarkMode = newDarkMode
         backgroundPatternView.isDarkMode = newDarkMode
-        questionBoundingBoxView.isDarkMode = newDarkMode
 
         let pageBg: UIColor = isDarkMode ? Self.pageBackgroundDark : .white
 
@@ -1838,10 +1208,6 @@ class PageContainerView: UIView {
         }
 
         updateShadow(for: newDarkMode, animated: true)
-    }
-
-    func updateQuestionRegions(_ regions: [QuestionRegion]) {
-        questionBoundingBoxView.regions = regions
     }
 
     private func updateShadow(for darkMode: Bool, animated: Bool = false) {

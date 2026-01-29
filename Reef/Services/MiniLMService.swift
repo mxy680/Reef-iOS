@@ -44,8 +44,6 @@ actor MiniLMService {
 
         model = try MLModel(contentsOf: modelURL, configuration: config)
         isInitialized = true
-
-        print("[MiniLMService] Model loaded successfully")
     }
 
     // MARK: - Inference
@@ -83,9 +81,7 @@ actor MiniLMService {
             throw MiniLMError.invalidOutput
         }
 
-        // Debug: print shape to verify tensor layout
         let shape = lastHiddenState.shape.map { $0.intValue }
-        print("[MiniLMService] Output shape: \(shape)")
 
         // Apply mean pooling with attention mask
         let embedding = meanPool(lastHiddenState: lastHiddenState, attentionMask: attentionMask, shape: shape)
@@ -126,12 +122,10 @@ actor MiniLMService {
                 seqLen = shape[2]
                 seqFirst = false
             } else {
-                print("[MiniLMService] Warning: Unexpected shape \(shape), using default layout")
                 seqLen = Self.maxSequenceLength
                 seqFirst = true
             }
         } else {
-            print("[MiniLMService] Warning: Expected 3D tensor, got \(shape.count)D")
             seqLen = Self.maxSequenceLength
             seqFirst = true
         }

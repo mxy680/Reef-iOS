@@ -28,7 +28,6 @@ protocol DocumentItem: AnyObject {
     var fileTypeIcon: String { get }
     var documentFileType: DocumentFileType { get }
     var extractionStatus: ExtractionStatus { get }
-    var questionDetectionStatus: QuestionDetectionStatus { get }
     var isVectorIndexed: Bool { get }
     var isProcessingForAI: Bool { get }
     var isAIReady: Bool { get }

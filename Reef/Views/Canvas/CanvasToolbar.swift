@@ -78,17 +78,14 @@ struct CanvasToolbar: View {
     @Binding var eraserSize: CGFloat
     @Binding var eraserType: EraserType
     @Binding var diagramWidth: CGFloat
+    @Binding var diagramAutosnap: Bool
     @Binding var customPenColors: [Color]
     @Binding var customHighlighterColors: [Color]
     @Binding var canvasBackgroundMode: CanvasBackgroundMode
     @Binding var canvasBackgroundOpacity: CGFloat
     @Binding var canvasBackgroundSpacing: CGFloat
     let colorScheme: ColorScheme
-    let canUndo: Bool
-    let canRedo: Bool
     let onHomePressed: () -> Void
-    let onUndo: () -> Void
-    let onRedo: () -> Void
     let onAIPressed: () -> Void
     let onToggleDarkMode: () -> Void
     var isDocumentAIReady: Bool = true
@@ -197,6 +194,7 @@ struct CanvasToolbar: View {
                     eraserSize: $eraserSize,
                     eraserType: $eraserType,
                     diagramWidth: $diagramWidth,
+                    diagramAutosnap: $diagramAutosnap,
                     selectedPenColor: $selectedPenColor,
                     selectedHighlighterColor: $selectedHighlighterColor,
                     customPenColors: $customPenColors,
@@ -321,21 +319,12 @@ struct CanvasToolbar: View {
 
             toolbarDivider
 
-            // Undo/Redo
+            // List icon (placeholder for future functionality)
             ToolbarButton(
-                icon: "arrow.uturn.backward",
+                icon: "list.number",
                 isSelected: false,
-                isDisabled: !canUndo,
                 colorScheme: colorScheme,
-                action: onUndo
-            )
-
-            ToolbarButton(
-                icon: "arrow.uturn.forward",
-                isSelected: false,
-                isDisabled: !canRedo,
-                colorScheme: colorScheme,
-                action: onRedo
+                action: { }
             )
 
             toolbarDivider
@@ -573,7 +562,7 @@ private struct BackgroundModeToolbar: View {
 
 // MARK: - AI Toolbar
 
-private struct AIToolbar: View {
+struct AIToolbar: View {
     let colorScheme: ColorScheme
     var onClose: (() -> Void)? = nil
 
@@ -637,7 +626,7 @@ private struct AIToolbar: View {
 
             // Recap button
             AIToolbarButton(
-                icon: "arrow.counterclockwise",
+                icon: "arrow.clockwise",
                 label: "Recap",
                 colorScheme: colorScheme,
                 action: { /* No functionality yet */ }
@@ -691,21 +680,39 @@ private struct AIToolbarButton: View {
     let icon: String
     let label: String
     let colorScheme: ColorScheme
+    var isDisabled: Bool = false
+    var isLoading: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 2) {
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .medium))
-                    .frame(width: 24, height: 24)
+                ZStack {
+                    if isLoading {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .frame(width: 24, height: 24)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: 18, weight: .medium))
+                            .frame(width: 24, height: 24)
+                    }
+                }
                 Text(label)
                     .font(.system(size: 10, weight: .medium))
             }
-            .foregroundColor(Color.adaptiveText(for: colorScheme))
+            .foregroundColor(foregroundColor)
             .frame(width: 52, height: 40)
         }
         .buttonStyle(.plain)
+        .disabled(isDisabled || isLoading)
+    }
+
+    private var foregroundColor: Color {
+        if isDisabled || isLoading {
+            return Color.adaptiveText(for: colorScheme).opacity(0.3)
+        }
+        return Color.adaptiveText(for: colorScheme)
     }
 }
 
@@ -856,17 +863,14 @@ private struct DocumentOperationsToolbar: View {
             eraserSize: .constant(StrokeWidthRange.eraserDefault),
             eraserType: .constant(.stroke),
             diagramWidth: .constant(StrokeWidthRange.diagramDefault),
+            diagramAutosnap: .constant(true),
             customPenColors: .constant([]),
             customHighlighterColors: .constant([]),
             canvasBackgroundMode: .constant(.normal),
             canvasBackgroundOpacity: .constant(0.15),
             canvasBackgroundSpacing: .constant(48),
             colorScheme: .light,
-            canUndo: true,
-            canRedo: false,
             onHomePressed: {},
-            onUndo: {},
-            onRedo: {},
             onAIPressed: {},
             onToggleDarkMode: {},
             isDocumentAIReady: false  // Shows processing indicator in preview

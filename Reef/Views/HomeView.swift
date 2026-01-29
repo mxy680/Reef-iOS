@@ -716,7 +716,6 @@ struct HomeView: View {
 
                 // Extract text using OCR and embedded extraction
                 note.extractionStatus = .extracting
-                note.questionDetectionStatus = .detecting
                 let noteID = note.id
                 let courseID = course.id
                 Task.detached {
@@ -725,11 +724,8 @@ struct HomeView: View {
                         fileExtension: fileExtension
                     )
 
-                    // Run text extraction and question detection in parallel
-                    async let textExtractionTask = DocumentTextExtractor.shared.extractText(from: fileURL)
-                    async let questionDetectionTask = QuestionRegionDetector.shared.detectQuestions(in: fileURL)
-
-                    let (result, questionRegions) = await (textExtractionTask, questionDetectionTask)
+                    // Extract text from document
+                    let result = await DocumentTextExtractor.shared.extractText(from: fileURL)
 
                     await MainActor.run {
                         // Update text extraction results
@@ -738,23 +734,6 @@ struct HomeView: View {
                         note.ocrConfidence = result.confidence
                         note.extractionStatus = result.text != nil ? .completed : .failed
                         note.isTextExtracted = true
-
-                        // Update question detection results
-                        if let regions = questionRegions {
-                            // Update document ID to match the note
-                            let updatedRegions = DocumentQuestionRegions(
-                                documentId: noteID,
-                                pageCount: regions.pageCount,
-                                regions: regions.regions,
-                                detectedAt: regions.detectedAt
-                            )
-                            note.questionRegions = updatedRegions
-                            note.questionDetectionStatus = .completed
-                            print("[QuestionDetector] Detected \(regions.regions.count) question(s) in \(note.name)")
-                        } else {
-                            note.questionDetectionStatus = .notApplicable
-                            print("[QuestionDetector] No questions detected in \(note.name)")
-                        }
                     }
 
                     // Index for RAG if text extraction succeeded

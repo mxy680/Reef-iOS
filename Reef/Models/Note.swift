@@ -29,10 +29,7 @@ class Note: Hashable {
     var extractionMethodRaw: String?
     var ocrConfidence: Double?
     var isVectorIndexed: Bool = false
-
-    // Question detection fields
-    var questionDetectionStatusRaw: String = QuestionDetectionStatus.pending.rawValue
-    var questionRegionsData: Data?  // JSON-encoded DocumentQuestionRegions
+    var isAssignment: Bool = false
 
     var extractionStatus: ExtractionStatus {
         get { ExtractionStatus(rawValue: extractionStatusRaw) ?? .pending }
@@ -42,21 +39,6 @@ class Note: Hashable {
     var extractionMethod: ExtractionMethod? {
         get { extractionMethodRaw.flatMap { ExtractionMethod(rawValue: $0) } }
         set { extractionMethodRaw = newValue?.rawValue }
-    }
-
-    var questionDetectionStatus: QuestionDetectionStatus {
-        get { QuestionDetectionStatus(rawValue: questionDetectionStatusRaw) ?? .pending }
-        set { questionDetectionStatusRaw = newValue.rawValue }
-    }
-
-    var questionRegions: DocumentQuestionRegions? {
-        get {
-            guard let data = questionRegionsData else { return nil }
-            return try? JSONDecoder().decode(DocumentQuestionRegions.self, from: data)
-        }
-        set {
-            questionRegionsData = try? JSONEncoder().encode(newValue)
-        }
     }
 
     var fileType: FileType {
@@ -82,14 +64,12 @@ class Note: Hashable {
     /// True if any background processing for AI features is still in progress
     var isProcessingForAI: Bool {
         extractionStatus == .extracting ||
-        questionDetectionStatus == .detecting ||
         (extractionStatus == .completed && !isVectorIndexed)
     }
 
     /// True when all AI processing is complete and AI features are ready to use
     var isAIReady: Bool {
         extractionStatus == .completed &&
-        questionDetectionStatus != .detecting &&
         isVectorIndexed
     }
 
