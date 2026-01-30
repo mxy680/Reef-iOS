@@ -169,7 +169,8 @@ enum AIServiceError: Error, LocalizedError {
 // MARK: - AIService
 
 /// Service for communicating with the Reef-Server AI endpoints
-actor AIService {
+@MainActor
+class AIService {
     static let shared = AIService()
 
     // Configure your server URL here
@@ -200,7 +201,6 @@ actor AIService {
     ///   - context: Optional RAG context from course materials (use RAGService.getServerContext)
     ///   - useMock: Whether to use mock mode for testing
     /// - Returns: AIFeedbackResponse with AI feedback
-    @MainActor
     func feedback(
         images: [Data],
         prompt: String? = nil,
@@ -208,6 +208,9 @@ actor AIService {
         useMock: Bool = false
     ) async throws -> AIFeedbackResponse {
         let prefs = PreferencesManager.shared
+        let model = prefs.handwritingModel
+        let detailLevel = prefs.feedbackDetailLevel.lowercased()
+        let language = languageCode(for: prefs.recognitionLanguage)
 
         let request = AIFeedbackRequest(
             images: images.map { imageData in
@@ -219,9 +222,9 @@ actor AIService {
             prompt: prompt,
             rag_context: context,
             preferences: ServerAIPreferences(
-                model: prefs.handwritingModel,
-                detail_level: prefs.feedbackDetailLevel.lowercased(),
-                language: languageCode(for: prefs.recognitionLanguage)
+                model: model,
+                detail_level: detailLevel,
+                language: language
             )
         )
 
@@ -244,7 +247,6 @@ actor AIService {
     ///   - additionalInstructions: Optional instructions for the AI
     ///   - useMock: Whether to use mock mode for testing
     /// - Returns: AIQuizResponse with generated questions
-    @MainActor
     func generateQuiz(
         context: ServerRAGContext,
         count: Int = 5,
@@ -254,6 +256,7 @@ actor AIService {
         useMock: Bool = false
     ) async throws -> AIQuizResponse {
         let prefs = PreferencesManager.shared
+        let model = prefs.reasoningModel
 
         let request = AIQuizRequest(
             rag_context: context,
@@ -263,7 +266,7 @@ actor AIService {
                 difficulty: difficulty
             ),
             preferences: ServerAIPreferences(
-                model: prefs.reasoningModel,
+                model: model,
                 detail_level: "balanced",
                 language: "en"
             ),
@@ -287,7 +290,6 @@ actor AIService {
     ///   - history: Previous messages in the conversation
     ///   - useMock: Whether to use mock mode for testing
     /// - Returns: AIChatResponse with AI's reply
-    @MainActor
     func chat(
         message: String,
         context: ServerRAGContext? = nil,
@@ -295,15 +297,18 @@ actor AIService {
         useMock: Bool = false
     ) async throws -> AIChatResponse {
         let prefs = PreferencesManager.shared
+        let model = prefs.reasoningModel
+        let detailLevel = prefs.feedbackDetailLevel.lowercased()
+        let language = languageCode(for: prefs.recognitionLanguage)
 
         let request = AIChatRequest(
             message: message,
             rag_context: context,
             conversation_history: history.map { AIChatMessageRequest(role: $0.role, content: $0.content) },
             preferences: ServerAIPreferences(
-                model: prefs.reasoningModel,
-                detail_level: prefs.feedbackDetailLevel.lowercased(),
-                language: languageCode(for: prefs.recognitionLanguage)
+                model: model,
+                detail_level: detailLevel,
+                language: language
             )
         )
 
