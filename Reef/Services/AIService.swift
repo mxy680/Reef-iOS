@@ -180,11 +180,8 @@ class AIService {
     private init() {
         // Default to localhost for development
         // In production, this should be configured via environment or config file
-        #if DEBUG
-        self.baseURL = "http://localhost:8000"
-        #else
+        // Use Railway server for all builds
         self.baseURL = "https://reef-production-08bd.up.railway.app"
-        #endif
 
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 60
