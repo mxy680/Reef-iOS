@@ -25,7 +25,15 @@ CLAUDE.md
 # Secrets
 Secrets.swift
 .env
+Reef/Config.plist
+Config.plist
 
 # Worktrees
 .worktrees/
 Reef/Secrets.swift
+
+# Claude
+.claude/
+
+# Scripts
+scripts/
