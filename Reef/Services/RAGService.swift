@@ -248,4 +248,67 @@ actor RAGService {
             return 0
         }
     }
+
+    // MARK: - Server Export
+
+    /// Get context in server-compatible format for AI endpoints
+    /// - Parameters:
+    ///   - query: The user's query or current work context
+    ///   - courseId: Course ID to scope the search
+    ///   - topK: Maximum number of chunks to retrieve
+    ///   - maxTokens: Maximum tokens in the context (approximate)
+    /// - Returns: ServerRAGContext ready for API calls
+    func getServerContext(
+        query: String,
+        courseId: UUID,
+        topK: Int = 5,
+        maxTokens: Int = 2000
+    ) async throws -> ServerRAGContext {
+        // Check if embedding service is available
+        guard await EmbeddingService.shared.isAvailable() else {
+            return ServerRAGContext(chunks: [], query: query)
+        }
+
+        // Embed the query
+        let queryEmbedding = try await EmbeddingService.shared.embed(query)
+
+        // Search for relevant chunks
+        let results = try await VectorStore.shared.search(
+            query: queryEmbedding,
+            courseId: courseId,
+            topK: topK
+        )
+
+        guard !results.isEmpty else {
+            return ServerRAGContext(chunks: [], query: query)
+        }
+
+        // Build context within token budget
+        let maxChars = Int(Double(maxTokens) * charsPerToken)
+        var serverChunks: [ServerContextChunk] = []
+        var totalChars = 0
+
+        for result in results {
+            // Skip low-similarity results
+            guard result.similarity > 0.15 else { continue }
+
+            // Check token budget
+            let chunkChars = result.text.count + 50
+            if totalChars + chunkChars > maxChars {
+                break
+            }
+
+            serverChunks.append(ServerContextChunk(
+                text: result.text,
+                source_type: result.documentType == .note ? "note" : "assignment",
+                source_id: result.documentId.uuidString,
+                heading: result.heading,
+                page_number: result.pageNumber,
+                similarity: result.similarity
+            ))
+            totalChars += chunkChars
+        }
+
+        return ServerRAGContext(chunks: serverChunks, query: query)
+    }
 }

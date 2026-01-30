@@ -10,17 +10,15 @@ import SwiftUI
 // MARK: - Enums
 
 enum ReasoningModel: String, CaseIterable, Identifiable {
-    case gpt4o = "GPT-4o"
-    case claudeSonnet = "Claude Sonnet"
     case geminiPro = "Gemini Pro"
+    case gemini2Flash = "Gemini 2 Flash"
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .gpt4o: return "GPT-4o (Recommended)"
-        case .claudeSonnet: return "Claude Sonnet"
-        case .geminiPro: return "Gemini Pro"
+        case .geminiPro: return "Gemini Pro (Recommended)"
+        case .gemini2Flash: return "Gemini 2 Flash"
         }
     }
 }
@@ -47,7 +45,6 @@ enum RecognitionLanguage: String, CaseIterable, Identifiable {
 enum HandwritingModel: String, CaseIterable, Identifiable {
     case gemini3Pro = "Gemini 3 Pro"
     case gemini2Flash = "Gemini 2 Flash"
-    case gpt4Vision = "GPT-4 Vision"
 
     var id: String { rawValue }
 
@@ -55,7 +52,6 @@ enum HandwritingModel: String, CaseIterable, Identifiable {
         switch self {
         case .gemini3Pro: return "Gemini 3 Pro (Recommended)"
         case .gemini2Flash: return "Gemini 2 Flash"
-        case .gpt4Vision: return "GPT-4 Vision"
         }
     }
 }
@@ -102,7 +98,7 @@ class PreferencesManager: ObservableObject {
 
     // MARK: - AI Settings
 
-    @AppStorage("reasoningModel") var reasoningModel: String = ReasoningModel.gpt4o.rawValue
+    @AppStorage("reasoningModel") var reasoningModel: String = ReasoningModel.geminiPro.rawValue
     @AppStorage("pauseDetectionSensitivity") var pauseDetectionSensitivity: Double = 0.5
     @AppStorage("autoFeedbackEnabled") var autoFeedbackEnabled: Bool = true
     @AppStorage("feedbackDetailLevel") var feedbackDetailLevel: String = FeedbackDetailLevel.balanced.rawValue
@@ -168,7 +164,7 @@ class PreferencesManager: ObservableObject {
     // MARK: - Convenience Getters
 
     var selectedReasoningModel: ReasoningModel {
-        ReasoningModel(rawValue: reasoningModel) ?? .gpt4o
+        ReasoningModel(rawValue: reasoningModel) ?? .geminiPro
     }
 
     var selectedFeedbackDetailLevel: FeedbackDetailLevel {
