@@ -108,9 +108,9 @@ class QuestionExtractionService {
 
     private init() {
         let config = URLSessionConfiguration.default
-        // Shorter timeouts since we're using async jobs now
-        config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 60
+        // Submit can take time for large PDF uploads, but polling is fast
+        config.timeoutIntervalForRequest = 120
+        config.timeoutIntervalForResource = 180
         self.session = URLSession(configuration: config)
     }
 
