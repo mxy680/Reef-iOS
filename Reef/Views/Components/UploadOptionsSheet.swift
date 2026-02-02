@@ -8,137 +8,95 @@
 import SwiftUI
 
 struct UploadOptionsSheet: View {
-    @StateObject private var themeManager = ThemeManager.shared
     @Binding var isPresented: Bool
-    @State private var assignmentModeEnabled: Bool = false
+    @State private var assignmentModeEnabled: Bool = true
     let urls: [URL]
-    let onUpload: (Bool) -> Void  // Pass assignment mode selection
-
-    private var effectiveColorScheme: ColorScheme {
-        themeManager.isDarkMode ? .dark : .light
-    }
-
-    private var cardBackgroundColor: Color {
-        Color.adaptiveCardBackground(for: effectiveColorScheme)
-    }
-
-    private var textFieldBackgroundColor: Color {
-        effectiveColorScheme == .dark ? Color.deepOcean : Color.lightGrayBackground
-    }
+    let onUpload: (Bool) -> Void
 
     var body: some View {
         ZStack {
             // Dimmed backdrop
-            Color.black.opacity(0.4)
+            Color.black.opacity(0.3)
                 .ignoresSafeArea()
                 .onTapGesture {
                     isPresented = false
                 }
 
-            VStack {
-                Spacer()
+            // Centered popup card
+            VStack(spacing: 16) {
+                // Header
+                Text("Upload \(urls.count) \(urls.count == 1 ? "file" : "files")")
+                    .font(.quicksand(16, weight: .semiBold))
+                    .foregroundColor(Color(white: 0.2))
 
-                // Bottom sheet content
-                VStack(spacing: 0) {
-                    // Header with drag indicator
-                    VStack(spacing: 12) {
-                        // Drag indicator
-                        RoundedRectangle(cornerRadius: 2.5)
-                            .fill(Color.gray.opacity(0.4))
-                            .frame(width: 36, height: 5)
-                            .padding(.top, 12)
+                // Assignment mode toggle
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Assignment Mode")
+                            .font(.quicksand(14, weight: .medium))
+                            .foregroundColor(Color(white: 0.2))
 
-                        Text("Upload Options")
-                            .font(.quicksand(20, weight: .semiBold))
-                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                        Text("Extract problems individually")
+                            .font(.quicksand(11, weight: .regular))
+                            .foregroundColor(Color(white: 0.5))
                     }
-                    .padding(.bottom, 20)
 
-                    // Content
-                    VStack(spacing: 24) {
-                        // File count info
-                        HStack {
-                            Image(systemName: "doc.fill")
-                                .font(.system(size: 16))
-                                .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
+                    Spacer()
 
-                            Text("\(urls.count) \(urls.count == 1 ? "file" : "files") selected")
-                                .font(.quicksand(15, weight: .medium))
-                                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                    Toggle("", isOn: $assignmentModeEnabled)
+                        .toggleStyle(SwitchToggleStyle(tint: .vibrantTeal))
+                        .labelsHidden()
+                }
 
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(textFieldBackgroundColor)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                // Processing time note
+                if assignmentModeEnabled {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 10))
+                        Text("1-2 min processing")
+                            .font(.quicksand(10, weight: .regular))
+                    }
+                    .foregroundColor(Color(white: 0.55))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .transition(.opacity)
+                }
 
-                        // Assignment mode toggle
-                        VStack(alignment: .leading, spacing: 8) {
-                            Toggle(isOn: $assignmentModeEnabled) {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "list.number")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(assignmentModeEnabled ? .vibrantTeal : Color.adaptiveSecondary(for: effectiveColorScheme))
+                // Buttons
+                HStack(spacing: 10) {
+                    Button {
+                        isPresented = false
+                    } label: {
+                        Text("Cancel")
+                            .font(.quicksand(14, weight: .medium))
+                            .foregroundColor(Color(white: 0.4))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 11)
+                            .background(Color(white: 0.94))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
 
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Assignment Mode")
-                                            .font(.quicksand(16, weight: .semiBold))
-                                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
-
-                                        Text("Extract individual problems for step-by-step solving")
-                                            .font(.quicksand(13, weight: .regular))
-                                            .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
-                                    }
-                                }
-                            }
-                            .toggleStyle(SwitchToggleStyle(tint: .vibrantTeal))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                            .background(textFieldBackgroundColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                            // Processing time warning when enabled
-                            if assignmentModeEnabled {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "clock")
-                                        .font(.system(size: 12))
-                                    Text("Takes 1-2 minutes to process")
-                                        .font(.quicksand(12, weight: .regular))
-                                }
-                                .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
-                                .padding(.leading, 4)
-                                .transition(.opacity.combined(with: .move(edge: .top)))
-                            }
-                        }
-
-                        // Upload button
-                        Button {
-                            isPresented = false
-                            onUpload(assignmentModeEnabled)
-                        } label: {
-                            HStack {
-                                Image(systemName: "arrow.up.doc.fill")
-                                    .font(.system(size: 16))
-                                Text("Upload")
-                                    .font(.quicksand(16, weight: .semiBold))
-                            }
+                    Button {
+                        isPresented = false
+                        onUpload(assignmentModeEnabled)
+                    } label: {
+                        Text("Upload")
+                            .font(.quicksand(14, weight: .semiBold))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
+                            .padding(.vertical, 11)
                             .background(Color.vibrantTeal)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(.plain)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
+                    .buttonStyle(.plain)
                 }
-                .background(cardBackgroundColor)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .shadow(color: Color.black.opacity(0.2), radius: 20, y: -5)
             }
-            .ignoresSafeArea(edges: .bottom)
+            .padding(22)
+            .frame(width: 320)
+            .background(Color.lightGrayBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: Color.black.opacity(0.12), radius: 24, x: 0, y: 8)
+            .shadow(color: Color.black.opacity(0.06), radius: 4, x: 0, y: 2)
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: assignmentModeEnabled)
     }
