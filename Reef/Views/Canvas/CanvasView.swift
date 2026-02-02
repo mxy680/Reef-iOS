@@ -212,6 +212,10 @@ struct CanvasView: View {
             }
             // Set default pen color based on theme
             selectedPenColor = themeManager.isDarkMode ? .white : .black
+            // Auto-default to assignment view when assignment is ready
+            if note.isAssignment && note.isAssignmentReady {
+                viewMode = .assignment
+            }
         }
         .onDisappear {
             // Only manage state if not controlled by parent

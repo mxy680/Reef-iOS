@@ -359,32 +359,6 @@ struct CanvasToolbar: View {
             if isAssignmentEnabled {
                 toolbarDivider
 
-                // Doc/Assignment toggle
-                HStack(spacing: 2) {
-                    ForEach(CanvasViewMode.allCases, id: \.self) { mode in
-                        Button {
-                            viewMode = mode
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: mode.iconName)
-                                    .font(.system(size: 12, weight: .medium))
-                                Text(mode.displayName)
-                                    .font(.system(size: 11, weight: .medium))
-                            }
-                            .foregroundColor(viewMode == mode ? .white : Color.adaptiveText(for: colorScheme))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(viewMode == mode ? Color.vibrantTeal : Color.clear)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(isAssignmentProcessing)
-                    }
-                }
-                .padding(.horizontal, 4)
-
                 // Pagination controls (always visible, disabled in document mode)
                 HStack(spacing: 4) {
                     // Previous button
@@ -392,11 +366,11 @@ struct CanvasToolbar: View {
                         onPreviousQuestion()
                     } label: {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(paginationEnabled && currentQuestionIndex > 0
                                 ? Color.adaptiveText(for: colorScheme)
                                 : Color.adaptiveText(for: colorScheme).opacity(0.3))
-                            .frame(width: 28, height: 28)
+                            .frame(width: 32, height: 32)
                     }
                     .buttonStyle(.plain)
                     .disabled(!paginationEnabled || currentQuestionIndex == 0)
@@ -414,15 +388,27 @@ struct CanvasToolbar: View {
                         onNextQuestion()
                     } label: {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(paginationEnabled && currentQuestionIndex < totalQuestions - 1
                                 ? Color.adaptiveText(for: colorScheme)
                                 : Color.adaptiveText(for: colorScheme).opacity(0.3))
-                            .frame(width: 28, height: 28)
+                            .frame(width: 32, height: 32)
                     }
                     .buttonStyle(.plain)
                     .disabled(!paginationEnabled || currentQuestionIndex >= totalQuestions - 1)
                 }
+
+                // Single toggle icon for Doc/Assignment mode
+                Button {
+                    viewMode = (viewMode == .assignment) ? .document : .assignment
+                } label: {
+                    Image(systemName: viewMode == .assignment ? "doc.text" : "list.number")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(Color.adaptiveText(for: colorScheme))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .disabled(isAssignmentProcessing)
             }
 
             toolbarDivider
