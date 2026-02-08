@@ -68,6 +68,8 @@ struct HomeView: View {
     @State private var isViewingCanvas: Bool = false
     @State private var selectedNote: Note? = nil
     @State private var isCanvasExiting: Bool = false
+    @State private var isShowingProfileCompletion = false
+    @State private var profileCompletionName = ""
 
     private var effectiveColorScheme: ColorScheme {
         themeManager.isDarkMode ? .dark : .light
@@ -560,6 +562,20 @@ struct HomeView: View {
             }
         } message: {
             Text("Enter the name for your new course")
+        }
+        .alert("What's your name?", isPresented: $isShowingProfileCompletion) {
+            TextField("Your name", text: $profileCompletionName)
+            Button("Save") {
+                authManager.completeProfile(name: profileCompletionName)
+                profileCompletionName = ""
+            }
+        } message: {
+            Text("We couldn't retrieve your name from Apple ID. Please enter it below.")
+        }
+        .onReceive(authManager.$needsProfileCompletion) { needs in
+            if needs {
+                isShowingProfileCompletion = true
+            }
         }
         .sheet(isPresented: $isShowingDocumentPicker) {
             DocumentPicker { urls in

@@ -236,7 +236,9 @@ struct AccountSettingsView: View {
         .alert("Delete Account", isPresented: $showDeleteAccountConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
-                // TODO: Implement account deletion
+                if let uid = authManager.userIdentifier {
+                    ProfileService.shared.deleteProfile(userIdentifier: uid)
+                }
                 authManager.signOut()
             }
         } message: {
@@ -250,6 +252,15 @@ struct AccountSettingsView: View {
         if !editedName.isEmpty {
             authManager.userName = editedName
             KeychainService.save(editedName, for: .userName)
+
+            // Back up to server
+            if let uid = authManager.userIdentifier {
+                ProfileService.shared.saveProfile(
+                    userIdentifier: uid,
+                    name: editedName,
+                    email: authManager.userEmail
+                )
+            }
         }
         isEditingName = false
     }
