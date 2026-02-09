@@ -2,7 +2,7 @@
 //  PinnedItemsView.swift
 //  Reef
 //
-//  Horizontal scrolling section showing pinned courses and notes.
+//  Pinned courses and notes displayed as inline rows in a single card.
 //
 
 import SwiftUI
@@ -19,12 +19,10 @@ struct PinnedItemsView: View {
         var items: [PinnedItem] = []
 
         for course in courses {
-            // Check if course is pinned
             if userPrefs.isPinned(id: course.id) {
                 items.append(.course(course))
             }
 
-            // Check pinned notes in this course
             for note in course.notes {
                 if userPrefs.isPinned(id: note.id) {
                     items.append(.note(note, course))
@@ -36,70 +34,133 @@ struct PinnedItemsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header
-            Text("Pinned")
-                .font(.quicksand(20, weight: .semiBold))
-                .foregroundColor(Color.adaptiveText(for: colorScheme))
-
-            if pinnedItems.isEmpty {
-                // Empty state
-                HStack {
-                    Spacer()
-                    VStack(spacing: 8) {
-                        Image(systemName: "pin.slash")
-                            .font(.system(size: 32))
-                            .foregroundColor(Color.adaptiveSecondary(for: colorScheme).opacity(0.5))
-
-                        Text("Pin your favorite courses and notes for quick access")
-                            .font(.quicksand(14, weight: .regular))
-                            .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.vertical, 32)
-                    Spacer()
-                }
-                .background(Color.adaptiveCardBackground(for: colorScheme))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.black.opacity(colorScheme == .dark ? 0.5 : 0.35), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.08 : 0.04), radius: 8, x: 0, y: 2)
-            } else {
-                // Vertical list
-                VStack(spacing: 0) {
-                    ForEach(Array(pinnedItems.enumerated()), id: \.element.id) { index, item in
-                        PinnedItemRow(
-                            item: item,
-                            colorScheme: colorScheme,
-                            onTap: {
-                                switch item {
-                                case .course(let course):
-                                    onSelectCourse(course)
-                                case .note(let note, let course):
-                                    onSelectNote(note, course)
-                                }
-                            }
-                        )
-
-                        if index < pinnedItems.count - 1 {
-                            Divider()
-                                .background(Color.adaptiveSecondary(for: colorScheme).opacity(0.08))
-                        }
-                    }
-                }
-                .background(Color.adaptiveCardBackground(for: colorScheme))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.black.opacity(colorScheme == .dark ? 0.5 : 0.35), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.08 : 0.04), radius: 8, x: 0, y: 2)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color.deepCoral)
+                    .frame(width: 8, height: 8)
+                Text("Pinned")
+                    .font(.quicksand(18, weight: .semiBold))
+                    .foregroundColor(Color.adaptiveText(for: colorScheme))
             }
+
+            VStack(spacing: 0) {
+                let items = Array(pinnedItems.prefix(3))
+                let skeletonCount = 3 - items.count
+
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    PinnedRowView(
+                        item: item,
+                        colorScheme: colorScheme,
+                        onTap: {
+                            switch item {
+                            case .course(let course):
+                                onSelectCourse(course)
+                            case .note(let note, let course):
+                                onSelectNote(note, course)
+                            }
+                        }
+                    )
+
+                    if index < items.count - 1 || skeletonCount > 0 {
+                        Divider()
+                            .padding(.leading, 64)
+                    }
+                }
+
+                ForEach(0..<skeletonCount, id: \.self) { index in
+                    PinnedSkeletonRow(colorScheme: colorScheme)
+
+                    if index < skeletonCount - 1 {
+                        Divider()
+                            .padding(.leading, 64)
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+            .frame(height: 210)
+            .clipped()
+            .background(Color.adaptiveCardBackground(for: colorScheme))
+            .dashboardCard(colorScheme: colorScheme, cornerRadius: 16)
         }
     }
 }
+
+// MARK: - Pinned Row View
+
+private struct PinnedRowView: View {
+    let item: PinnedItem
+    let colorScheme: ColorScheme
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                // Icon in rounded rect
+                Image(systemName: item.icon)
+                    .font(.system(size: 18))
+                    .foregroundColor(.deepTeal)
+                    .frame(width: 40, height: 40)
+                    .background(Color.seafoam.opacity(colorScheme == .dark ? 0.2 : 0.4))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                // Title + subtitle
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title)
+                        .font(.quicksand(16, weight: .medium))
+                        .foregroundColor(Color.adaptiveText(for: colorScheme))
+                        .lineLimit(1)
+
+                    Text(item.subtitle ?? "Course")
+                        .font(.quicksand(13, weight: .regular))
+                        .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.5))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Pinned Skeleton Row
+
+private struct PinnedSkeletonRow: View {
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.1))
+                .frame(width: 40, height: 40)
+
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.1))
+                    .frame(width: 100, height: 12)
+
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.07))
+                    .frame(width: 60, height: 10)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+}
+
+// MARK: - Pinned Item Enum
 
 enum PinnedItem: Identifiable {
     case course(Course)
@@ -131,55 +192,5 @@ enum PinnedItem: Identifiable {
         case .course: return nil
         case .note(_, let course): return course.name
         }
-    }
-}
-
-struct PinnedItemRow: View {
-    let item: PinnedItem
-    let colorScheme: ColorScheme
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Icon
-                Image(systemName: item.icon)
-                    .font(.system(size: 20))
-                    .foregroundColor(.deepTeal)
-                    .frame(width: 52, height: 52)
-                    .background(Color.adaptiveBackground(for: colorScheme))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                // Title and subtitle
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.title)
-                        .font(.quicksand(16, weight: .medium))
-                        .foregroundColor(Color.adaptiveText(for: colorScheme))
-                        .lineLimit(1)
-
-                    if let subtitle = item.subtitle {
-                        Text(subtitle)
-                            .font(.quicksand(14, weight: .regular))
-                            .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
-                            .lineLimit(1)
-                    } else {
-                        Text("Course")
-                            .font(.quicksand(14, weight: .regular))
-                            .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
-                    }
-                }
-
-                Spacer()
-
-                // Chevron
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Color.adaptiveSecondary(for: colorScheme).opacity(0.5))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 16)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }

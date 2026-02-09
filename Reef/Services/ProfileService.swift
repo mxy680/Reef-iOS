@@ -26,7 +26,7 @@ struct ProfileRequest: Codable {
 class ProfileService {
     static let shared = ProfileService()
 
-    private let baseURL = "https://reef-production-08bd.up.railway.app"
+    private let baseURL = "https://api.studyreef.com"
     private let session: URLSession
 
     private init() {

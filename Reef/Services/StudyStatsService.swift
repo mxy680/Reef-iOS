@@ -60,6 +60,10 @@ class StudyStatsService: ObservableObject {
         aiFeedbackThisWeek
     }
 
+    func hasActivity(on date: Date) -> Bool {
+        activityDates.contains(dateFormatter.string(from: date))
+    }
+
     // MARK: - Recording Activity
 
     func recordActivity() {

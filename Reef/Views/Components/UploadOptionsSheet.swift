@@ -15,21 +15,13 @@ struct UploadOptionsSheet: View {
     let urls: [URL]
     let onUpload: (Bool) -> Void
 
-    /// Estimated processing time string based on total page count.
-    /// Formula: T(n) ≈ 20 + 4n seconds per document, summed across all docs.
+    /// Estimated processing time for Hetzner CPU-only server with cold start.
+    /// Formula: 30s cold start + 25s/doc base + 8s/page (layout detection + extraction).
     private var estimatedTimeString: String {
         guard totalPages > 0 else { return "Estimating..." }
-        let totalSeconds = 20 * urls.count + 4 * totalPages
-        if totalSeconds < 60 {
-            return "~\(totalSeconds) sec processing"
-        } else {
-            let minutes = Double(totalSeconds) / 60.0
-            if minutes < 2 {
-                return "~1 min processing"
-            } else {
-                return "~\(Int(minutes.rounded())) min processing"
-            }
-        }
+        let totalSeconds = 30 + 25 * urls.count + 8 * totalPages
+        let minutes = Int((Double(totalSeconds) / 60.0).rounded())
+        return "~\(max(minutes, 1)) min processing"
     }
 
     var body: some View {

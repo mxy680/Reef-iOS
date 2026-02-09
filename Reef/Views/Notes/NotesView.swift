@@ -275,5 +275,6 @@ struct NotesView: View {
         }
 
         modelContext.delete(note)
+        try? modelContext.save()
     }
 }

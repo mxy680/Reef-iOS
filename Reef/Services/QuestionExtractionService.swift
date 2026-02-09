@@ -66,7 +66,7 @@ enum ExtractionJobStatus: String {
 actor QuestionExtractionService {
     static let shared = QuestionExtractionService()
 
-    private let baseURL = "https://reef-production-08bd.up.railway.app"
+    private let baseURL = "https://api.studyreef.com"
     private let session: URLSession
 
     private init() {

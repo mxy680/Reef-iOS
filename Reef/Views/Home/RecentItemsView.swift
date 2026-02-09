@@ -2,7 +2,7 @@
 //  RecentItemsView.swift
 //  Reef
 //
-//  Vertical list showing recently opened documents.
+//  Recently opened documents displayed as inline rows in a single card.
 //
 
 import SwiftUI
@@ -18,7 +18,6 @@ struct RecentItemsView: View {
         var items: [RecentItem] = []
 
         for course in courses {
-            // Add notes with lastOpenedAt
             for note in course.notes {
                 if let lastOpened = note.lastOpenedAt {
                     items.append(.note(note, course, lastOpened))
@@ -26,19 +25,22 @@ struct RecentItemsView: View {
             }
         }
 
-        // Sort by most recent and limit to 10
         return items
             .sorted { $0.lastOpened > $1.lastOpened }
-            .prefix(10)
+            .prefix(3)
             .map { $0 }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header
-            Text("Recent")
-                .font(.quicksand(20, weight: .semiBold))
-                .foregroundColor(Color.adaptiveText(for: colorScheme))
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color.deepCoral)
+                    .frame(width: 8, height: 8)
+                Text("Recent")
+                    .font(.quicksand(18, weight: .semiBold))
+                    .foregroundColor(Color.adaptiveText(for: colorScheme))
+            }
 
             if recentItems.isEmpty {
                 // Empty state
@@ -47,68 +49,100 @@ struct RecentItemsView: View {
                     VStack(spacing: 8) {
                         Image(systemName: "clock.arrow.circlepath")
                             .font(.system(size: 32))
-                            .foregroundColor(Color.adaptiveSecondary(for: colorScheme).opacity(0.5))
+                            .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.5))
 
                         Text("No recent activity yet")
                             .font(.quicksand(14, weight: .regular))
-                            .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
+                            .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
                     }
                     .padding(.vertical, 32)
                     Spacer()
                 }
+                .frame(maxWidth: .infinity)
+                .frame(height: 210)
                 .background(Color.adaptiveCardBackground(for: colorScheme))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.black.opacity(colorScheme == .dark ? 0.5 : 0.35), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.08 : 0.04), radius: 8, x: 0, y: 2)
+                .dashboardCard(colorScheme: colorScheme, cornerRadius: 16)
             } else {
-                // Vertical list
                 VStack(spacing: 0) {
                     ForEach(Array(recentItems.enumerated()), id: \.element.id) { index, item in
-                        RecentItemRow(
+                        RecentRowView(
                             item: item,
                             colorScheme: colorScheme,
-                            isPinned: isPinned(item),
                             onTap: {
                                 switch item {
                                 case .note(let note, let course, _):
                                     onSelectNote(note, course)
-                                }
-                            },
-                            onPin: {
-                                switch item {
-                                case .note(let note, _, _):
-                                    userPrefs.togglePin(id: note.id)
                                 }
                             }
                         )
 
                         if index < recentItems.count - 1 {
                             Divider()
-                                .background(Color.adaptiveSecondary(for: colorScheme).opacity(0.08))
+                                .padding(.leading, 64)
                         }
                     }
+                    Spacer(minLength: 0)
                 }
+                .frame(height: 210)
+                .clipped()
                 .background(Color.adaptiveCardBackground(for: colorScheme))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.black.opacity(colorScheme == .dark ? 0.5 : 0.35), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.08 : 0.04), radius: 8, x: 0, y: 2)
+                .dashboardCard(colorScheme: colorScheme, cornerRadius: 16)
             }
         }
     }
+}
 
-    private func isPinned(_ item: RecentItem) -> Bool {
-        switch item {
-        case .note(let note, _, _):
-            return userPrefs.isPinned(id: note.id)
+// MARK: - Recent Row View
+
+private struct RecentRowView: View {
+    let item: RecentItem
+    let colorScheme: ColorScheme
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                // Icon in rounded rect
+                Image(systemName: item.icon)
+                    .font(.system(size: 18))
+                    .foregroundColor(.deepTeal)
+                    .frame(width: 40, height: 40)
+                    .background(Color.seafoam.opacity(colorScheme == .dark ? 0.2 : 0.4))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                // Title + subtitle
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title)
+                        .font(.quicksand(16, weight: .medium))
+                        .foregroundColor(Color.adaptiveText(for: colorScheme))
+                        .lineLimit(1)
+
+                    Text(item.courseName)
+                        .font(.quicksand(13, weight: .regular))
+                        .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                // Relative time
+                Text(item.relativeTime)
+                    .font(.quicksand(12, weight: .regular))
+                    .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.7))
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.5))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 }
+
+// MARK: - Recent Item Enum
 
 enum RecentItem: Identifiable {
     case note(Note, Course, Date)
@@ -147,59 +181,5 @@ enum RecentItem: Identifiable {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: lastOpened, relativeTo: Date())
-    }
-}
-
-struct RecentItemRow: View {
-    let item: RecentItem
-    let colorScheme: ColorScheme
-    let isPinned: Bool
-    let onTap: () -> Void
-    let onPin: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Thumbnail/icon
-                Image(systemName: item.icon)
-                    .font(.system(size: 20))
-                    .foregroundColor(.deepTeal)
-                    .frame(width: 52, height: 52)
-                    .background(Color.adaptiveBackground(for: colorScheme))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                // Title and course name
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.title)
-                        .font(.quicksand(16, weight: .medium))
-                        .foregroundColor(Color.adaptiveText(for: colorScheme))
-                        .lineLimit(1)
-
-                    Text(item.courseName)
-                        .font(.quicksand(14, weight: .regular))
-                        .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                // Relative timestamp
-                Text(item.relativeTime)
-                    .font(.quicksand(12, weight: .regular))
-                    .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
-
-                // Pin button
-                Button(action: onPin) {
-                    Image(systemName: isPinned ? "pin.fill" : "pin")
-                        .font(.system(size: 16))
-                        .foregroundColor(isPinned ? .deepTeal : Color.adaptiveSecondary(for: colorScheme))
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 16)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }

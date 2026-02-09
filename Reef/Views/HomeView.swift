@@ -148,13 +148,13 @@ struct HomeView: View {
             VStack(spacing: 16) {
                 Image(systemName: selectedItem?.icon ?? "questionmark")
                     .font(.system(size: 48))
-                    .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme).opacity(0.5))
+                    .foregroundColor(Color.adaptiveSecondaryText(for: effectiveColorScheme).opacity(0.5))
                 Text(selectedItem?.rawValue ?? "")
                     .font(.quicksand(24, weight: .semiBold))
                     .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                 Text("Coming soon")
                     .font(.quicksand(16, weight: .regular))
-                    .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
+                    .foregroundColor(Color.adaptiveSecondaryText(for: effectiveColorScheme))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.adaptiveBackground(for: effectiveColorScheme))
@@ -163,6 +163,7 @@ struct HomeView: View {
             DashboardView(
                 courses: courses,
                 colorScheme: effectiveColorScheme,
+                userName: authManager.userName,
                 onSelectCourse: { course in
                     selectedCourse = course
                     selectedCourseSubPage = nil
@@ -192,7 +193,7 @@ struct HomeView: View {
                 HStack {
                     Label(SidebarItem.home.rawValue, systemImage: SidebarItem.home.icon)
                         .font(.quicksand(17, weight: .medium))
-                        .foregroundColor(selectedItem == .home && selectedCourse == nil ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
+                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                     Spacer()
                 }
                 .padding(.horizontal, 12)
@@ -215,7 +216,7 @@ struct HomeView: View {
                 HStack {
                     Label(SidebarItem.myReef.rawValue, systemImage: SidebarItem.myReef.icon)
                         .font(.quicksand(17, weight: .medium))
-                        .foregroundColor(selectedItem == .myReef ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
+                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                     Spacer()
                 }
                 .padding(.horizontal, 12)
@@ -238,7 +239,7 @@ struct HomeView: View {
                 HStack {
                     Label(SidebarItem.analytics.rawValue, systemImage: SidebarItem.analytics.icon)
                         .font(.quicksand(17, weight: .medium))
-                        .foregroundColor(selectedItem == .analytics ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
+                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                     Spacer()
                 }
                 .padding(.horizontal, 12)
@@ -261,7 +262,7 @@ struct HomeView: View {
                 HStack {
                     Label(SidebarItem.tutors.rawValue, systemImage: SidebarItem.tutors.icon)
                         .font(.quicksand(17, weight: .medium))
-                        .foregroundColor(selectedItem == .tutors ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
+                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                     Spacer()
                 }
                 .padding(.horizontal, 12)
@@ -284,7 +285,7 @@ struct HomeView: View {
                 HStack {
                     Label(SidebarItem.settings.rawValue, systemImage: SidebarItem.settings.icon)
                         .font(.quicksand(17, weight: .medium))
-                        .foregroundColor(selectedItem == .settings ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
+                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                     Spacer()
                 }
                 .padding(.horizontal, 12)
@@ -338,7 +339,7 @@ struct HomeView: View {
                     } label: {
                         Label(course.name, systemImage: course.icon)
                             .font(.quicksand(17, weight: .medium))
-                            .foregroundColor(selectedCourse?.id == course.id ? Color.adaptiveSecondary(for: effectiveColorScheme) : Color.adaptiveText(for: effectiveColorScheme))
+                            .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                     }
                     .buttonStyle(.plain)
 
@@ -350,7 +351,7 @@ struct HomeView: View {
                         } label: {
                             Image(systemName: "pin.fill")
                                 .font(.system(size: 12))
-                                .foregroundColor(selectedCourse?.id == course.id ? .deepTeal : Color.adaptiveText(for: effectiveColorScheme))
+                                .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
                         }
                         .buttonStyle(.plain)
                     }
@@ -372,7 +373,7 @@ struct HomeView: View {
                 } label: {
                     Label("Add Course", systemImage: "plus")
                         .font(.quicksand(17, weight: .medium))
-                        .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
+                        .foregroundColor(Color.adaptiveSecondaryText(for: effectiveColorScheme))
                 }
                 .buttonStyle(.plain)
                 .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
@@ -483,7 +484,7 @@ struct HomeView: View {
                 if let email = authManager.userEmail {
                     Text(email)
                         .font(.quicksand(14, weight: .regular))
-                        .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
+                        .foregroundColor(Color.adaptiveSecondaryText(for: effectiveColorScheme))
                         .lineLimit(1)
                 }
             }
@@ -818,6 +819,8 @@ struct HomeView: View {
                     let result = await DocumentTextExtractor.shared.extractText(from: fileURL)
 
                     await MainActor.run {
+                        // Skip if note was deleted while processing
+                        guard !note.isDeleted else { return }
                         // Update text extraction results
                         note.extractedText = result.text
                         note.extractionMethod = result.method
@@ -825,6 +828,10 @@ struct HomeView: View {
                         note.extractionStatus = result.text != nil ? .completed : .failed
                         note.isTextExtracted = true
                     }
+
+                    // Check deletion before continuing
+                    let wasDeleted = await MainActor.run { note.isDeleted }
+                    guard !wasDeleted else { return }
 
                     // Index for RAG if text extraction succeeded
                     if let text = result.text {
@@ -836,6 +843,7 @@ struct HomeView: View {
                                 text: text
                             )
                             await MainActor.run {
+                                guard !note.isDeleted else { return }
                                 note.isVectorIndexed = true
                             }
                         } catch {
@@ -845,6 +853,8 @@ struct HomeView: View {
 
                     // Extract questions if assignment mode is enabled
                     if isAssignment {
+                        let deleted = await MainActor.run { note.isDeleted }
+                        guard !deleted else { return }
                         await extractQuestions(for: note, fileURL: fileURL)
                     }
                 }
@@ -865,12 +875,14 @@ struct HomeView: View {
             )
 
             await MainActor.run {
+                guard !note.isDeleted else { return }
                 note.extractedQuestions = extractedQuestions
                 note.assignmentStatus = extractedQuestions.isEmpty ? .failed : .completed
             }
         } catch {
             print("Failed to extract questions: \(error)")
             await MainActor.run {
+                guard !note.isDeleted else { return }
                 // Silent fallback - note remains usable as regular document
                 note.assignmentStatus = .failed
             }

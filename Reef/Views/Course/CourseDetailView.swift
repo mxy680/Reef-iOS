@@ -42,7 +42,7 @@ struct CourseDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 32) {
+            VStack(alignment: .leading, spacing: 20) {
                 // Search Bar
                 searchBar
 
@@ -50,9 +50,10 @@ struct CourseDetailView: View {
                 if !debouncedSearchText.isEmpty {
                     searchResultsView
                 } else {
-                    contentCards
+                    // === BENTO TOP ROW ===
+                    bentoTopRow
 
-                    // Recent Notes Section
+                    // === RECENT DOCUMENTS ===
                     if !recentNotes.isEmpty {
                         recentNotesSection
                     }
@@ -80,7 +81,7 @@ struct CourseDetailView: View {
         HStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 16))
-                .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
+                .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
 
             TextField("Search notes, quizzes, and exams...", text: $searchText)
                 .font(.quicksand(16, weight: .regular))
@@ -93,7 +94,7 @@ struct CourseDetailView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 16))
-                        .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
+                        .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
                 }
                 .buttonStyle(.plain)
             }
@@ -108,50 +109,48 @@ struct CourseDetailView: View {
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.08 : 0.04), radius: 8, x: 0, y: 2)
     }
 
-    // MARK: - Content Cards
+    // MARK: - Bento Top Row
 
-    private var contentCards: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 20),
-            GridItem(.flexible(), spacing: 20),
-            GridItem(.flexible(), spacing: 20)
-        ], spacing: 20) {
-            // Notes Card
-            ContentCard(
-                title: "Notes",
-                icon: "doc.text",
+    private var bentoTopRow: some View {
+        HStack(spacing: 16) {
+            // Left: Notes hero card
+            NotesHeroCard(
                 count: course.notes.count,
                 colorScheme: colorScheme,
                 onTap: { onSelectSubPage("notes") }
             )
 
-            // Quizzes Card
-            ContentCard(
-                title: "Quizzes",
-                icon: "list.bullet.clipboard",
-                count: 0, // TODO: Add quizzes count when Quiz model is available
-                colorScheme: colorScheme,
-                onTap: { onSelectSubPage("quizzes") }
-            )
-
-            // Exams Card
-            ContentCard(
-                title: "Exams",
-                icon: "doc.text.magnifyingglass",
-                count: 0, // TODO: Add exams count when Exam model is available
-                colorScheme: colorScheme,
-                onTap: { onSelectSubPage("exams") }
-            )
+            // Right: Quizzes + Exams stacked
+            VStack(spacing: 16) {
+                BentoContentCard(
+                    title: "Quizzes",
+                    icon: "list.bullet.clipboard",
+                    count: 0,
+                    colorScheme: colorScheme,
+                    onTap: { onSelectSubPage("quizzes") }
+                )
+                BentoContentCard(
+                    title: "Exams",
+                    icon: "doc.text.magnifyingglass",
+                    count: 0,
+                    colorScheme: colorScheme,
+                    onTap: { onSelectSubPage("exams") }
+                )
+            }
         }
+        .frame(height: 256)
     }
 
     // MARK: - Recent Notes Section
 
     private var recentNotesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header
-            HStack {
-                Text("Recent Documents")
+            // Header with coral dot (matching dashboard style)
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color.deepCoral)
+                    .frame(width: 8, height: 8)
+                Text("Recent")
                     .font(.quicksand(18, weight: .semiBold))
                     .foregroundColor(Color.adaptiveText(for: colorScheme))
 
@@ -162,28 +161,28 @@ struct CourseDetailView: View {
                 } label: {
                     Text("View All")
                         .font(.quicksand(14, weight: .medium))
-                        .foregroundColor(.deepTeal)
+                        .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
                 }
                 .buttonStyle(.plain)
             }
 
-            // Recent notes list
+            // Recent notes list (dashboard card style)
             VStack(spacing: 0) {
                 ForEach(Array(recentNotes.enumerated()), id: \.element.id) { index, note in
                     Button {
                         onSelectNote(note)
                     } label: {
                         HStack(spacing: 12) {
-                            // Icon
+                            // Icon in tinted rounded rect
                             Image(systemName: note.fileTypeIcon)
                                 .font(.system(size: 18))
-                                .foregroundColor(.deepTeal)
+                                .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
                                 .frame(width: 40, height: 40)
-                                .background(Color.adaptiveBackground(for: colorScheme))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .background(Color.seafoam.opacity(colorScheme == .dark ? 0.2 : 0.4))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
 
                             // Title and date
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text(note.name)
                                     .font(.quicksand(16, weight: .medium))
                                     .foregroundColor(Color.adaptiveText(for: colorScheme))
@@ -192,34 +191,30 @@ struct CourseDetailView: View {
                                 if let lastOpened = note.lastOpenedAt {
                                     Text(lastOpened.relativeFormatted)
                                         .font(.quicksand(13, weight: .regular))
-                                        .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.5))
+                                        .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
                                 }
                             }
 
                             Spacer()
 
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.3))
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.5))
                         }
-                        .padding(14)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
 
                     if index < recentNotes.count - 1 {
                         Divider()
-                            .background(Color.adaptiveSecondary(for: colorScheme).opacity(0.08))
+                            .padding(.leading, 64)
                     }
                 }
             }
             .background(Color.adaptiveCardBackground(for: colorScheme))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.black.opacity(colorScheme == .dark ? 0.5 : 0.35), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.08 : 0.04), radius: 8, x: 0, y: 2)
+            .dashboardCard(colorScheme: colorScheme, cornerRadius: 16)
         }
     }
 
@@ -232,7 +227,7 @@ struct CourseDetailView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 40))
-                        .foregroundColor(Color.adaptiveSecondary(for: colorScheme).opacity(0.4))
+                        .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.4))
 
                     Text("No results found")
                         .font(.quicksand(18, weight: .semiBold))
@@ -240,7 +235,7 @@ struct CourseDetailView: View {
 
                     Text("Try a different search term")
                         .font(.quicksand(14, weight: .regular))
-                        .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
+                        .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 48)
@@ -255,7 +250,7 @@ struct CourseDetailView: View {
 
                             Text("(\(filteredNotes.count))")
                                 .font(.quicksand(14, weight: .regular))
-                                .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
+                                .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
 
                             Spacer()
 
@@ -264,7 +259,7 @@ struct CourseDetailView: View {
                             } label: {
                                 Text("View All")
                                     .font(.quicksand(14, weight: .medium))
-                                    .foregroundColor(.deepTeal)
+                                    .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
                             }
                             .buttonStyle(.plain)
                         }
@@ -289,43 +284,116 @@ struct CourseDetailView: View {
     }
 }
 
-// MARK: - Content Card
+// MARK: - Notes Hero Card
 
-struct ContentCard: View {
+struct NotesHeroCard: View {
+    let count: Int
+    let colorScheme: ColorScheme
+    let onTap: () -> Void
+
+    @State private var animatedCount: Int = 0
+
+    private var heroGradient: LinearGradient {
+        LinearGradient(
+            colors: colorScheme == .dark
+                ? [Color(hex: "2A5A5A"), .deepTeal]
+                : [.seafoam, .deepTeal],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 4) {
+                // Top: icon
+                HStack(alignment: .top) {
+                    Spacer()
+                    Image(systemName: "doc.text.fill")
+                        .font(.system(size: 32))
+                        .foregroundColor(.white.opacity(0.9))
+                }
+
+                Spacer(minLength: 0)
+
+                // Bottom: count + label
+                Text("\(animatedCount)")
+                    .font(.dynaPuff(64, weight: .bold))
+                    .foregroundColor(.white)
+                    .contentTransition(.numericText())
+
+                Text("notes")
+                    .font(.quicksand(16, weight: .medium))
+                    .foregroundColor(.white.opacity(0.85))
+
+                Text("View all \(Image(systemName: "arrow.right"))")
+                    .font(.quicksand(13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.85))
+                    .padding(.top, 2)
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .background(heroGradient)
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(Color.black.opacity(colorScheme == .dark ? 0.35 : 0.4), lineWidth: 1.5)
+            )
+            .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.8)) {
+                animatedCount = count
+            }
+        }
+        .onChange(of: count) { _, newValue in
+            withAnimation(.easeOut(duration: 0.5)) {
+                animatedCount = newValue
+            }
+        }
+    }
+}
+
+// MARK: - Bento Content Card
+
+struct BentoContentCard: View {
     let title: String
     let icon: String
     let count: Int
     let colorScheme: ColorScheme
     let onTap: () -> Void
 
+    private var cardBackground: Color {
+        colorScheme == .dark ? Color.warmDarkCard : .white
+    }
+
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 16) {
-                // Icon
+            HStack(spacing: 14) {
                 Image(systemName: icon)
-                    .font(.system(size: 40))
+                    .font(.system(size: 28))
                     .foregroundColor(.deepTeal)
 
-                // Title
-                Text(title)
-                    .font(.quicksand(18, weight: .semiBold))
-                    .foregroundColor(Color.adaptiveText(for: colorScheme))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(count)")
+                        .font(.quicksand(28, weight: .bold))
+                        .foregroundColor(Color.adaptiveText(for: colorScheme))
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
 
-                // Count
-                Text("\(count) items")
-                    .font(.quicksand(14, weight: .regular))
-                    .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.5))
+                    Text(title.lowercased())
+                        .font(.quicksand(13, weight: .regular))
+                        .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
+                        .lineLimit(1)
+                }
+
+                Spacer()
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
-            .background(Color.adaptiveCardBackground(for: colorScheme))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.black.opacity(colorScheme == .dark ? 0.5 : 0.35), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.12 : 0.06), radius: 12, x: 0, y: 4)
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.06 : 0.03), radius: 3, x: 0, y: 1)
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(cardBackground)
+            .dashboardCard(colorScheme: colorScheme)
         }
         .buttonStyle(.plain)
     }
@@ -343,7 +411,7 @@ struct SearchResultRow: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 18))
-                .foregroundColor(.deepTeal)
+                .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
                 .frame(width: 40, height: 40)
                 .background(Color.adaptiveBackground(for: colorScheme))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -356,7 +424,7 @@ struct SearchResultRow: View {
 
                 Text(subtitle)
                     .font(.quicksand(14, weight: .regular))
-                    .foregroundColor(Color.adaptiveSecondary(for: colorScheme))
+                    .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
             }
 
             Spacer()
