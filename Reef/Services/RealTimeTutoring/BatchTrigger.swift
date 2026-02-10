@@ -2,14 +2,13 @@
 //  BatchTrigger.swift
 //  Reef
 //
-//  Timer-based trigger that fires when:
-//  - At least one stroke is pending AND
-//  - Time since last send >= interval
+//  Debounce-based trigger that fires 2s after the last drawing activity
+//  (stroke added or erased). Ensures screenshots are only sent on pauses.
 //
 
 import Foundation
 
-/// Fires a callback when a batch of strokes should be sent.
+/// Fires a callback when a batch of strokes should be sent (after a drawing pause).
 final class BatchTrigger {
 
     // MARK: - Configuration
@@ -18,11 +17,11 @@ final class BatchTrigger {
 
     // MARK: - State
 
-    /// Number of strokes pending since last batch
-    private var pendingStrokeCount: Int = 0
+    /// Whether any drawing changes have occurred since the last batch
+    private var hasChanges: Bool = false
 
-    /// When the last batch was sent (or when tracking started)
-    private var lastSendTime: Date = Date()
+    /// Timestamp of the most recent drawing activity
+    private var lastActivityTime: Date = Date()
 
     /// Timer for periodic condition checks
     private var checkTimer: Timer?
@@ -49,7 +48,7 @@ final class BatchTrigger {
     func start() {
         guard !isActive else { return }
         isActive = true
-        lastSendTime = Date()
+        lastActivityTime = Date()
         let timer = Timer(timeInterval: config.checkInterval, repeats: true) { [weak self] _ in
             self?.checkConditions()
         }
@@ -66,28 +65,30 @@ final class BatchTrigger {
 
     // MARK: - Public Methods
 
-    /// Record that a new stroke was added to the pending buffer
-    func recordStrokeAdded() {
-        pendingStrokeCount += 1
+    /// Record that drawing activity occurred (stroke added or erased).
+    /// Resets the debounce timer so the batch fires after the configured
+    /// interval of inactivity.
+    func recordActivity() {
+        lastActivityTime = Date()
+        hasChanges = true
     }
 
-    /// Record that a batch was sent (resets counters)
+    /// Record that a batch was sent (resets the changes flag)
     func recordBatchSent() {
-        pendingStrokeCount = 0
-        lastSendTime = Date()
+        hasChanges = false
     }
 
     /// Reset all state
     func reset() {
-        pendingStrokeCount = 0
-        lastSendTime = Date()
+        hasChanges = false
+        lastActivityTime = Date()
     }
 
     // MARK: - Private
 
     private func checkConditions() {
-        guard pendingStrokeCount >= 1,
-              Date().timeIntervalSince(lastSendTime) >= config.interval else { return }
+        guard hasChanges,
+              Date().timeIntervalSince(lastActivityTime) >= config.interval else { return }
         fire()
     }
 

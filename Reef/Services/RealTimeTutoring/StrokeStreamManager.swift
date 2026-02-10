@@ -3,7 +3,10 @@
 //  Reef
 //
 //  Central orchestrator for the real-time tutoring stroke pipeline.
-//  Receives strokes → classifies → buffers → triggers → renders → fires callback.
+//  Tracks three stroke categories for full-canvas rendering:
+//    - transcribed (gray): sent in previous batches, still on canvas
+//    - new (black): added since last batch
+//    - erased (red): removed since last batch
 //
 
 import Foundation
@@ -31,11 +34,14 @@ final class StrokeStreamManager {
 
     // MARK: - State
 
-    /// Strokes pending in the current batch
-    private var pendingStrokes: [StrokeMetadata] = []
+    /// Strokes that have been sent in previous batches and are still on the canvas
+    private var transcribedStrokes: [StrokeMetadata] = []
 
-    /// Strokes from the last batch (used as gray context for rendering)
-    private var previousBatchStrokes: [PKStroke] = []
+    /// Strokes added since the last batch (will render in black)
+    private var newStrokes: [StrokeMetadata] = []
+
+    /// Strokes erased since the last batch (will render in red)
+    private var erasedStrokes: [StrokeMetadata] = []
 
     /// Annotation state accumulated across batches
     private var annotationState = AnnotationProcessor.AnnotationState()
@@ -97,11 +103,36 @@ final class StrokeStreamManager {
             label: label,
             features: features,
             startPoint: startPoint,
-            endPoint: endPoint
+            endPoint: endPoint,
+            fingerprint: StrokeFingerprint(stroke: stroke)
         )
 
-        pendingStrokes.append(metadata)
-        batchTrigger.recordStrokeAdded()
+        newStrokes.append(metadata)
+        batchTrigger.recordActivity()
+    }
+
+    /// Record that strokes were erased from the canvas.
+    /// Matches removed strokes against transcribed + new strokes by fingerprint,
+    /// moves matches to the erased array for red rendering.
+    func recordErasure(removedStrokes: [PKStroke]) {
+        for removed in removedStrokes {
+            let removedFP = StrokeFingerprint(stroke: removed)
+
+            // Check transcribed strokes first
+            if let idx = transcribedStrokes.firstIndex(where: { $0.fingerprint == removedFP }) {
+                let meta = transcribedStrokes.remove(at: idx)
+                erasedStrokes.append(meta)
+                continue
+            }
+
+            // Check new strokes (erasing something drawn since last batch)
+            if let idx = newStrokes.firstIndex(where: { $0.fingerprint == removedFP }) {
+                // Erasing a not-yet-sent stroke — just remove it, no need to render in red
+                newStrokes.remove(at: idx)
+                continue
+            }
+        }
+        batchTrigger.recordActivity()
     }
 
     /// Update the active tool (affects classification behavior).
@@ -116,8 +147,9 @@ final class StrokeStreamManager {
 
     /// Reset all state (e.g., when switching documents).
     func reset() {
-        pendingStrokes.removeAll()
-        previousBatchStrokes.removeAll()
+        transcribedStrokes.removeAll()
+        newStrokes.removeAll()
+        erasedStrokes.removeAll()
         annotationState = AnnotationProcessor.AnnotationState()
         batchIndex = 0
         batchTrigger.reset()
@@ -132,31 +164,36 @@ final class StrokeStreamManager {
     }
 
     private func processBatch() {
-        guard !pendingStrokes.isEmpty else { return }
+        guard !newStrokes.isEmpty || !erasedStrokes.isEmpty else { return }
 
-        // Snapshot and clear pending strokes
-        let batchStrokes = pendingStrokes
-        pendingStrokes.removeAll()
+        // Snapshot current state
+        let batchNewStrokes = newStrokes
+        let batchErasedStrokes = erasedStrokes
         batchTrigger.recordBatchSent()
 
-        // Separate content vs annotation strokes
-        let contentMeta = batchStrokes.filter { !$0.label.isAnnotation }
-        let annotationMeta = batchStrokes.filter { $0.label.isAnnotation }
+        // Separate content vs annotation strokes from new strokes
+        let contentMeta = batchNewStrokes.filter { !$0.label.isAnnotation }
+        let annotationMeta = batchNewStrokes.filter { $0.label.isAnnotation }
 
         // Process annotations
         if !annotationMeta.isEmpty {
             AnnotationProcessor.process(annotations: annotationMeta, state: &annotationState)
         }
 
-        // Render content strokes to image
-        let contentStrokes = contentMeta.map { $0.stroke }
+        // Render full canvas with three colors
+        let transcribedPKStrokes = transcribedStrokes.map { $0.stroke }
+        let newPKStrokes = contentMeta.map { $0.stroke }
+        let erasedPKStrokes = batchErasedStrokes.map { $0.stroke }
+
         let renderResult = BatchRenderer.render(
-            contentStrokes: contentStrokes,
-            contextStrokes: previousBatchStrokes
+            transcribedStrokes: transcribedPKStrokes,
+            newStrokes: newPKStrokes,
+            erasedStrokes: erasedPKStrokes
         )
 
-        // Determine primary page index (most common page)
-        let pageIndices = batchStrokes.compactMap { $0.pageIndex }
+        // Determine primary page index (most common page among new strokes)
+        let allBatchStrokes = batchNewStrokes
+        let pageIndices = allBatchStrokes.compactMap { $0.pageIndex }
         let primaryPage: Int?
         if !pageIndices.isEmpty {
             let counts = Dictionary(grouping: pageIndices, by: { $0 }).mapValues { $0.count }
@@ -167,7 +204,7 @@ final class StrokeStreamManager {
 
         // Resolve subquestion from stroke positions (if in assignment mode)
         var subquestionLabel: String? = nil
-        if let qCtx = questionContext, let lastStroke = batchStrokes.last {
+        if let qCtx = questionContext, let lastStroke = allBatchStrokes.last {
             let pdfY = CoordinateMapper.canvasToPDFY(lastStroke.endPoint.y)
             let page = lastStroke.pageIndex ?? 0
             if let resolved = RegionResolver.resolve(pdfY: pdfY, page: page, regionData: qCtx.regionData) {
@@ -181,7 +218,8 @@ final class StrokeStreamManager {
             contentBounds: renderResult?.contentBounds ?? .zero,
             strokeCount: contentMeta.count,
             annotationCount: annotationMeta.count,
-            strokeMetadata: batchStrokes,
+            hasErasures: !batchErasedStrokes.isEmpty,
+            strokeMetadata: allBatchStrokes,
             primaryPageIndex: primaryPage,
             timestamp: Date(),
             questionNumber: questionContext?.questionNumber,
@@ -190,8 +228,10 @@ final class StrokeStreamManager {
 
         batchIndex += 1
 
-        // Store content strokes as context for next batch
-        previousBatchStrokes = contentStrokes.suffix(2).map { $0 }
+        // Move new content strokes to transcribed; clear erased
+        transcribedStrokes.append(contentsOf: contentMeta)
+        newStrokes.removeAll()
+        erasedStrokes.removeAll()
 
         onBatchReady?(payload)
     }

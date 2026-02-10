@@ -201,6 +201,8 @@ struct DrawingOverlayView: UIViewRepresentable {
         // Pause detection — fires pause messages for AI tutoring reasoning triggers
         private let pauseDetector = PauseDetector()
         private var previousStrokeCount: Int = 0
+        /// Snapshot of strokes from last change, used for erasure detection via fingerprint diff
+        private var previousStrokes: [PKStroke] = []
         var onPauseDetectedCallback: ((PauseContext) -> Void)?
 
         // Real-time tutoring
@@ -225,12 +227,13 @@ struct DrawingOverlayView: UIViewRepresentable {
                         location += " part \(sub)"
                     }
                 }
-                print("[StrokeStream] Sending screenshot: \(payload.strokeCount) strokes, \(imageData.count) bytes\(location)")
+                print("[StrokeStream] Sending screenshot: \(payload.strokeCount) strokes, \(imageData.count) bytes, erasures=\(payload.hasErasures)\(location)")
                 self?.tutoringService?.sendScreenshot(
                     imageData: imageData,
                     batchIndex: payload.batchIndex,
                     questionNumber: payload.questionNumber,
-                    subquestion: payload.subquestionLabel
+                    subquestion: payload.subquestionLabel,
+                    hasErasures: payload.hasErasures
                 )
             }
             strokeStreamManager.start()
@@ -249,6 +252,26 @@ struct DrawingOverlayView: UIViewRepresentable {
 
         private func handlePauseDetected(_ context: PauseContext) {
             onPauseDetectedCallback?(context)
+        }
+
+        /// Find strokes present in `previous` but missing from `current` using fingerprint comparison.
+        private func findRemovedStrokes(previous: [PKStroke], current: [PKStroke]) -> [PKStroke] {
+            let currentFingerprints = current.map { StrokeFingerprint(stroke: $0) }
+            var removed: [PKStroke] = []
+            var usedIndices = Set<Int>()
+
+            for stroke in previous {
+                let fp = StrokeFingerprint(stroke: stroke)
+                // Find a matching fingerprint in current that hasn't been used yet
+                if let matchIdx = currentFingerprints.indices.first(where: { idx in
+                    !usedIndices.contains(idx) && currentFingerprints[idx] == fp
+                }) {
+                    usedIndices.insert(matchIdx)
+                } else {
+                    removed.append(stroke)
+                }
+            }
+            return removed
         }
 
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
@@ -270,6 +293,7 @@ struct DrawingOverlayView: UIViewRepresentable {
                 strokes[strokes.count - 1] = replacement
                 canvasView.drawing = PKDrawing(strokes: strokes)
                 previousStrokeCount = canvasView.drawing.strokes.count
+                previousStrokes = canvasView.drawing.strokes
                 DispatchQueue.main.async { self.isReplacingStroke = false }
 
                 // Trigger debounced save
@@ -284,17 +308,29 @@ struct DrawingOverlayView: UIViewRepresentable {
                 return
             }
 
+            let currentStrokes = canvasView.drawing.strokes
+
             // Detect new strokes for pause detection and stroke stream
             // Skip eraser — bitmap eraser modifies strokes in-place, which can
             // cause false positives even with the count guard
             if currentStrokeCount > previousStrokeCount,
                currentTool != .eraser,
-               let latestStroke = canvasView.drawing.strokes.last {
+               let latestStroke = currentStrokes.last {
                 let pageIndex = container?.pageContainers.firstIndex(where: { $0.canvasView === canvasView })
                 strokeStreamManager.recordStroke(latestStroke, pageIndex: pageIndex)
                 pauseDetector.recordStrokeCompleted(stroke: latestStroke, pageIndex: pageIndex)
             }
+
+            // Detect erasures (vector eraser or undo — stroke count decreased)
+            if currentStrokeCount < previousStrokeCount {
+                let removedStrokes = findRemovedStrokes(previous: previousStrokes, current: currentStrokes)
+                if !removedStrokes.isEmpty {
+                    strokeStreamManager.recordErasure(removedStrokes: removedStrokes)
+                }
+            }
+
             previousStrokeCount = currentStrokeCount
+            previousStrokes = currentStrokes
 
             // Debounced save callback (500ms)
             drawingChangeTask?.cancel()

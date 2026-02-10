@@ -82,7 +82,8 @@ final class TutoringWebSocketService: ObservableObject {
         imageData: Data,
         batchIndex: Int,
         questionNumber: Int?,
-        subquestion: String?
+        subquestion: String?,
+        hasErasures: Bool = false
     ) {
         ensureConnected()
 
@@ -92,6 +93,7 @@ final class TutoringWebSocketService: ObservableObject {
             "batch_index": batchIndex,
             "question_number": questionNumber as Any,
             "subquestion": subquestion as Any,
+            "has_erasures": hasErasures,
         ]
         sendJSON(payload)
     }

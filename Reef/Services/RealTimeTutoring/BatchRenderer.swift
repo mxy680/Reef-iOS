@@ -3,7 +3,7 @@
 //  Reef
 //
 //  Renders stroke batches to JPEG images using PKDrawing's native rendering.
-//  Recolors context strokes gray and new content strokes black.
+//  Three-color scheme: gray (transcribed), black (new), red (erased).
 //
 
 import UIKit
@@ -28,33 +28,44 @@ enum BatchRenderer {
 
     // MARK: - Rendering
 
-    /// Render content strokes to JPEG data with optional context strokes in gray.
+    /// Render the full canvas with three stroke colors for the LLM.
     /// - Parameters:
-    ///   - contentStrokes: New strokes to render in black
-    ///   - contextStrokes: Previous overlap strokes to render in gray
-    /// - Returns: JPEG data and the content bounding rect, or nil if no strokes
+    ///   - transcribedStrokes: Already-transcribed strokes → rendered in gray
+    ///   - newStrokes: New strokes since last batch → rendered in black
+    ///   - erasedStrokes: Erased strokes since last batch → rendered in red
+    /// - Returns: JPEG data and the content bounding rect, or nil if all arrays are empty
     static func render(
-        contentStrokes: [PKStroke],
-        contextStrokes: [PKStroke] = []
+        transcribedStrokes: [PKStroke],
+        newStrokes: [PKStroke],
+        erasedStrokes: [PKStroke] = []
     ) -> (imageData: Data, contentBounds: CGRect)? {
-        guard !contentStrokes.isEmpty else { return nil }
+        guard !transcribedStrokes.isEmpty || !newStrokes.isEmpty || !erasedStrokes.isEmpty else {
+            return nil
+        }
 
-        // Recolor context strokes to gray
-        let grayContext = contextStrokes.map { stroke -> PKStroke in
+        // Recolor transcribed strokes to gray (background layer)
+        let grayStrokes = transcribedStrokes.map { stroke -> PKStroke in
             var recolored = stroke
             recolored.ink = PKInk(stroke.ink.inkType, color: .gray)
             return recolored
         }
 
-        // Recolor content strokes to black
-        let blackContent = contentStrokes.map { stroke -> PKStroke in
+        // Recolor erased strokes to red (middle layer)
+        let redStrokes = erasedStrokes.map { stroke -> PKStroke in
+            var recolored = stroke
+            recolored.ink = PKInk(stroke.ink.inkType, color: .red)
+            return recolored
+        }
+
+        // Recolor new strokes to black (top layer)
+        let blackStrokes = newStrokes.map { stroke -> PKStroke in
             var recolored = stroke
             recolored.ink = PKInk(stroke.ink.inkType, color: .black)
             return recolored
         }
 
-        // Combine all strokes
-        let allStrokes = grayContext + blackContent
+        // Render order: gray first (background), then red, then black (top)
+        let allStrokes = grayStrokes + redStrokes + blackStrokes
         let drawing = PKDrawing(strokes: allStrokes)
 
         // Compute bounding box of all strokes with padding

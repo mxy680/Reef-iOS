@@ -25,6 +25,9 @@ struct BatchPayload {
     /// Number of annotation strokes in this batch
     let annotationCount: Int
 
+    /// Whether erased strokes are present (tells server to expect corrected_transcript)
+    let hasErasures: Bool
+
     /// Metadata for all strokes in this batch
     let strokeMetadata: [StrokeMetadata]
 
