@@ -45,6 +45,7 @@ struct DrawingOverlayView: UIViewRepresentable {
     var textColor: UIColor = .black
     var recognitionEnabled: Bool = false
     var pauseSensitivity: Double = 0.5
+    var questionContext: StrokeStreamManager.QuestionContext? = nil
     var onCanvasReady: (CanvasContainerView) -> Void = { _ in }
     var onUndoStateChanged: (Bool) -> Void = { _ in }
     var onRedoStateChanged: (Bool) -> Void = { _ in }
@@ -120,6 +121,9 @@ struct DrawingOverlayView: UIViewRepresentable {
         context.coordinator.pauseSensitivity = pauseSensitivity
         context.coordinator.onRecognitionResult = onRecognitionResult
         context.coordinator.onPauseDetectedCallback = onPauseDetected
+
+        // Keep stroke stream question context in sync
+        context.coordinator.strokeStreamManager.updateQuestionContext(questionContext)
     }
 
     private func updateTool(_ canvasView: PKCanvasView) {
@@ -150,6 +154,9 @@ struct DrawingOverlayView: UIViewRepresentable {
             canvasView.isUserInteractionEnabled = true
         case .textBox:
             // Disable PencilKit drawing — text overlay handles input
+            canvasView.isUserInteractionEnabled = false
+        case .pan:
+            // Disable PencilKit drawing — let touches pass through to scroll view
             canvasView.isUserInteractionEnabled = false
         }
     }
@@ -183,6 +190,7 @@ struct DrawingOverlayView: UIViewRepresentable {
         var currentTool: CanvasTool = .pen {
             didSet {
                 updatePauseDetectorState()
+                strokeStreamManager.updateTool(currentTool)
             }
         }
         var currentPenColor: UIColor = .black
@@ -194,18 +202,36 @@ struct DrawingOverlayView: UIViewRepresentable {
         private var previousStrokeCount: Int = 0
         var onPauseDetectedCallback: ((PauseContext) -> Void)?
 
+        // Real-time tutoring stroke pipeline
+        let strokeStreamManager = StrokeStreamManager()
+
         // Shape detection — prevents re-entrant callbacks when replacing a stroke
         private var isReplacingStroke: Bool = false
 
         override init() {
             super.init()
             setupPauseDetector()
+            setupStrokeStreamManager()
         }
 
         private func setupPauseDetector() {
             pauseDetector.onPauseDetected = { [weak self] context in
                 self?.handlePauseDetected(context)
             }
+        }
+
+        private func setupStrokeStreamManager() {
+            strokeStreamManager.onBatchReady = { payload in
+                var location = ""
+                if let q = payload.questionNumber {
+                    location = " | Q\(q)"
+                    if let sub = payload.subquestionLabel {
+                        location += " part \(sub)"
+                    }
+                }
+                print("[StrokeStream] Batch #\(payload.batchIndex): \(payload.strokeCount) content + \(payload.annotationCount) annotations, image: \(payload.imageData?.count ?? 0) bytes\(location)")
+            }
+            strokeStreamManager.start()
         }
 
         private func handlePauseDetected(_ context: PauseContext) {
@@ -253,11 +279,15 @@ struct DrawingOverlayView: UIViewRepresentable {
                 return
             }
 
-            // Detect new strokes for pause detection
+            // Detect new strokes for pause detection and stroke stream
+            // Skip eraser — bitmap eraser modifies strokes in-place, which can
+            // cause false positives even with the count guard
             if currentStrokeCount > previousStrokeCount,
+               currentTool != .eraser,
                let latestStroke = canvasView.drawing.strokes.last {
                 let pageIndex = container?.pageContainers.firstIndex(where: { $0.canvasView === canvasView })
                 pauseDetector.recordStrokeCompleted(stroke: latestStroke, pageIndex: pageIndex)
+                strokeStreamManager.recordStroke(latestStroke, pageIndex: pageIndex)
             }
             previousStrokeCount = currentStrokeCount
 
@@ -1401,7 +1431,11 @@ class PageContainerView: UIView {
         canvasView.translatesAutoresizingMaskIntoConstraints = false
         canvasView.backgroundColor = .clear
         canvasView.isOpaque = false
+        #if targetEnvironment(simulator)
+        canvasView.drawingPolicy = .anyInput
+        #else
         canvasView.drawingPolicy = .pencilOnly
+        #endif
         addSubview(canvasView)
 
         // Text box container view (above canvas)

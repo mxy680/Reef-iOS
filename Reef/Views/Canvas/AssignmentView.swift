@@ -91,6 +91,13 @@ struct AssignmentView: View {
                         isRulerActive: isRulerActive,
                         textSize: textSize,
                         textColor: textColor,
+                        questionContext: currentQuestion.map { q in
+                            StrokeStreamManager.QuestionContext(
+                                questionIndex: currentIndex,
+                                questionNumber: q.questionNumber,
+                                regionData: q.regionData
+                            )
+                        },
                         onCanvasReady: onCanvasReady,
                         onUndoStateChanged: onUndoStateChanged,
                         onRedoStateChanged: onRedoStateChanged,

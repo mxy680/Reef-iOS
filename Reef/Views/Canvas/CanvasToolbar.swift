@@ -16,13 +16,14 @@ enum CanvasTool: Equatable {
     case lasso
     case diagram
     case textBox
+    case pan
 }
 
 extension CanvasTool {
     var hasSecondaryOptions: Bool {
         switch self {
         case .pen, .highlighter, .eraser, .diagram, .textBox: return true
-        case .lasso: return false
+        case .lasso, .pan: return false
         }
     }
 }
@@ -485,6 +486,14 @@ struct CanvasToolbar: View {
                 action: { selectTool(.lasso) }
             )
 
+            // Pan (scroll/zoom) — useful in simulator where finger = draw
+            ToolbarButton(
+                icon: "hand.draw",
+                isSelected: selectedTool == .pan,
+                colorScheme: colorScheme,
+                action: { selectTool(.pan) }
+            )
+
             // --- Canvas utilities ---
 
             // Ruler toggle
@@ -664,7 +673,7 @@ struct CanvasToolbar: View {
                             customPenColors: $customPenColors,
                             colorScheme: colorScheme
                         )
-                    case .lasso:
+                    case .lasso, .pan:
                         EmptyView()
                     }
                 }
