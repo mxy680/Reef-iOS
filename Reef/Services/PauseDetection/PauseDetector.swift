@@ -16,7 +16,7 @@ final class PauseDetector {
     // MARK: - Configuration
 
     /// Minimum pause duration before triggering (in seconds)
-    private let minimumPauseDuration: TimeInterval = 0.8
+    private let minimumPauseDuration: TimeInterval = 0.4
 
     /// Window for tracking stroke rate (in seconds)
     private let strokeRateWindow: TimeInterval = 2.0

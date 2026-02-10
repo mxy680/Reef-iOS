@@ -52,6 +52,7 @@ struct DrawingOverlayView: UIViewRepresentable {
     var onRecognitionResult: (RecognitionResult) -> Void = { _ in }
     var onDrawingChanged: (PKDrawing) -> Void = { _ in }
     var onPauseDetected: ((PauseContext) -> Void)? = nil
+    var tutoringService: TutoringWebSocketService? = nil
     var onSwipeLeft: (() -> Void)? = nil
     var onSwipeRight: (() -> Void)? = nil
 
@@ -65,6 +66,7 @@ struct DrawingOverlayView: UIViewRepresentable {
         context.coordinator.recognitionEnabled = recognitionEnabled
         context.coordinator.pauseSensitivity = pauseSensitivity
         context.coordinator.onPauseDetectedCallback = onPauseDetected
+        context.coordinator.tutoringService = tutoringService
         container.onSwipeLeft = onSwipeLeft
         container.onSwipeRight = onSwipeRight
 
@@ -189,7 +191,6 @@ struct DrawingOverlayView: UIViewRepresentable {
         // Tool state
         var currentTool: CanvasTool = .pen {
             didSet {
-                updatePauseDetectorState()
                 strokeStreamManager.updateTool(currentTool)
             }
         }
@@ -197,12 +198,13 @@ struct DrawingOverlayView: UIViewRepresentable {
         var currentPenWidth: CGFloat = 4.0
         var diagramAutosnap: Bool = true
 
-        // Pause detection
-        private let pauseDetector = PauseDetector()
+        // Pause detection (disabled — stroke stream handles batching now)
+        // private let pauseDetector = PauseDetector()
         private var previousStrokeCount: Int = 0
         var onPauseDetectedCallback: ((PauseContext) -> Void)?
 
-        // Real-time tutoring stroke pipeline
+        // Real-time tutoring
+        var tutoringService: TutoringWebSocketService?
         let strokeStreamManager = StrokeStreamManager()
 
         // Shape detection — prevents re-entrant callbacks when replacing a stroke
@@ -210,18 +212,12 @@ struct DrawingOverlayView: UIViewRepresentable {
 
         override init() {
             super.init()
-            setupPauseDetector()
             setupStrokeStreamManager()
         }
 
-        private func setupPauseDetector() {
-            pauseDetector.onPauseDetected = { [weak self] context in
-                self?.handlePauseDetected(context)
-            }
-        }
-
         private func setupStrokeStreamManager() {
-            strokeStreamManager.onBatchReady = { payload in
+            strokeStreamManager.onBatchReady = { [weak self] payload in
+                guard let imageData = payload.imageData else { return }
                 var location = ""
                 if let q = payload.questionNumber {
                     location = " | Q\(q)"
@@ -229,21 +225,19 @@ struct DrawingOverlayView: UIViewRepresentable {
                         location += " part \(sub)"
                     }
                 }
-                print("[StrokeStream] Batch #\(payload.batchIndex): \(payload.strokeCount) content + \(payload.annotationCount) annotations, image: \(payload.imageData?.count ?? 0) bytes\(location)")
+                print("[StrokeStream] 📸 Sending screenshot: \(payload.strokeCount) strokes, \(imageData.count) bytes\(location)")
+                self?.tutoringService?.sendScreenshot(
+                    imageData: imageData,
+                    batchIndex: payload.batchIndex,
+                    questionNumber: payload.questionNumber,
+                    subquestion: payload.subquestionLabel
+                )
             }
             strokeStreamManager.start()
         }
 
         private func handlePauseDetected(_ context: PauseContext) {
-            print("[PauseDetector] Pause detected: \(String(format: "%.1f", context.duration))s after \(context.strokeCount) strokes (tool: \(context.lastTool), velocity: \(String(format: "%.1f", context.lastStrokeVelocity)) pts/s)")
             onPauseDetectedCallback?(context)
-        }
-
-        private func updatePauseDetectorState() {
-            let isScrolling = container?.scrollView.isDragging == true ||
-                              container?.scrollView.isDecelerating == true ||
-                              container?.scrollView.isZooming == true
-            pauseDetector.update(currentTool: currentTool, isScrolling: isScrolling)
         }
 
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
@@ -286,7 +280,6 @@ struct DrawingOverlayView: UIViewRepresentable {
                currentTool != .eraser,
                let latestStroke = canvasView.drawing.strokes.last {
                 let pageIndex = container?.pageContainers.firstIndex(where: { $0.canvasView === canvasView })
-                pauseDetector.recordStrokeCompleted(stroke: latestStroke, pageIndex: pageIndex)
                 strokeStreamManager.recordStroke(latestStroke, pageIndex: pageIndex)
             }
             previousStrokeCount = currentStrokeCount
@@ -304,12 +297,10 @@ struct DrawingOverlayView: UIViewRepresentable {
         }
 
         func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
-            updatePauseDetectorState()
         }
 
         func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
             updateUndoRedoState(canvasView)
-            pauseDetector.recordToolEnded()
         }
 
         private func updateUndoRedoState(_ canvasView: PKCanvasView) {

@@ -38,6 +38,8 @@ struct AssignmentView: View {
     var onUndoStateChanged: (Bool) -> Void = { _ in }
     var onRedoStateChanged: (Bool) -> Void = { _ in }
 
+    @StateObject private var tutoringService = TutoringWebSocketService()
+
     private var questions: [ExtractedQuestion] {
         note.extractedQuestions
     }
@@ -91,6 +93,7 @@ struct AssignmentView: View {
                         isRulerActive: isRulerActive,
                         textSize: textSize,
                         textColor: textColor,
+                        tutoringService: tutoringService,
                         questionContext: currentQuestion.map { q in
                             StrokeStreamManager.QuestionContext(
                                 questionIndex: currentIndex,
@@ -120,6 +123,23 @@ struct AssignmentView: View {
                     .background(isDarkMode ? Color.warmDark : Color.blushWhite)
                 }
             }
+        }
+        .onAppear {
+            setupTutoringCallbacks()
+            tutoringService.connect()
+        }
+        .onDisappear {
+            tutoringService.disconnect()
+        }
+        .onChange(of: currentIndex) { _ in
+            tutoringService.disconnect()
+            tutoringService.connect()
+        }
+    }
+
+    private func setupTutoringCallbacks() {
+        tutoringService.onTranscriptionComplete = { text, batchIndex in
+            print("[Tutor] Transcription (batch #\(batchIndex)): \(text)")
         }
     }
 }

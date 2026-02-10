@@ -97,27 +97,11 @@ final class BatchTrigger {
     private func checkConditions() {
         guard pendingStrokeCount > 0 else { return }
 
-        let now = Date()
-
-        // Condition 1: Stroke count threshold
-        if pendingStrokeCount >= config.strokeCountThreshold {
-            fire()
-            return
-        }
-
-        // Condition 2: Max time since last send
-        let timeSinceLastSend = now.timeIntervalSince(lastSendTime)
-        if timeSinceLastSend >= config.maxTimeSinceLastSend {
-            fire()
-            return
-        }
-
-        // Condition 3: Pencil lift delay
+        // Single condition: pencil lifted for >= liftDelay
         if let liftTime = lastPencilLiftTime {
-            let timeSinceLift = now.timeIntervalSince(liftTime)
+            let timeSinceLift = Date().timeIntervalSince(liftTime)
             if timeSinceLift >= config.pencilLiftDelay {
                 fire()
-                return
             }
         }
     }

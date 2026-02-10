@@ -16,7 +16,7 @@ struct BatchTriggerConfig {
     var maxTimeSinceLastSend: TimeInterval = 1.5
 
     /// Trigger when time since pencil lift exceeds this (seconds), if pending >= 1
-    var pencilLiftDelay: TimeInterval = 0.4
+    var pencilLiftDelay: TimeInterval = 1.0
 
     /// How often to check trigger conditions (seconds)
     var checkInterval: TimeInterval = 0.1
