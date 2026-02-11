@@ -44,15 +44,11 @@ struct DrawingOverlayView: UIViewRepresentable {
     var textSize: CGFloat = 16
     var textColor: UIColor = .black
     var recognitionEnabled: Bool = false
-    var pauseSensitivity: Double = 0.5
-    var questionContext: StrokeStreamManager.QuestionContext? = nil
     var onCanvasReady: (CanvasContainerView) -> Void = { _ in }
     var onUndoStateChanged: (Bool) -> Void = { _ in }
     var onRedoStateChanged: (Bool) -> Void = { _ in }
     var onRecognitionResult: (RecognitionResult) -> Void = { _ in }
     var onDrawingChanged: (PKDrawing) -> Void = { _ in }
-    var onPauseDetected: ((PauseContext) -> Void)? = nil
-    var tutoringService: TutoringWebSocketService? = nil
     var onSwipeLeft: (() -> Void)? = nil
     var onSwipeRight: (() -> Void)? = nil
 
@@ -64,9 +60,6 @@ struct DrawingOverlayView: UIViewRepresentable {
         context.coordinator.onRecognitionResult = onRecognitionResult
         context.coordinator.onDrawingChanged = onDrawingChanged
         context.coordinator.recognitionEnabled = recognitionEnabled
-        context.coordinator.pauseSensitivity = pauseSensitivity
-        context.coordinator.onPauseDetectedCallback = onPauseDetected
-        context.coordinator.tutoringService = tutoringService
         container.onSwipeLeft = onSwipeLeft
         container.onSwipeRight = onSwipeRight
 
@@ -120,12 +113,7 @@ struct DrawingOverlayView: UIViewRepresentable {
 
         // Keep recognition settings in sync
         context.coordinator.recognitionEnabled = recognitionEnabled
-        context.coordinator.pauseSensitivity = pauseSensitivity
         context.coordinator.onRecognitionResult = onRecognitionResult
-        context.coordinator.onPauseDetectedCallback = onPauseDetected
-
-        // Keep stroke stream question context in sync
-        context.coordinator.strokeStreamManager.updateQuestionContext(questionContext)
     }
 
     private func updateTool(_ canvasView: PKCanvasView) {
@@ -186,93 +174,17 @@ struct DrawingOverlayView: UIViewRepresentable {
 
         // Recognition state
         var recognitionEnabled: Bool = false
-        var pauseSensitivity: Double = 0.5
 
         // Tool state
-        var currentTool: CanvasTool = .pen {
-            didSet {
-                strokeStreamManager.updateTool(currentTool)
-            }
-        }
+        var currentTool: CanvasTool = .pen
         var currentPenColor: UIColor = .black
         var currentPenWidth: CGFloat = 4.0
         var diagramAutosnap: Bool = true
 
-        // Pause detection — fires pause messages for AI tutoring reasoning triggers
-        private let pauseDetector = PauseDetector()
         private var previousStrokeCount: Int = 0
-        /// Snapshot of strokes from last change, used for erasure detection via fingerprint diff
-        private var previousStrokes: [PKStroke] = []
-        var onPauseDetectedCallback: ((PauseContext) -> Void)?
-
-        // Real-time tutoring
-        var tutoringService: TutoringWebSocketService?
-        let strokeStreamManager = StrokeStreamManager()
 
         // Shape detection — prevents re-entrant callbacks when replacing a stroke
         private var isReplacingStroke: Bool = false
-
-        override init() {
-            super.init()
-            setupStrokeStreamManager()
-        }
-
-        private func setupStrokeStreamManager() {
-            strokeStreamManager.onBatchReady = { [weak self] payload in
-                guard let imageData = payload.imageData else { return }
-                var location = ""
-                if let q = payload.questionNumber {
-                    location = " | Q\(q)"
-                    if let sub = payload.subquestionLabel {
-                        location += " part \(sub)"
-                    }
-                }
-                print("[StrokeStream] Sending screenshot: \(payload.strokeCount) strokes, \(imageData.count) bytes, erasures=\(payload.hasErasures)\(location)")
-                self?.tutoringService?.sendScreenshot(
-                    imageData: imageData,
-                    batchIndex: payload.batchIndex,
-                    questionNumber: payload.questionNumber,
-                    subquestion: payload.subquestionLabel,
-                    hasErasures: payload.hasErasures
-                )
-            }
-            strokeStreamManager.start()
-
-            // Wire PauseDetector to send pause messages via WebSocket
-            pauseDetector.onPauseDetected = { [weak self] context in
-                self?.handlePauseDetected(context)
-                self?.tutoringService?.sendPause(
-                    duration: context.duration,
-                    strokeCount: context.strokeCount,
-                    questionNumber: self?.strokeStreamManager.currentQuestionNumber,
-                    subquestion: nil
-                )
-            }
-        }
-
-        private func handlePauseDetected(_ context: PauseContext) {
-            onPauseDetectedCallback?(context)
-        }
-
-        /// Find strokes present in `previous` but missing from `current` using fingerprint comparison.
-        private func findRemovedStrokes(previous: [PKStroke], current: [PKStroke]) -> [PKStroke] {
-            let currentFingerprints = current.map { StrokeFingerprint(stroke: $0) }
-            var removed: [PKStroke] = []
-            var usedIndices = Set<Int>()
-
-            for stroke in previous {
-                let fp = StrokeFingerprint(stroke: stroke)
-                // Find a matching fingerprint in current that hasn't been used yet
-                if let matchIdx = currentFingerprints.indices.first(where: { idx in
-                    !usedIndices.contains(idx) && currentFingerprints[idx] == fp
-                }) {
-                    usedIndices.insert(matchIdx)
-                } else {
-                    removed.append(stroke)
-                }
-            }
-            return removed
-        }
 
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
             updateUndoRedoState(canvasView)
@@ -293,7 +205,6 @@ struct DrawingOverlayView: UIViewRepresentable {
                 strokes[strokes.count - 1] = replacement
                 canvasView.drawing = PKDrawing(strokes: strokes)
                 previousStrokeCount = canvasView.drawing.strokes.count
-                previousStrokes = canvasView.drawing.strokes
                 DispatchQueue.main.async { self.isReplacingStroke = false }
 
                 // Trigger debounced save
@@ -308,29 +219,7 @@ struct DrawingOverlayView: UIViewRepresentable {
                 return
             }
 
-            let currentStrokes = canvasView.drawing.strokes
-
-            // Detect new strokes for pause detection and stroke stream
-            // Skip eraser — bitmap eraser modifies strokes in-place, which can
-            // cause false positives even with the count guard
-            if currentStrokeCount > previousStrokeCount,
-               currentTool != .eraser,
-               let latestStroke = currentStrokes.last {
-                let pageIndex = container?.pageContainers.firstIndex(where: { $0.canvasView === canvasView })
-                strokeStreamManager.recordStroke(latestStroke, pageIndex: pageIndex)
-                pauseDetector.recordStrokeCompleted(stroke: latestStroke, pageIndex: pageIndex)
-            }
-
-            // Detect erasures (vector eraser or undo — stroke count decreased)
-            if currentStrokeCount < previousStrokeCount {
-                let removedStrokes = findRemovedStrokes(previous: previousStrokes, current: currentStrokes)
-                if !removedStrokes.isEmpty {
-                    strokeStreamManager.recordErasure(removedStrokes: removedStrokes)
-                }
-            }
-
             previousStrokeCount = currentStrokeCount
-            previousStrokes = currentStrokes
 
             // Debounced save callback (500ms)
             drawingChangeTask?.cancel()

@@ -34,12 +34,8 @@ struct AssignmentView: View {
     var onPreviousQuestion: () -> Void = {}
     var onNextQuestion: () -> Void = {}
     var onCanvasReady: (CanvasContainerView) -> Void = { _ in }
-    var onPauseDetected: ((PauseContext) -> Void)? = nil
     var onUndoStateChanged: (Bool) -> Void = { _ in }
     var onRedoStateChanged: (Bool) -> Void = { _ in }
-
-    @StateObject private var tutoringService = TutoringWebSocketService()
-    @StateObject private var audioPlayer = TutorAudioPlayer()
 
     private var questions: [ExtractedQuestion] {
         note.extractedQuestions
@@ -94,18 +90,9 @@ struct AssignmentView: View {
                         isRulerActive: isRulerActive,
                         textSize: textSize,
                         textColor: textColor,
-                        questionContext: currentQuestion.map { q in
-                            StrokeStreamManager.QuestionContext(
-                                questionIndex: currentIndex,
-                                questionNumber: q.questionNumber,
-                                regionData: q.regionData
-                            )
-                        },
                         onCanvasReady: onCanvasReady,
                         onUndoStateChanged: onUndoStateChanged,
                         onRedoStateChanged: onRedoStateChanged,
-                        onPauseDetected: onPauseDetected,
-                        tutoringService: tutoringService,
                         onSwipeLeft: onNextQuestion,
                         onSwipeRight: onPreviousQuestion
                     )
@@ -124,44 +111,6 @@ struct AssignmentView: View {
                     .background(isDarkMode ? Color.warmDark : Color.blushWhite)
                 }
             }
-        }
-        .onAppear {
-            setupTutoringCallbacks()
-            startTutoringSession()
-        }
-        .onDisappear {
-            tutoringService.endSession()
-            tutoringService.disconnect()
-            audioPlayer.cancelAll()
-        }
-        .onChange(of: currentIndex) { _ in
-            audioPlayer.cancelAll()
-            tutoringService.endSession()
-            startTutoringSession()
-        }
-    }
-
-    private func startTutoringSession() {
-        guard let question = currentQuestion else { return }
-        tutoringService.startSession(
-            problemId: "\(note.id.uuidString)-q\(currentIndex)",
-            questionNumber: question.questionNumber,
-            problemText: "", // Problem text not stored on ExtractedQuestion — server uses transcript
-            problemParts: [],
-            courseName: note.course?.name ?? ""
-        )
-    }
-
-    private func setupTutoringCallbacks() {
-        tutoringService.onTranscriptionComplete = { text, batchIndex in
-            print("[Tutor] Transcription (batch #\(batchIndex)): \(text)")
-        }
-        tutoringService.onTutorAudio = { [audioPlayer] audioData, text, status, confidence in
-            print("[Tutor] Audio feedback (\(status), \(confidence)): \(text)")
-            audioPlayer.enqueue(audioData: audioData, text: text)
-        }
-        tutoringService.onTutorFeedback = { text, status, confidence in
-            print("[Tutor] Text feedback (\(status), \(confidence)): \(text)")
         }
     }
 }

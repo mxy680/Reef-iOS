@@ -59,9 +59,6 @@ struct CanvasView: View {
     @State private var currentQuestionIndex: Int = 0
     @State private var showTutorSidebar: Bool = false
 
-    // Tutor detection
-    @StateObject private var tutorDetection = TutorDetectionState()
-
     private var effectiveColorScheme: ColorScheme {
         themeManager.isDarkMode ? .dark : .light
     }
@@ -214,9 +211,6 @@ struct CanvasView: View {
                         onCanvasReady: { container in
                             canvasViewRef = container
                         },
-                        onPauseDetected: { context in
-                            handlePauseDetected(context)
-                        },
                         onUndoStateChanged: { canUndo = $0 },
                         onRedoStateChanged: { canRedo = $0 }
                     )
@@ -313,9 +307,7 @@ struct CanvasView: View {
                 isViewingCanvas = false
             }
         }
-        .onChange(of: currentQuestionIndex) { _, _ in
-            tutorDetection.clear()
-        }
+        .onChange(of: currentQuestionIndex) { _, _ in }
     }
 
     // MARK: - PDF Export
@@ -356,36 +348,6 @@ struct CanvasView: View {
         }
     }
 
-    // MARK: - Tutor Detection
-
-    private func handlePauseDetected(_ context: PauseContext) {
-        let questions = note.extractedQuestions
-        guard currentQuestionIndex >= 0 && currentQuestionIndex < questions.count else { return }
-
-        let question = questions[currentQuestionIndex]
-        let regionData = question.regionData
-
-        var subquestionLabel: String? = nil
-
-        if let endPoint = context.lastStrokeEndPoint {
-            let pdfY = CoordinateMapper.canvasToPDFY(endPoint.y)
-            let page = context.lastStrokePageIndex ?? 0
-
-            if let resolved = RegionResolver.resolve(pdfY: pdfY, page: page, regionData: regionData) {
-                subquestionLabel = resolved.label
-            }
-        }
-
-        let result = TutorDetectionResult(
-            questionIndex: currentQuestionIndex,
-            questionNumber: question.questionNumber,
-            subquestionLabel: subquestionLabel,
-            pauseContext: context,
-            timestamp: Date()
-        )
-
-        tutorDetection.update(result)
-    }
 }
 
 // MARK: - PDF Export Preview
