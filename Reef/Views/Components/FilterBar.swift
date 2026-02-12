@@ -72,7 +72,7 @@ struct FilterBar: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 40)
+        .padding(.horizontal, 24)
         .padding(.top, 20)
         .padding(.bottom, 12)
         .background(Color.adaptiveBackground(for: effectiveColorScheme))

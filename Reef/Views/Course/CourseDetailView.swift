@@ -254,7 +254,7 @@ struct CourseDetailView: View {
                 BentoContentCard(
                     title: "Quizzes",
                     icon: "list.bullet.clipboard",
-                    count: 0,
+                    count: course.quizzes.count,
                     colorScheme: colorScheme,
                     onTap: { onSelectSubPage("quizzes") }
                 )

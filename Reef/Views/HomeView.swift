@@ -15,6 +15,8 @@ class Course {
     var icon: String = "folder.fill"
     @Relationship(deleteRule: .cascade, inverse: \Note.course)
     var notes: [Note] = []
+    @Relationship(deleteRule: .cascade, inverse: \Quiz.course)
+    var quizzes: [Quiz] = []
 
     init(name: String, icon: String = "folder.fill") {
         self.name = name
@@ -574,12 +576,12 @@ struct HomeView: View {
                             Text(detailTitle)
                                 .font(.quicksand(20, weight: .semiBold))
                                 .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
-                                .padding(.leading, 16)
+                                .padding(.leading, 8)
                         }
 
                         ToolbarItem(placement: .topBarTrailing) {
                             toolbarTrailingContent
-                                .padding(.trailing, 12)
+                                .padding(.trailing, 4)
                         }
                     }
                     .toolbarBackground(Color.adaptiveBackground(for: effectiveColorScheme), for: .navigationBar)

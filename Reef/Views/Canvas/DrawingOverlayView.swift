@@ -172,6 +172,12 @@ struct DrawingOverlayView: UIViewRepresentable {
         // Drawing change debounce
         private var drawingChangeTask: Task<Void, Never>?
 
+        // Transcription debounce (800ms after last stroke change)
+        private var transcriptionTask: Task<Void, Never>?
+
+        // Spatial stroke clustering — one manager per canvas (page)
+        private var clusterManagers: [ObjectIdentifier: StrokeClusterManager] = [:]
+
         // Recognition state
         var recognitionEnabled: Bool = false
 
@@ -185,6 +191,58 @@ struct DrawingOverlayView: UIViewRepresentable {
 
         // Shape detection — prevents re-entrant callbacks when replacing a stroke
         private var isReplacingStroke: Bool = false
+
+        // WebSocket connection state
+        private var webSocketConnected: Bool = false
+
+        /// Returns (or creates) the StrokeClusterManager for a given canvas view.
+        private func getClusterManager(for canvasView: PKCanvasView) -> StrokeClusterManager {
+            let key = ObjectIdentifier(canvasView)
+            if let existing = clusterManagers[key] {
+                return existing
+            }
+            let manager = StrokeClusterManager()
+            clusterManagers[key] = manager
+            return manager
+        }
+
+        /// Returns the 1-based page number for a canvas view, or nil if not found.
+        private func getPageIndex(for canvasView: PKCanvasView) -> Int? {
+            guard let index = container?.pageContainers.firstIndex(where: { $0.canvasView === canvasView }) else {
+                return nil
+            }
+            return index + 1 // 1-based for display
+        }
+
+        /// Lazily connects the cluster WebSocket and registers the response handler.
+        private func ensureWebSocketConnected() {
+            guard !webSocketConnected else { return }
+            webSocketConnected = true
+            AIService.shared.connectClusterSocket()
+            AIService.shared.onClusters { [weak self] page, clusters in
+                self?.handleClusterResponse(page: page, clusters: clusters)
+            }
+        }
+
+        /// Handles a cluster response from the server.
+        private func handleClusterResponse(page: Int, clusters: [[String: Any]]) {
+            guard let container = container else { return }
+            let pageIndex = page - 1  // convert 1-based to 0-based
+            guard pageIndex >= 0, pageIndex < container.pageContainers.count else { return }
+
+            let canvasView = container.pageContainers[pageIndex].canvasView
+            let manager = getClusterManager(for: canvasView)
+            manager.applyClusters(clusters)
+
+            let dirty = manager.dirtyClusters
+            if !dirty.isEmpty {
+                print("[Clustering] Server response — \(dirty.count) dirty cluster(s) on page \(page):")
+                for c in dirty {
+                    let b = c.boundingBox
+                    print("  → [\(c.id)] \(c.strokeCount) strokes, bounds=(\(Int(b.minX)),\(Int(b.minY)) \(Int(b.width))x\(Int(b.height)))")
+                }
+            }
+        }
 
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
             updateUndoRedoState(canvasView)
@@ -216,6 +274,22 @@ struct DrawingOverlayView: UIViewRepresentable {
                         self.onDrawingChanged(canvasView.drawing)
                     }
                 }
+
+                // Update spatial clusters after shape replacement
+                let shapeClusterManager = getClusterManager(for: canvasView)
+                shapeClusterManager.update(with: canvasView.drawing.strokes)
+                let shapePageNum = getPageIndex(for: canvasView) ?? 0
+
+                // Transcription debounce (800ms) — send stroke bounds to server
+                transcriptionTask?.cancel()
+                transcriptionTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 800_000_000)
+                    if !Task.isCancelled {
+                        self.ensureWebSocketConnected()
+                        let payload = shapeClusterManager.strokeBoundsPayload()
+                        AIService.shared.sendStrokeBounds(page: shapePageNum, strokes: payload)
+                    }
+                }
                 return
             }
 
@@ -229,6 +303,22 @@ struct DrawingOverlayView: UIViewRepresentable {
                     // Save all drawings for multi-page support
                     self.container?.saveAllDrawings()
                     self.onDrawingChanged(canvasView.drawing)
+                }
+            }
+
+            // Update spatial clusters
+            let clusterManager = getClusterManager(for: canvasView)
+            clusterManager.update(with: canvasView.drawing.strokes)
+            let pageNum = getPageIndex(for: canvasView) ?? 0
+
+            // Transcription debounce (800ms) — send stroke bounds to server
+            transcriptionTask?.cancel()
+            transcriptionTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                if !Task.isCancelled {
+                    self.ensureWebSocketConnected()
+                    let payload = clusterManager.strokeBoundsPayload()
+                    AIService.shared.sendStrokeBounds(page: pageNum, strokes: payload)
                 }
             }
         }

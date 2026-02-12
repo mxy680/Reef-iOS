@@ -12,17 +12,24 @@ struct QuizzesView: View {
     @StateObject private var themeManager = ThemeManager.shared
 
     @State private var isInitialLoad: Bool = true
+    @State private var selectedQuiz: Quiz? = nil
 
     private var effectiveColorScheme: ColorScheme {
         themeManager.isDarkMode ? .dark : .light
+    }
+
+    private var courseQuizzes: [Quiz] {
+        course.quizzes.sorted { $0.dateCreated > $1.dateCreated }
     }
 
     var body: some View {
         Group {
             if isInitialLoad {
                 skeletonView
-            } else {
+            } else if courseQuizzes.isEmpty {
                 emptyStateView
+            } else {
+                quizListView
             }
         }
         .onAppear {
@@ -32,6 +39,71 @@ struct QuizzesView: View {
                 }
             }
         }
+        .fullScreenCover(item: $selectedQuiz) { quiz in
+            QuizAttemptView(quiz: quiz)
+        }
+    }
+
+    // MARK: - Quiz List
+
+    private var quizListView: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(courseQuizzes) { quiz in
+                    Button {
+                        selectedQuiz = quiz
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "list.bullet.clipboard")
+                                .font(.system(size: 18))
+                                .foregroundColor(.deepTeal)
+                                .frame(width: 40, height: 40)
+                                .background(Color.seafoam.opacity(effectiveColorScheme == .dark ? 0.2 : 0.4))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(quiz.topic)
+                                    .font(.quicksand(16, weight: .medium))
+                                    .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+                                    .lineLimit(1)
+
+                                HStack(spacing: 8) {
+                                    Text("\(quiz.numberOfQuestions) questions")
+                                        .font(.quicksand(13, weight: .regular))
+                                        .foregroundColor(Color.adaptiveSecondaryText(for: effectiveColorScheme))
+
+                                    Text(quiz.difficulty.rawValue)
+                                        .font(.quicksand(11, weight: .medium))
+                                        .foregroundColor(Color.adaptiveText(for: effectiveColorScheme).opacity(0.5))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.adaptiveText(for: effectiveColorScheme).opacity(0.08))
+                                        .cornerRadius(4)
+
+                                    Spacer()
+
+                                    Text(quiz.dateCreated, style: .date)
+                                        .font(.quicksand(12, weight: .regular))
+                                        .foregroundColor(Color.adaptiveSecondaryText(for: effectiveColorScheme))
+                                }
+                            }
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(Color.adaptiveSecondaryText(for: effectiveColorScheme).opacity(0.5))
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 14)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+                        .padding(.leading, 72)
+                }
+            }
+        }
+        .background(Color.adaptiveBackground(for: effectiveColorScheme))
     }
 
     // MARK: - Skeleton
@@ -122,6 +194,15 @@ enum QuizQuestionType: String, CaseIterable {
     case openEnded = "Open Ended"
     case multipleChoice = "Multiple Choice"
     case fillInBlank = "Fill in the Blank"
+
+    /// Server-side key for API request
+    var apiKey: String {
+        switch self {
+        case .openEnded: return "open_ended"
+        case .multipleChoice: return "multiple_choice"
+        case .fillInBlank: return "fill_in_blank"
+        }
+    }
 }
 
 // MARK: - Quiz Generation View
@@ -129,6 +210,7 @@ enum QuizQuestionType: String, CaseIterable {
 struct QuizGenerationView: View {
     let course: Course
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @StateObject private var themeManager = ThemeManager.shared
 
     private var effectiveColorScheme: ColorScheme {
@@ -143,9 +225,14 @@ struct QuizGenerationView: View {
     @State private var selectedNoteIds: Set<UUID> = []
     @State private var isNotesExpanded: Bool = true
     @State private var additionalNotes: String = ""
+    @State private var useGeneralKnowledge: Bool = false
+
+    // Generation state
+    @State private var isGenerating: Bool = false
+    @State private var generationError: String? = nil
 
     private var canGenerate: Bool {
-        !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !selectedQuestionTypes.isEmpty && !selectedNoteIds.isEmpty
+        !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !selectedQuestionTypes.isEmpty && (!selectedNoteIds.isEmpty || useGeneralKnowledge)
     }
 
     // Notes for source selection
@@ -159,27 +246,65 @@ struct QuizGenerationView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    topicField
+            ZStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        topicField
 
-                    difficultySelector
+                        difficultySelector
 
-                    numberOfQuestionsSelector
+                        numberOfQuestionsSelector
 
-                    questionTypesSelector
+                        questionTypesSelector
 
-                    sourceNotesSelector
+                        generalKnowledgeToggle
 
-                    notesField
+                        sourceNotesSelector
+
+                        notesField
+
+                        if let error = generationError {
+                            Text(error)
+                                .font(.quicksand(14, weight: .medium))
+                                .foregroundColor(.red)
+                                .padding(12)
+                                .background(Color.red.opacity(0.1))
+                                .cornerRadius(10)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+                    .padding(.bottom, 120)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 16)
-                .padding(.bottom, 120) // Space for fixed button
-            }
-            .background(Color.adaptiveBackground(for: effectiveColorScheme))
-            .overlay(alignment: .bottom) {
-                generateButton
+                .background(Color.adaptiveBackground(for: effectiveColorScheme))
+                .overlay(alignment: .bottom) {
+                    generateButton
+                }
+
+                // Loading overlay
+                if isGenerating {
+                    ZStack {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+
+                        VStack(spacing: 20) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                                .tint(.white)
+
+                            Text("Generating quiz...")
+                                .font(.quicksand(18, weight: .semiBold))
+                                .foregroundColor(.white)
+
+                            Text("This may take a moment")
+                                .font(.quicksand(14, weight: .regular))
+                                .foregroundColor(.white.opacity(0.7))
+                        }
+                        .padding(40)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                    }
+                }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.adaptiveBackground(for: effectiveColorScheme), for: .navigationBar)
@@ -191,6 +316,7 @@ struct QuizGenerationView: View {
                     }
                     .font(.quicksand(16, weight: .medium))
                     .foregroundColor(Color.adaptiveSecondary(for: effectiveColorScheme))
+                    .disabled(isGenerating)
                 }
                 ToolbarItem(placement: .principal) {
                     Text("Generate Quiz")
@@ -200,8 +326,8 @@ struct QuizGenerationView: View {
             }
         }
         .preferredColorScheme(effectiveColorScheme)
+        .interactiveDismissDisabled(isGenerating)
         .onAppear {
-            // Pre-select all notes by default
             selectedNoteIds = Set(allSourceNotes.map { $0.id })
         }
     }
@@ -210,7 +336,7 @@ struct QuizGenerationView: View {
 
     private var generateButton: some View {
         Button {
-            dismiss()
+            generateQuiz()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles")
@@ -221,13 +347,105 @@ struct QuizGenerationView: View {
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(canGenerate ? Color.deepTeal : Color.deepTeal.opacity(0.5))
+            .background(canGenerate && !isGenerating ? Color.deepTeal : Color.deepTeal.opacity(0.5))
             .cornerRadius(20)
         }
-        .disabled(!canGenerate)
+        .disabled(!canGenerate || isGenerating)
         .padding(.horizontal, 24)
         .padding(.bottom, 32)
         .background(Color.adaptiveBackground(for: effectiveColorScheme))
+    }
+
+    // MARK: - Generation Logic
+
+    private func generateQuiz() {
+        isGenerating = true
+        generationError = nil
+
+        let quizTopic = topic.trimmingCharacters(in: .whitespacesAndNewlines)
+        let quizDifficulty = difficulty
+        let quizNumQuestions = Int(numberOfQuestions)
+        let quizNoteIds = Array(selectedNoteIds)
+        let quizQuestionTypes = selectedQuestionTypes.map { $0.apiKey }
+        let quizAdditionalNotes = additionalNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let quizUseGeneralKnowledge = useGeneralKnowledge
+        let courseId = course.id
+
+        Task {
+            do {
+                // Get RAG context from selected notes
+                let ragContext: String
+                if !quizNoteIds.isEmpty {
+                    let context = try await RAGService.shared.getContext(
+                        query: quizTopic,
+                        courseId: courseId,
+                        topK: 10,
+                        maxTokens: 4000
+                    )
+                    ragContext = context.formattedPrompt
+                } else {
+                    ragContext = ""
+                }
+
+                // Create quiz ID for file storage
+                let quizID = UUID()
+
+                // Call server
+                let questions = try await QuizGenerationService.shared.generateQuiz(
+                    topic: quizTopic,
+                    difficulty: quizDifficulty.rawValue.lowercased(),
+                    numberOfQuestions: quizNumQuestions,
+                    ragContext: ragContext,
+                    useGeneralKnowledge: quizUseGeneralKnowledge,
+                    additionalNotes: quizAdditionalNotes.isEmpty ? nil : quizAdditionalNotes,
+                    questionTypes: quizQuestionTypes,
+                    quizID: quizID
+                )
+
+                // Create Quiz model and save
+                await MainActor.run {
+                    let quiz = Quiz(
+                        topic: quizTopic,
+                        difficulty: quizDifficulty,
+                        numberOfQuestions: quizNumQuestions,
+                        sourceNoteIds: quizNoteIds,
+                        usedGeneralKnowledge: quizUseGeneralKnowledge,
+                        course: course
+                    )
+                    quiz.id = quizID
+                    quiz.questions = questions
+                    modelContext.insert(quiz)
+                    isGenerating = false
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    isGenerating = false
+                    generationError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    // MARK: - General Knowledge Toggle
+
+    private var generalKnowledgeToggle: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Use General Knowledge")
+                    .font(.quicksand(14, weight: .semiBold))
+                    .foregroundColor(Color.adaptiveText(for: effectiveColorScheme))
+
+                Text("Allow questions beyond your notes")
+                    .font(.quicksand(12, weight: .regular))
+                    .foregroundColor(Color.adaptiveSecondaryText(for: effectiveColorScheme))
+            }
+
+            Spacer()
+
+            Toggle("", isOn: $useGeneralKnowledge)
+                .tint(Color.deepTeal)
+        }
     }
 
     // MARK: - Topic Field
@@ -336,7 +554,6 @@ struct QuizGenerationView: View {
 
     private func toggleQuestionType(_ type: QuizQuestionType) {
         if selectedQuestionTypes.contains(type) {
-            // Don't allow deselecting the last one
             if selectedQuestionTypes.count > 1 {
                 selectedQuestionTypes.remove(type)
             }
@@ -349,7 +566,6 @@ struct QuizGenerationView: View {
 
     private var sourceNotesSelector: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Header with expand/collapse and select all
             HStack {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -378,7 +594,6 @@ struct QuizGenerationView: View {
                 .buttonStyle(.plain)
             }
 
-            // Notes list
             if isNotesExpanded {
                 VStack(spacing: 0) {
                     if allSourceNotes.isEmpty {

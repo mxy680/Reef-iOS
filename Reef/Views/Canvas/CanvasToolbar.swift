@@ -276,15 +276,15 @@ struct CanvasToolbar: View {
     }
 
     private var toolbarBackground: Color {
-        .deepTeal
+        colorScheme == .dark ? .toolbarDark : .deepTeal
     }
 
     private var tabStripBackground: Color {
-        Color(red: 0.28, green: 0.53, blue: 0.52) // darker teal
+        colorScheme == .dark ? .tabStripDark : Color(red: 0.28, green: 0.53, blue: 0.52)
     }
 
     private var tabSurface: Color {
-        .deepTeal
+        colorScheme == .dark ? .toolbarDark : .deepTeal
     }
 
     private var problemTabBar: some View {
@@ -787,7 +787,7 @@ struct CanvasToolbar: View {
 
     private var toolbarDivider: some View {
         Rectangle()
-            .fill(Color.white.opacity(0.3))
+            .fill(Color.white.opacity(colorScheme == .dark ? 0.15 : 0.3))
             .frame(width: 1, height: 28)
             .padding(.horizontal, 6)
     }
@@ -1279,11 +1279,17 @@ private extension View {
 // MARK: - Tutor Toggle Style
 
 private struct TutorToggleStyle: ToggleStyle {
+    @Environment(\.colorScheme) private var colorScheme
+
     func makeBody(configuration: Configuration) -> some View {
         let trackWidth: CGFloat = 36
         let trackHeight: CGFloat = 20
         let knobSize: CGFloat = 16
         let knobPadding: CGFloat = 2
+
+        let onColor = colorScheme == .dark ? Color.brightTealDark : Color.deepTeal
+        let offColor = colorScheme == .dark ? Color.warmWhite.opacity(0.12) : Color.charcoal.opacity(0.12)
+        let borderColor = colorScheme == .dark ? Color.warmWhite.opacity(0.25) : Color.charcoal.opacity(0.25)
 
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
@@ -1292,15 +1298,16 @@ private struct TutorToggleStyle: ToggleStyle {
         } label: {
             ZStack(alignment: configuration.isOn ? .trailing : .leading) {
                 Capsule()
-                    .fill(configuration.isOn ? Color.seafoam : Color.white.opacity(0.15))
+                    .fill(configuration.isOn ? onColor : offColor)
                     .overlay(
                         Capsule()
-                            .strokeBorder(Color.deepTeal.opacity(configuration.isOn ? 0 : 0.6), lineWidth: 1)
+                            .strokeBorder(configuration.isOn ? Color.clear : borderColor, lineWidth: 1)
                     )
                     .frame(width: trackWidth, height: trackHeight)
 
                 Circle()
                     .fill(Color.white)
+                    .shadow(color: .black.opacity(0.15), radius: 1, x: 0, y: 1)
                     .frame(width: knobSize, height: knobSize)
                     .padding(knobPadding)
             }

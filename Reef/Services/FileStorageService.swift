@@ -132,4 +132,47 @@ class FileStorageService {
             try fileManager.removeItem(at: directory)
         }
     }
+
+    // MARK: - Quiz Files
+
+    private var quizzesDirectory: URL {
+        appDocumentsDirectory.appendingPathComponent("Quizzes")
+    }
+
+    /// Gets the directory for a quiz's files
+    func getQuizDirectory(quizID: UUID) -> URL {
+        quizzesDirectory.appendingPathComponent(quizID.uuidString)
+    }
+
+    /// Gets the URL for a specific quiz question PDF file
+    func getQuizQuestionFileURL(quizID: UUID, fileName: String) -> URL {
+        getQuizDirectory(quizID: quizID).appendingPathComponent(fileName)
+    }
+
+    /// Saves quiz question PDF data to storage
+    @discardableResult
+    func saveQuizQuestionFile(data: Data, quizID: UUID, fileName: String) throws -> URL {
+        let directory = getQuizDirectory(quizID: quizID)
+
+        if !fileManager.fileExists(atPath: directory.path) {
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+
+        let fileURL = directory.appendingPathComponent(fileName)
+
+        if fileManager.fileExists(atPath: fileURL.path) {
+            try fileManager.removeItem(at: fileURL)
+        }
+
+        try data.write(to: fileURL)
+        return fileURL
+    }
+
+    /// Deletes all files for a quiz
+    func deleteQuiz(quizID: UUID) throws {
+        let directory = getQuizDirectory(quizID: quizID)
+        if fileManager.fileExists(atPath: directory.path) {
+            try fileManager.removeItem(at: directory)
+        }
+    }
 }

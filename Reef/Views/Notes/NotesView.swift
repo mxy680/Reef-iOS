@@ -177,7 +177,7 @@ struct NotesView: View {
                 if filteredNotes.isEmpty && !debouncedSearchText.isEmpty {
                     noResultsView
                 } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 24)], spacing: 24) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
                         ForEach(filteredNotes) { note in
                             Button {
                                 note.lastOpenedAt = Date()
@@ -194,7 +194,7 @@ struct NotesView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(40)
+                    .padding(24)
                 }
             }
         }
@@ -285,17 +285,17 @@ struct NotesView: View {
                     .fill(Color.deepTeal.opacity(0.5))
                     .frame(width: 110, height: 48)
             }
-            .padding(.horizontal, 40)
+            .padding(.horizontal, 24)
             .padding(.top, 20)
             .padding(.bottom, 12)
 
             ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 24)], spacing: 24) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
                     ForEach(0..<12, id: \.self) { _ in
                         SkeletonCardView(colorScheme: effectiveColorScheme)
                     }
                 }
-                .padding(40)
+                .padding(24)
             }
         }
         .background(Color.adaptiveBackground(for: effectiveColorScheme))
@@ -348,7 +348,7 @@ private struct SkeletonCardView: View {
                 shimmerOverlay
             }
             .frame(maxWidth: .infinity)
-            .aspectRatio(9/10, contentMode: .fill)
+            .aspectRatio(4/3, contentMode: .fit)
 
             // Separator — exact match
             Rectangle()
@@ -357,30 +357,30 @@ private struct SkeletonCardView: View {
 
             // Footer — mirrors HStack(alignment: .bottom, spacing: 8) from DocumentGridItem
             HStack(alignment: .bottom, spacing: 8) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     RoundedRectangle(cornerRadius: 4)
                         .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.12))
-                        .frame(width: 100, height: 15) // matches quicksand(15) line height
+                        .frame(width: 80, height: 13) // matches quicksand(13) line height
 
                     RoundedRectangle(cornerRadius: 3)
                         .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.08))
-                        .frame(width: 70, height: 13) // matches quicksand(13) line height
+                        .frame(width: 56, height: 11) // matches quicksand(11) line height
                 }
 
                 Spacer()
 
-                // Placeholder for action icons (two 32x32 frames)
-                HStack(spacing: 4) {
+                // Placeholder for action icons (two 28x28 frames)
+                HStack(spacing: 2) {
                     RoundedRectangle(cornerRadius: 6)
                         .fill(Color.clear)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 28, height: 28)
                     RoundedRectangle(cornerRadius: 6)
                         .fill(Color.clear)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 28, height: 28)
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(cardBackground)
         }
         .cornerRadius(16)

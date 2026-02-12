@@ -119,10 +119,16 @@ extension Color {
     static let warmWhite = Color(hex: "F5F0EE")
 
     /// Dark mode secondary — bright seafoam
-    static let brightSeafoam = Color(hex: "D4EDEC")
+    static let brightSeafoam = Color(hex: "D4ECE8")
 
     /// Dark mode accent — bright teal for links on dark backgrounds
-    static let brightTealDark = Color(hex: "7CB8B5")
+    static let brightTealDark = Color(hex: "7CB5AC")
+
+    /// Dark mode toolbar — deepTeal darkened (177°, 27%, 33%)
+    static let toolbarDark = Color(hex: "3D6B69")
+
+    /// Dark mode tab strip — deepTeal darker (177°, 27%, 28%)
+    static let tabStripDark = Color(hex: "345B59")
 
     // MARK: - Adaptive Colors
 

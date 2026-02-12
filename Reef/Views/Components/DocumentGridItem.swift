@@ -139,7 +139,7 @@ struct DocumentGridItem<T: DocumentItem>: View {
                 .padding(8)
             }
             .frame(maxWidth: .infinity)
-            .aspectRatio(9/10, contentMode: .fill)
+            .aspectRatio(4/3, contentMode: .fit)
 
             // Separator between thumbnail and footer
             Rectangle()
@@ -148,29 +148,29 @@ struct DocumentGridItem<T: DocumentItem>: View {
 
             // Name, date, and action icons footer
             HStack(alignment: .bottom, spacing: 8) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(document.name)
-                        .font(.quicksand(15, weight: .semiBold))
+                        .font(.quicksand(13, weight: .semiBold))
                         .foregroundColor(effectiveColorScheme == .dark ? .white : Color.charcoal)
                         .lineLimit(1)
 
                     Text(document.dateAdded.formatted(date: .abbreviated, time: .omitted))
-                        .font(.quicksand(13, weight: .regular))
+                        .font(.quicksand(11, weight: .regular))
                         .foregroundColor(effectiveColorScheme == .dark ? .white.opacity(0.6) : Color.charcoal.opacity(0.5))
                 }
 
                 Spacer()
 
                 // Action icons
-                HStack(spacing: 4) {
+                HStack(spacing: 2) {
                     Button {
                         editedName = document.name
                         isShowingRenameAlert = true
                     } label: {
                         Image(systemName: "pencil")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundColor(effectiveColorScheme == .dark ? .white.opacity(0.7) : .deepTeal)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 28, height: 28)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -179,16 +179,16 @@ struct DocumentGridItem<T: DocumentItem>: View {
                         isShowingDeleteConfirmation = true
                     } label: {
                         Image(systemName: "trash")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundColor(effectiveColorScheme == .dark ? Color.deepCoral.opacity(0.8) : .deepCoral)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 28, height: 28)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(footerColor)
         }
         .cornerRadius(16)
