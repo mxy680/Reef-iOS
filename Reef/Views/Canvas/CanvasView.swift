@@ -25,8 +25,6 @@ struct CanvasView: View {
     @State private var highlighterWidth: CGFloat = StrokeWidthRange.highlighterDefault
     @State private var eraserSize: CGFloat = StrokeWidthRange.eraserDefault
     @State private var eraserType: EraserType = .stroke
-    @State private var diagramWidth: CGFloat = StrokeWidthRange.diagramDefault
-    @State private var diagramAutosnap: Bool = true
     @State private var customPenColors: [Color] = []
     @State private var customHighlighterColors: [Color] = []
     @State private var canvasBackgroundMode: CanvasBackgroundMode = .normal
@@ -49,6 +47,9 @@ struct CanvasView: View {
 
     // Drawing persistence
     @State private var saveTask: Task<Void, Never>?
+
+    // Voice recording state
+    @State private var isRecording: Bool = false
 
     // PDF export state
     @State private var isExporting: Bool = false
@@ -121,8 +122,6 @@ struct CanvasView: View {
                     highlighterWidth: $highlighterWidth,
                     eraserSize: $eraserSize,
                     eraserType: $eraserType,
-                    diagramWidth: $diagramWidth,
-                    diagramAutosnap: $diagramAutosnap,
                     customPenColors: $customPenColors,
                     customHighlighterColors: $customHighlighterColors,
                     canvasBackgroundMode: $canvasBackgroundMode,
@@ -134,6 +133,27 @@ struct CanvasView: View {
                             onDismiss()
                         } else {
                             dismiss()
+                        }
+                    },
+                    onAIActionSelected: { action in
+                        if action == "ask" {
+                            if isRecording {
+                                // Stop recording and send
+                                isRecording = false
+                                if let audioData = VoiceRecordingService.shared.stopRecording() {
+                                    let sessionId = note?.id.uuidString ?? quiz?.id.uuidString ?? ""
+                                    AIService.shared.sendVoiceMessage(
+                                        audioData: audioData,
+                                        sessionId: sessionId,
+                                        page: 0
+                                    )
+                                }
+                            } else {
+                                // Start recording
+                                if VoiceRecordingService.shared.startRecording() {
+                                    isRecording = true
+                                }
+                            }
                         }
                     },
                     onToggleDarkMode: {
@@ -188,6 +208,7 @@ struct CanvasView: View {
                         }
                     },
                     isAssignmentProcessing: note?.isAssignmentProcessing ?? false,
+                    isRecording: isRecording,
                     isRulerActive: isRulerActive,
                     onToggleRuler: { isRulerActive.toggle() },
                     textSize: $textSize,
@@ -211,8 +232,6 @@ struct CanvasView: View {
                                 highlighterWidth: $highlighterWidth,
                                 eraserSize: $eraserSize,
                                 eraserType: $eraserType,
-                                diagramWidth: $diagramWidth,
-                                diagramAutosnap: $diagramAutosnap,
                                 canvasBackgroundMode: canvasBackgroundMode,
                                 canvasBackgroundOpacity: canvasBackgroundOpacity,
                                 canvasBackgroundSpacing: canvasBackgroundSpacing,
@@ -253,8 +272,6 @@ struct CanvasView: View {
                                 highlighterWidth: $highlighterWidth,
                                 eraserSize: $eraserSize,
                                 eraserType: $eraserType,
-                                diagramWidth: $diagramWidth,
-                                diagramAutosnap: $diagramAutosnap,
                                 canvasBackgroundMode: canvasBackgroundMode,
                                 canvasBackgroundOpacity: canvasBackgroundOpacity,
                                 canvasBackgroundSpacing: canvasBackgroundSpacing,
@@ -295,8 +312,6 @@ struct CanvasView: View {
                                 highlighterWidth: $highlighterWidth,
                                 eraserSize: $eraserSize,
                                 eraserType: $eraserType,
-                                diagramWidth: $diagramWidth,
-                                diagramAutosnap: $diagramAutosnap,
                                 canvasBackgroundMode: canvasBackgroundMode,
                                 canvasBackgroundOpacity: canvasBackgroundOpacity,
                                 canvasBackgroundSpacing: canvasBackgroundSpacing,

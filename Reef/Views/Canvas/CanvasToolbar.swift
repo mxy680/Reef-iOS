@@ -14,7 +14,6 @@ enum CanvasTool: Equatable {
     case highlighter
     case eraser
     case lasso
-    case diagram
     case textBox
     case pan
 }
@@ -22,7 +21,7 @@ enum CanvasTool: Equatable {
 extension CanvasTool {
     var hasSecondaryOptions: Bool {
         switch self {
-        case .pen, .highlighter, .eraser, .diagram: return true
+        case .pen, .highlighter, .eraser: return true
         case .textBox: return false
         case .lasso, .pan: return false
         }
@@ -75,9 +74,7 @@ enum StrokeWidthRange {
     static let eraserLarge: CGFloat = 48
     static let eraserDefault: CGFloat = 24
 
-    static let diagramMin: CGFloat = 4
-    static let diagramMax: CGFloat = 48
-    static let diagramDefault: CGFloat = 37
+
 }
 
 // MARK: - View Mode
@@ -111,8 +108,6 @@ struct CanvasToolbar: View {
     @Binding var highlighterWidth: CGFloat
     @Binding var eraserSize: CGFloat
     @Binding var eraserType: EraserType
-    @Binding var diagramWidth: CGFloat
-    @Binding var diagramAutosnap: Bool
     @Binding var customPenColors: [Color]
     @Binding var customHighlighterColors: [Color]
     @Binding var canvasBackgroundMode: CanvasBackgroundMode
@@ -146,6 +141,7 @@ struct CanvasToolbar: View {
     var onNextQuestion: () -> Void = {}
     var onJumpToQuestion: (Int) -> Void = { _ in }
     var isAssignmentProcessing: Bool = false
+    var isRecording: Bool = false
 
     // Ruler toggle
     var isRulerActive: Bool = false
@@ -437,16 +433,6 @@ struct CanvasToolbar: View {
                 action: { selectTool(.pen) }
             )
 
-            // Diagram
-            DrawingToolButton(
-                icon: "compass.drawing",
-                isSelected: selectedTool == .diagram,
-                colorDot: selectedPenColor,
-                showColorDot: true,
-                colorScheme: colorScheme,
-                action: { selectTool(.diagram) }
-            )
-
             // --- Edit tools ---
 
             // Eraser
@@ -635,14 +621,6 @@ struct CanvasToolbar: View {
                             colorScheme: colorScheme,
                             onClearPage: onClearCurrentPage
                         )
-                    case .diagram:
-                        DiagramOptionsView(
-                            diagramWidth: $diagramWidth,
-                            diagramAutosnap: $diagramAutosnap,
-                            selectedPenColor: $selectedPenColor,
-                            customPenColors: $customPenColors,
-                            colorScheme: colorScheme
-                        )
                     case .textBox, .lasso, .pan:
                         EmptyView()
                     }
@@ -674,33 +652,15 @@ struct CanvasToolbar: View {
     @ViewBuilder
     private var aiSection: some View {
         if isAssignmentEnabled {
-            // Ask
+            // Mic
             ToolbarButton(
-                icon: "sparkles",
-                isSelected: false,
+                icon: isRecording ? "mic.fill" : "mic.fill",
+                isSelected: isRecording,
                 isDisabled: aiDisabled,
-                showProcessingIndicator: !isDocumentAIReady || isAssignmentProcessing,
-                processingIndicatorColor: isAssignmentProcessing ? .blue : .yellow,
+                showProcessingIndicator: isRecording || (!isDocumentAIReady || isAssignmentProcessing),
+                processingIndicatorColor: isRecording ? .red : (isAssignmentProcessing ? .blue : .yellow),
                 colorScheme: colorScheme,
                 action: { onAIActionSelected("ask") }
-            )
-
-            // Hint
-            ToolbarButton(
-                icon: "lightbulb.fill",
-                isSelected: false,
-                isDisabled: aiDisabled,
-                colorScheme: colorScheme,
-                action: { onAIActionSelected("hint") }
-            )
-
-            // Check
-            ToolbarButton(
-                icon: "checkmark.circle.fill",
-                isSelected: false,
-                isDisabled: aiDisabled,
-                colorScheme: colorScheme,
-                action: { onAIActionSelected("check") }
             )
 
             // More AI actions
@@ -955,6 +915,10 @@ private struct AIActionsPopoverContent: View {
 
     private var sections: [AIActionSection] {
         [
+            AIActionSection(id: "quick", title: "QUICK ACTIONS", items: [
+                AIActionItem(id: "hint", icon: "lightbulb.fill", label: "Hint"),
+                AIActionItem(id: "check", icon: "checkmark.circle.fill", label: "Check"),
+            ]),
             AIActionSection(id: "help", title: "HELP ME", items: [
                 AIActionItem(id: "simplify", icon: "list.bullet", label: "Simplify"),
                 AIActionItem(id: "improve", icon: "wand.and.stars", label: "Improve"),
@@ -1181,8 +1145,6 @@ private struct ChromeTabShape: Shape {
             highlighterWidth: .constant(StrokeWidthRange.highlighterDefault),
             eraserSize: .constant(StrokeWidthRange.eraserDefault),
             eraserType: .constant(.stroke),
-            diagramWidth: .constant(StrokeWidthRange.diagramDefault),
-            diagramAutosnap: .constant(true),
             customPenColors: .constant([]),
             customHighlighterColors: .constant([]),
             canvasBackgroundMode: .constant(.normal),
