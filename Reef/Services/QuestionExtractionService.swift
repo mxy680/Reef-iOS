@@ -92,7 +92,7 @@ actor QuestionExtractionService {
     static let shared = QuestionExtractionService()
 
     #if DEBUG
-    private let baseURL = "https://044c-129-22-21-200.ngrok-free.app"
+    private let baseURL = "http://172.20.87.11:8000"
     #else
     private let baseURL = "https://api.studyreef.com"
     #endif
@@ -123,6 +123,7 @@ actor QuestionExtractionService {
     func extractQuestions(
         fileURL: URL,
         noteID: UUID,
+        fileName: String = "document.pdf",
         onStatusUpdate: ((ExtractionJobStatus) -> Void)? = nil
     ) async throws -> [ExtractedQuestion] {
         // Read PDF file
@@ -142,10 +143,10 @@ actor QuestionExtractionService {
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
 
-        // Build multipart body
+        // Build multipart body — use actual filename so server can match on delete
         var body = Data()
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"pdf\"; filename=\"document.pdf\"\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"pdf\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: application/pdf\r\n\r\n".data(using: .utf8)!)
         body.append(pdfData)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
@@ -242,5 +243,21 @@ actor QuestionExtractionService {
             pdfFileName: fileName,
             regionData: regionData
         )
+    }
+
+    /// Delete a document and its questions/answer keys from the server database
+    func deleteDocument(filename: String) async {
+        guard let url = URL(string: baseURL + "/ai/documents/\(filename)") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+
+        do {
+            let (_, response) = try await session.data(for: request)
+            if let http = response as? HTTPURLResponse {
+                print("[QuestionExtraction] DELETE /ai/documents/\(filename) → \(http.statusCode)")
+            }
+        } catch {
+            print("[QuestionExtraction] Failed to delete document from server: \(error.localizedDescription)")
+        }
     }
 }

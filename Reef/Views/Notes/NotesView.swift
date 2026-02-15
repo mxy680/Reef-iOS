@@ -315,6 +315,7 @@ struct NotesView: View {
 
         // Cancel any in-progress server extraction and clean up question files
         let noteId = note.id
+        let noteFileName = note.fileName
         Task {
             await QuestionExtractionService.shared.cancelExtraction(for: noteId)
         }
@@ -323,6 +324,13 @@ struct NotesView: View {
         // Remove from vector index
         Task {
             try? await RAGService.shared.deleteDocument(documentId: noteId)
+        }
+
+        // Delete document, questions, and answer keys from server database
+        Task {
+            // Server stores filename stem (without extension)
+            let stem = (noteFileName as NSString).deletingPathExtension
+            await QuestionExtractionService.shared.deleteDocument(filename: stem)
         }
 
         modelContext.delete(note)

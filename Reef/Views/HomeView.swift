@@ -878,7 +878,8 @@ struct HomeView: View {
         do {
             let extractedQuestions = try await QuestionExtractionService.shared.extractQuestions(
                 fileURL: fileURL,
-                noteID: noteID
+                noteID: noteID,
+                fileName: note.fileName
             )
 
             await MainActor.run {
