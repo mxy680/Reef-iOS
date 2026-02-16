@@ -142,14 +142,14 @@ class AIService {
     var onTranscription: ((String, String, Double, Int) -> Void)?
 
     /// Connects to the stroke logging WebSocket endpoint.
-    /// Always creates a fresh connection when a sessionId is provided.
+    /// Always creates a fresh connection when a sessionId is provided
+    /// (ensures document_name/question_number params are sent).
     func connectStrokeSocket(sessionId: String? = nil, documentName: String? = nil, questionNumber: Int? = nil) {
         if let sid = sessionId {
-            // New session — close the old socket and open a fresh one
-            if currentSessionId != sid {
-                strokeSocket?.cancel(with: .normalClosure, reason: nil)
-                strokeSocket = nil
-            }
+            // Always replace when sessionId is provided — the reconnect path
+            // creates sockets without session metadata, so we must replace them.
+            strokeSocket?.cancel(with: .normalClosure, reason: nil)
+            strokeSocket = nil
             currentSessionId = sid
         }
         guard strokeSocket == nil else { return }
