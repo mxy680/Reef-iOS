@@ -134,7 +134,6 @@ struct DashboardView: View {
                     )
                 }
 
-                Spacer(minLength: 40)
             }
             .padding(32)
         }
@@ -222,7 +221,6 @@ struct DashboardView: View {
                     skeletonListCard
                 }
 
-                Spacer(minLength: 40)
             }
             .padding(32)
         }
