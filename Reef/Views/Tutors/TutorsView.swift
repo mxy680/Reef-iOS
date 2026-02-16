@@ -74,10 +74,10 @@ struct TutorsView: View {
         let tutor = focusedTutor
         let isActive = selectionManager.selectedTutorID == tutor.id
 
-        return VStack(spacing: 16) {
+        return VStack(spacing: 14) {
             // Large emoji
             Text(tutor.emoji)
-                .font(.system(size: 72))
+                .font(.system(size: 64))
                 .shadow(color: tutor.accentColor.opacity(0.3), radius: 12)
                 .id(tutor.id + "-emoji")
 
@@ -93,32 +93,42 @@ struct TutorsView: View {
             }
             .id(tutor.id + "-name")
 
-            // Specialty pill
-            Text(tutor.specialty)
-                .font(.quicksand(14, weight: .medium))
-                .foregroundColor(colorScheme == .dark ? .brightTealDark : .deepTeal)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(Color.deepTeal.opacity(colorScheme == .dark ? 0.15 : 0.1))
-                )
-
-            // Tagline
-            Text(tutor.tagline)
-                .font(.quicksand(15, weight: .regular))
-                .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
-                .italic()
-                .id(tutor.id + "-tagline")
-
-            // Backstory
-            Text(tutor.backstory)
+            // Personality
+            Text(tutor.personality)
                 .font(.quicksand(14, weight: .regular))
-                .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
+                .foregroundColor(Color.adaptiveText(for: colorScheme))
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .padding(.horizontal, 40)
-                .id(tutor.id + "-backstory")
+                .id(tutor.id + "-personality")
+
+            // Voice + Lore in two columns
+            HStack(alignment: .top, spacing: 20) {
+                profileDetail(
+                    icon: "quote.bubble.fill",
+                    title: "Voice",
+                    text: tutor.voice
+                )
+
+                profileDetail(
+                    icon: "book.fill",
+                    title: "Lore",
+                    text: tutor.lore
+                )
+            }
+            .padding(.horizontal, 32)
+
+            // Fun fact
+            HStack(alignment: .top, spacing: 8) {
+                Text("🧠")
+                    .font(.system(size: 14))
+                Text(tutor.funFact)
+                    .font(.quicksand(12, weight: .regular))
+                    .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
+                    .italic()
+            }
+            .padding(.horizontal, 48)
+            .id(tutor.id + "-funfact")
 
             // Select button
             Button {
@@ -153,9 +163,29 @@ struct TutorsView: View {
                 .shadow(color: (isActive ? tutor.accentColor : Color.deepTeal).opacity(0.3), radius: 8, y: 4)
             }
             .buttonStyle(.plain)
-            .padding(.top, 4)
+            .padding(.top, 2)
         }
         .animation(.easeInOut(duration: 0.3), value: focusedTutorID)
+    }
+
+    private func profileDetail(icon: String, title: String, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .foregroundColor(focusedTutor.accentColor)
+                Text(title)
+                    .font(.quicksand(13, weight: .semiBold))
+                    .foregroundColor(Color.adaptiveText(for: colorScheme))
+            }
+
+            Text(text)
+                .font(.quicksand(12, weight: .regular))
+                .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Carousel
@@ -186,7 +216,7 @@ struct TutorsView: View {
             }
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $focusedTutorID)
-            .frame(height: 230)
+            .frame(height: 210)
             .onChange(of: focusedTutorID) { _, _ in
                 // Reset auto-scroll when user swipes
                 if isUserInteracting {
@@ -260,7 +290,7 @@ struct TutorsView: View {
             VStack(spacing: 14) {
                 Circle()
                     .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.08))
-                    .frame(width: 80, height: 80)
+                    .frame(width: 72, height: 72)
 
                 RoundedRectangle(cornerRadius: 6)
                     .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.12))
@@ -270,18 +300,35 @@ struct TutorsView: View {
                     .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.08))
                     .frame(width: 80, height: 16)
 
-                Capsule()
-                    .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.08))
-                    .frame(width: 100, height: 28)
-
                 VStack(spacing: 6) {
                     RoundedRectangle(cornerRadius: 3)
                         .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.06))
-                        .frame(width: 300, height: 14)
+                        .frame(width: 320, height: 14)
                     RoundedRectangle(cornerRadius: 3)
                         .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.06))
-                        .frame(width: 240, height: 14)
+                        .frame(width: 260, height: 14)
                 }
+
+                // Two-column placeholder
+                HStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.08))
+                            .frame(width: 50, height: 14)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.06))
+                            .frame(height: 40)
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.08))
+                            .frame(width: 50, height: 14)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.06))
+                            .frame(height: 40)
+                    }
+                }
+                .padding(.horizontal, 32)
 
                 Capsule()
                     .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.1))
@@ -298,7 +345,7 @@ struct TutorsView: View {
                         Color.adaptiveCardBackground(for: colorScheme)
                         SkeletonShimmerView(colorScheme: colorScheme)
                     }
-                    .frame(width: 180, height: 210)
+                    .frame(width: 180, height: 190)
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)

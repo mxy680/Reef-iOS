@@ -35,17 +35,6 @@ struct TutorCardView: View {
                 .font(.quicksand(12, weight: .regular))
                 .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
 
-            // Specialty pill
-            Text(tutor.specialty)
-                .font(.quicksand(11, weight: .medium))
-                .foregroundColor(colorScheme == .dark ? .brightTealDark : .deepTeal)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill(Color.deepTeal.opacity(colorScheme == .dark ? 0.15 : 0.1))
-                )
-
             // Active indicator
             if isActiveTutor {
                 HStack(spacing: 4) {
@@ -59,7 +48,7 @@ struct TutorCardView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
-        .frame(width: 180, height: 210)
+        .frame(width: 180, height: 190)
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(
