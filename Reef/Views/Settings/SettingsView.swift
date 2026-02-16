@@ -2,7 +2,7 @@
 //  SettingsView.swift
 //  Reef
 //
-//  Settings home — grid of cards that navigate into detail views.
+//  Settings home — bento box grid that navigates into detail views.
 //
 
 import SwiftUI
@@ -45,36 +45,35 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-// MARK: - Card Component
+// MARK: - Bento Card
 
-struct SettingsCategoryCard: View {
+private struct BentoCard: View {
     let section: SettingsSection
     let colorScheme: ColorScheme
+    var isHero: Bool = false
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: isHero ? 14 : 8) {
             Image(systemName: section.icon)
-                .font(.system(size: 28, weight: .medium))
+                .font(.system(size: isHero ? 36 : 24, weight: .medium))
                 .foregroundColor(Color.deepTeal)
 
             Text(section.title)
-                .font(.quicksand(17, weight: .bold))
+                .font(.quicksand(isHero ? 20 : 16, weight: .bold))
                 .foregroundColor(Color.adaptiveText(for: colorScheme))
 
             Text(section.subtitle)
-                .font(.quicksand(13, weight: .regular))
+                .font(.quicksand(isHero ? 14 : 12, weight: .regular))
                 .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.6))
                 .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
-        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
                 .fill(colorScheme == .dark ? Color.warmDarkCard : Color.white)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
                 .stroke(Color.black.opacity(colorScheme == .dark ? 0.5 : 0.35), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
@@ -91,23 +90,52 @@ struct SettingsView: View {
         themeManager.isDarkMode ? .dark : .light
     }
 
-    private let columns = [
-        GridItem(.adaptive(minimum: 160, maximum: 220), spacing: 16)
-    ]
+    // Layout constants
+    private let gap: CGFloat = 12
+    private let topRowHeight: CGFloat = 240
+    private let bottomRowHeight: CGFloat = 160
 
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(SettingsSection.allCases) { section in
-                    NavigationLink(value: section) {
-                        SettingsCategoryCard(
-                            section: section,
-                            colorScheme: effectiveColorScheme
-                        )
+            GeometryReader { geo in
+                let w = geo.size.width
+                let leftCol = (w - gap) * 0.58
+                let rightCol = (w - gap) * 0.42
+                let smallCardH = (topRowHeight - gap) / 2
+                let botLeft = (w - gap) * 0.42
+                let botRight = (w - gap) * 0.58
+
+                VStack(spacing: gap) {
+                    // ┌──────────────┬──────────┐
+                    // │              │    AI    │
+                    // │   Account    ├──────────┤
+                    // │              │  Study   │
+                    // └──────────────┴──────────┘
+                    HStack(spacing: gap) {
+                        bentoLink(.account, isHero: true)
+                            .frame(width: leftCol, height: topRowHeight)
+
+                        VStack(spacing: gap) {
+                            bentoLink(.ai)
+                                .frame(height: smallCardH)
+                            bentoLink(.study)
+                                .frame(height: smallCardH)
+                        }
+                        .frame(width: rightCol, height: topRowHeight)
                     }
-                    .buttonStyle(.plain)
+
+                    // ┌─────────┬───────────────┐
+                    // │ Privacy │     About      │
+                    // └─────────┴───────────────┘
+                    HStack(spacing: gap) {
+                        bentoLink(.privacy)
+                            .frame(width: botLeft, height: bottomRowHeight)
+                        bentoLink(.about)
+                            .frame(width: botRight, height: bottomRowHeight)
+                    }
                 }
             }
+            .frame(height: topRowHeight + gap + bottomRowHeight)
             .padding(32)
         }
         .background(Color.adaptiveBackground(for: effectiveColorScheme))
@@ -120,6 +148,17 @@ struct SettingsView: View {
             case .about:   AboutView()
             }
         }
+    }
+
+    private func bentoLink(_ section: SettingsSection, isHero: Bool = false) -> some View {
+        NavigationLink(value: section) {
+            BentoCard(
+                section: section,
+                colorScheme: effectiveColorScheme,
+                isHero: isHero
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
