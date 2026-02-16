@@ -167,6 +167,15 @@ struct AboutView: View {
                 reefGraphic
                     .padding(.top, 24)
             }
+            .padding(24)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(effectiveColorScheme == .dark ? Color.warmDarkCard : Color.white)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.black.opacity(effectiveColorScheme == .dark ? 0.5 : 0.35), lineWidth: 1)
+            )
             .padding(32)
         }
         .background(Color.adaptiveBackground(for: effectiveColorScheme))
