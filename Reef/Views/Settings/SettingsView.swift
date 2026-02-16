@@ -86,12 +86,12 @@ private struct BentoCard: View {
 
     private var heroContent: some View {
         ZStack {
-            // Large decorative watermark
-            Image(systemName: section.icon)
-                .font(.system(size: 120, weight: .ultraLight))
-                .foregroundStyle(.white.opacity(0.12))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .offset(x: 20, y: 20)
+            // Accent circle peeking from top-right
+            Circle()
+                .fill(.white.opacity(0.15))
+                .frame(width: 180, height: 180)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .offset(x: 50, y: -40)
 
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: section.icon)
@@ -129,18 +129,16 @@ private struct BentoCard: View {
     }
 
     private var standardContent: some View {
-        let bgTint = colorScheme == .dark
-            ? section.iconColor.opacity(0.08)
-            : section.tint.opacity(0.25)
+        let tintOpacity: Double = colorScheme == .dark ? 0.08 : 0.25
         let cardBg = colorScheme == .dark ? Color.warmDarkCard : Color.white
 
         return ZStack {
-            // Large decorative watermark
-            Image(systemName: section.icon)
-                .font(.system(size: 72, weight: .ultraLight))
-                .foregroundStyle(section.iconColor.opacity(colorScheme == .dark ? 0.08 : 0.1))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .offset(x: 14, y: 14)
+            // Accent circle peeking from top-right
+            Circle()
+                .fill(section.tint.opacity(colorScheme == .dark ? 0.15 : 0.35))
+                .frame(width: 100, height: 100)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .offset(x: 30, y: -30)
 
             VStack(alignment: .leading, spacing: 4) {
                 Image(systemName: section.icon)
@@ -166,7 +164,7 @@ private struct BentoCard: View {
                 .fill(cardBg)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(bgTint)
+                        .fill(section.tint.opacity(tintOpacity))
                 )
         )
         .overlay(
