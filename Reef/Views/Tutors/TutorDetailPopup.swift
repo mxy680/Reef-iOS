@@ -71,7 +71,7 @@ struct TutorDetailPopup: View {
                     .padding(24)
                 }
             }
-            .frame(width: 420, maxHeight: 600)
+            .frame(maxWidth: 420, maxHeight: 600)
             .background(cardBackgroundColor)
             .clipShape(RoundedRectangle(cornerRadius: 20))
             .shadow(color: Color.black.opacity(0.15), radius: 32, x: 0, y: 12)
