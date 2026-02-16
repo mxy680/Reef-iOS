@@ -305,6 +305,7 @@ struct StudySettingsView: View {
                     .stroke(Color.deepTeal.opacity(0.4), lineWidth: 1)
             )
         }
+        .buttonStyle(.plain)
     }
 }
 
