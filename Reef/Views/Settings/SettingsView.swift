@@ -53,6 +53,16 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
         case .about:   return Color.deepCoral
         }
     }
+
+    var tint: Color {
+        switch self {
+        case .account: return Color.seafoam
+        case .ai:      return Color.seafoam
+        case .study:   return Color.softCoral
+        case .privacy: return Color.seafoam
+        case .about:   return Color.softCoral
+        }
+    }
 }
 
 // MARK: - Bento Card
@@ -66,10 +76,6 @@ private struct BentoCard: View {
         Color.black.opacity(colorScheme == .dark ? 0.5 : 0.35)
     }
 
-    private var cardFill: Color {
-        colorScheme == .dark ? Color.warmDarkCard : Color.white
-    }
-
     var body: some View {
         if isHero {
             heroContent
@@ -79,20 +85,33 @@ private struct BentoCard: View {
     }
 
     private var heroContent: some View {
-        VStack(spacing: 16) {
+        ZStack {
+            // Large decorative watermark
             Image(systemName: section.icon)
-                .font(.system(size: 44, weight: .medium))
-                .foregroundStyle(.white.opacity(0.95))
+                .font(.system(size: 120, weight: .ultraLight))
+                .foregroundStyle(.white.opacity(0.12))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .offset(x: 20, y: 20)
 
-            Text(section.title)
-                .font(.quicksand(22, weight: .bold))
-                .foregroundColor(.white)
+            VStack(alignment: .leading, spacing: 8) {
+                Image(systemName: section.icon)
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(.white)
 
-            Text(section.subtitle)
-                .font(.quicksand(14, weight: .medium))
-                .foregroundColor(.white.opacity(0.8))
+                Spacer()
+
+                Text(section.title)
+                    .font(.quicksand(24, weight: .bold))
+                    .foregroundColor(.white)
+
+                Text(section.subtitle)
+                    .font(.quicksand(14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.75))
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(
@@ -110,30 +129,45 @@ private struct BentoCard: View {
     }
 
     private var standardContent: some View {
-        VStack(spacing: 10) {
-            Circle()
-                .fill(section.iconColor.opacity(0.12))
-                .frame(width: 44, height: 44)
-                .overlay(
-                    Image(systemName: section.icon)
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(section.iconColor)
-                )
+        let bgTint = colorScheme == .dark
+            ? section.iconColor.opacity(0.08)
+            : section.tint.opacity(0.25)
+        let cardBg = colorScheme == .dark ? Color.warmDarkCard : Color.white
 
-            Text(section.title)
-                .font(.quicksand(16, weight: .bold))
-                .foregroundColor(Color.adaptiveText(for: colorScheme))
+        return ZStack {
+            // Large decorative watermark
+            Image(systemName: section.icon)
+                .font(.system(size: 72, weight: .ultraLight))
+                .foregroundStyle(section.iconColor.opacity(colorScheme == .dark ? 0.08 : 0.1))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .offset(x: 14, y: 14)
 
-            Text(section.subtitle)
-                .font(.quicksand(11, weight: .regular))
-                .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.55))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
+            VStack(alignment: .leading, spacing: 4) {
+                Image(systemName: section.icon)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(section.iconColor)
+
+                Spacer()
+
+                Text(section.title)
+                    .font(.quicksand(17, weight: .bold))
+                    .foregroundColor(Color.adaptiveText(for: colorScheme))
+
+                Text(section.subtitle)
+                    .font(.quicksand(12, weight: .regular))
+                    .foregroundColor(Color.adaptiveText(for: colorScheme).opacity(0.55))
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(cardFill)
+                .fill(cardBg)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(bgTint)
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16)
@@ -156,7 +190,7 @@ struct SettingsView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let w = geo.size.width - 64   // 32pt padding each side
+            let w = geo.size.width - 64
             let h = geo.size.height - 64
             let topH = (h - gap) * 0.6
             let botH = (h - gap) * 0.4
