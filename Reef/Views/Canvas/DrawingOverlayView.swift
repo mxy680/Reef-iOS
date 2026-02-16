@@ -123,10 +123,6 @@ struct DrawingOverlayView: UIViewRepresentable {
         context.coordinator.recognitionEnabled = recognitionEnabled
         context.coordinator.onRecognitionResult = onRecognitionResult
 
-        // Send problem context when text extraction completes (enriches reasoning, not needed for dashboard question ID)
-        if let ctx = problemContext, !ctx.isEmpty, ctx != context.coordinator.problemContext {
-            AIService.shared.sendProblemContext(sessionId: documentID.uuidString, problemContext: ctx)
-        }
         context.coordinator.problemContext = problemContext
     }
 
