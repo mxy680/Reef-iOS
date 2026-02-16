@@ -137,6 +137,10 @@ class AIService {
     /// The current stroke session ID, reused for voice messages.
     private(set) var currentSessionId: String?
 
+    /// Callback for page-level transcription messages from the server.
+    /// Parameters: latex, text, confidence, page
+    var onTranscription: ((String, String, Double, Int) -> Void)?
+
     /// Connects to the stroke logging WebSocket endpoint.
     /// Always creates a fresh connection when a sessionId is provided.
     func connectStrokeSocket(sessionId: String? = nil, documentName: String? = nil, questionNumber: Int? = nil) {
@@ -250,13 +254,24 @@ class AIService {
         }
     }
 
-    /// Receive loop for ack messages (keeps connection alive).
+    /// Receive loop for ack/transcription messages (keeps connection alive).
     private func listenForStrokeAcks() {
         guard let socket = strokeSocket else { return }
         socket.receive { [weak self] result in
             switch result {
-            case .success:
+            case .success(let message):
                 DispatchQueue.main.async {
+                    if case .string(let text) = message,
+                       let data = text.data(using: .utf8),
+                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let type = json["type"] as? String,
+                       type == "transcription",
+                       let latex = json["latex"] as? String,
+                       let plainText = json["text"] as? String,
+                       let confidence = json["confidence"] as? Double,
+                       let page = json["page"] as? Int {
+                        self?.onTranscription?(latex, plainText, confidence, page)
+                    }
                     self?.listenForStrokeAcks()
                 }
             case .failure:

@@ -83,6 +83,11 @@ struct DrawingOverlayView: UIViewRepresentable {
             questionNumber: questionNumber
         )
 
+        // Listen for page-level transcription messages from Mathpix
+        AIService.shared.onTranscription = { latex, text, confidence, page in
+            print("[Transcription] page=\(page) confidence=\(String(format: "%.1f%%", confidence * 100)) latex=\(latex.prefix(80))")
+        }
+
         return container
     }
 
