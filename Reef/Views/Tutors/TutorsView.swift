@@ -52,15 +52,18 @@ struct TutorsView: View {
     // MARK: - Main Content
 
     private var mainContent: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                heroCard
-                carouselSection
-            }
-            .padding(32)
-            .animation(.easeInOut(duration: 0.3), value: focusedTutorID)
+        VStack(spacing: 20) {
+            heroCard
+                .padding(.horizontal, 32)
+
+            carouselSection
+
+            Spacer(minLength: 0)
         }
+        .padding(.vertical, 32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.adaptiveBackground(for: colorScheme))
+        .animation(.easeInOut(duration: 0.3), value: focusedTutorID)
     }
 
     // MARK: - Hero Card
@@ -97,11 +100,13 @@ struct TutorsView: View {
                     Text(tutor.personality)
                         .font(.quicksand(14, weight: .regular))
                         .foregroundColor(.white.opacity(0.9))
+                        .lineLimit(4)
                         .id(tutor.id + "-personality")
 
                     Text(tutor.lore)
                         .font(.quicksand(13, weight: .regular))
                         .foregroundColor(.white.opacity(0.75))
+                        .lineLimit(3)
                         .id(tutor.id + "-lore")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -119,6 +124,7 @@ struct TutorsView: View {
                     Text(tutor.funFact)
                         .font(.quicksand(12, weight: .regular))
                         .foregroundColor(.white.opacity(0.75))
+                        .lineLimit(4)
                         .id(tutor.id + "-funfact")
                 }
                 .padding(14)
@@ -171,7 +177,7 @@ struct TutorsView: View {
             }
         }
         .padding(28)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: 300)
         .background(gradient)
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(
@@ -276,38 +282,41 @@ struct TutorsView: View {
     // MARK: - Skeleton
 
     private var skeletonView: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Hero skeleton
-                ZStack {
-                    Color.adaptiveCardBackground(for: colorScheme)
-                    SkeletonShimmerView(colorScheme: colorScheme)
-                }
-                .frame(height: 280)
-                .clipShape(RoundedRectangle(cornerRadius: 24))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(Color.black.opacity(colorScheme == .dark ? 0.35 : 0.4), lineWidth: 1.5)
-                )
+        VStack(spacing: 20) {
+            // Hero skeleton
+            ZStack {
+                Color.adaptiveCardBackground(for: colorScheme)
+                SkeletonShimmerView(colorScheme: colorScheme)
+            }
+            .frame(maxHeight: 300)
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(Color.black.opacity(colorScheme == .dark ? 0.35 : 0.4), lineWidth: 1.5)
+            )
+            .padding(.horizontal, 32)
 
-                // Carousel skeleton
-                HStack(spacing: 16) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        ZStack {
-                            Color.adaptiveCardBackground(for: colorScheme)
-                            SkeletonShimmerView(colorScheme: colorScheme)
-                        }
-                        .frame(width: 180, height: 190)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.black.opacity(colorScheme == .dark ? 0.35 : 0.4), lineWidth: 1.5)
-                        )
+            // Carousel skeleton
+            HStack(spacing: 16) {
+                ForEach(0..<3, id: \.self) { _ in
+                    ZStack {
+                        Color.adaptiveCardBackground(for: colorScheme)
+                        SkeletonShimmerView(colorScheme: colorScheme)
                     }
+                    .frame(width: 180, height: 190)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.black.opacity(colorScheme == .dark ? 0.35 : 0.4), lineWidth: 1.5)
+                    )
                 }
             }
-            .padding(32)
+            .padding(.horizontal, 32)
+
+            Spacer(minLength: 0)
         }
+        .padding(.vertical, 32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.adaptiveBackground(for: colorScheme))
     }
 }
