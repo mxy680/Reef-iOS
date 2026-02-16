@@ -25,10 +25,6 @@ struct TutorsView: View {
         tutors.first { $0.id == focusedTutorID } ?? tutors[0]
     }
 
-    private var cardBg: Color {
-        Color.adaptiveCardBackground(for: colorScheme)
-    }
-
     var body: some View {
         Group {
             if isInitialLoad {
@@ -59,7 +55,6 @@ struct TutorsView: View {
         ScrollView {
             VStack(spacing: 20) {
                 heroCard
-                funFactCard
                 carouselSection
             }
             .padding(32)
@@ -82,35 +77,58 @@ struct TutorsView: View {
             endPoint: .bottomTrailing
         )
 
-        return VStack(spacing: 12) {
-            Text(tutor.name)
-                .font(.dynaPuff(30, weight: .bold))
-                .foregroundColor(.white)
-                .id(tutor.id + "-name")
+        return VStack(spacing: 16) {
+            // Header
+            VStack(spacing: 4) {
+                Text(tutor.name)
+                    .font(.dynaPuff(30, weight: .bold))
+                    .foregroundColor(.white)
+                    .id(tutor.id + "-name")
 
-            Text("The \(tutor.species)")
-                .font(.quicksand(15, weight: .semiBold))
-                .foregroundColor(.white.opacity(0.85))
-
-            // Personality + lore
-            VStack(spacing: 8) {
-                Text(tutor.personality)
-                    .font(.quicksand(14, weight: .regular))
-                    .foregroundColor(.white.opacity(0.9))
-                    .multilineTextAlignment(.center)
-                    .id(tutor.id + "-personality")
-
-                Text(tutor.lore)
-                    .font(.quicksand(13, weight: .regular))
-                    .foregroundColor(.white.opacity(0.75))
-                    .multilineTextAlignment(.center)
-                    .id(tutor.id + "-lore")
+                Text("The \(tutor.species)")
+                    .font(.quicksand(15, weight: .semiBold))
+                    .foregroundColor(.white.opacity(0.85))
             }
-            .padding(.horizontal, 24)
+
+            // Two-column: personality+lore | fun fact
+            HStack(alignment: .top, spacing: 20) {
+                // Left: personality + lore
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(tutor.personality)
+                        .font(.quicksand(14, weight: .regular))
+                        .foregroundColor(.white.opacity(0.9))
+                        .id(tutor.id + "-personality")
+
+                    Text(tutor.lore)
+                        .font(.quicksand(13, weight: .regular))
+                        .foregroundColor(.white.opacity(0.75))
+                        .id(tutor.id + "-lore")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Right: fun fact
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Text("🧠")
+                            .font(.system(size: 14))
+                        Text("Did You Know?")
+                            .font(.quicksand(13, weight: .semiBold))
+                            .foregroundColor(.white)
+                    }
+
+                    Text(tutor.funFact)
+                        .font(.quicksand(12, weight: .regular))
+                        .foregroundColor(.white.opacity(0.75))
+                        .id(tutor.id + "-funfact")
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
 
             // Buttons row
             HStack(spacing: 12) {
-                // Preview voice
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         showingVoicePreview.toggle()
@@ -125,14 +143,10 @@ struct TutorsView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 12)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.2))
-                    )
+                    .background(Capsule().fill(Color.white.opacity(0.2)))
                 }
                 .buttonStyle(.plain)
 
-                // Select tutor
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         if isActive {
@@ -151,18 +165,12 @@ struct TutorsView: View {
                     .foregroundColor(isActive ? .white : Color.adaptiveText(for: colorScheme))
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
-                    .background(
-                        Capsule()
-                            .fill(isActive ? Color.white.opacity(0.25) : Color.white)
-                    )
+                    .background(Capsule().fill(isActive ? Color.white.opacity(0.25) : Color.white))
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.top, 4)
-
         }
-        .padding(.vertical, 28)
-        .padding(.horizontal, 16)
+        .padding(28)
         .frame(maxWidth: .infinity)
         .background(gradient)
         .clipShape(RoundedRectangle(cornerRadius: 24))
@@ -174,36 +182,6 @@ struct TutorsView: View {
         .onChange(of: focusedTutorID) { _, _ in
             showingVoicePreview = false
         }
-    }
-
-    // MARK: - Fun Fact Card
-
-    private var funFactCard: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text("🧠")
-                .font(.system(size: 22))
-                .frame(width: 36, height: 36)
-                .background(
-                    Color.deepTeal.opacity(colorScheme == .dark ? 0.15 : 0.08)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Did You Know?")
-                    .font(.quicksand(14, weight: .semiBold))
-                    .foregroundColor(Color.adaptiveText(for: colorScheme))
-
-                Text(focusedTutor.funFact)
-                    .font(.quicksand(13, weight: .regular))
-                    .foregroundColor(Color.adaptiveSecondaryText(for: colorScheme))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(cardBg)
-        .dashboardCard(colorScheme: colorScheme)
-        .id(focusedTutor.id + "-funfact")
     }
 
     // MARK: - Carousel
@@ -312,9 +290,6 @@ struct TutorsView: View {
                         .stroke(Color.black.opacity(colorScheme == .dark ? 0.35 : 0.4), lineWidth: 1.5)
                 )
 
-                // Fun fact skeleton
-                skeletonInfoCard
-
                 // Carousel skeleton
                 HStack(spacing: 16) {
                     ForEach(0..<3, id: \.self) { _ in
@@ -334,36 +309,5 @@ struct TutorsView: View {
             .padding(32)
         }
         .background(Color.adaptiveBackground(for: colorScheme))
-    }
-
-    private var skeletonInfoCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.08))
-                    .frame(width: 32, height: 32)
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.12))
-                    .frame(width: 60, height: 16)
-            }
-            VStack(spacing: 6) {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.06))
-                    .frame(height: 13)
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.06))
-                    .frame(height: 13)
-                HStack {
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.adaptiveSecondaryText(for: colorScheme).opacity(0.04))
-                        .frame(height: 13)
-                    Spacer()
-                }
-            }
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(cardBg)
-        .dashboardCard(colorScheme: colorScheme)
     }
 }
