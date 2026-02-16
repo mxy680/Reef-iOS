@@ -145,7 +145,9 @@ struct HomeView: View {
             }
         } else if selectedItem == .settings {
             SettingsView(authManager: authManager)
-        } else if selectedItem == .myReef || selectedItem == .analytics || selectedItem == .tutors {
+        } else if selectedItem == .analytics {
+            AnalyticsView(colorScheme: effectiveColorScheme)
+        } else if selectedItem == .myReef || selectedItem == .tutors {
             // Placeholder for unimplemented sections
             VStack(spacing: 16) {
                 Image(systemName: selectedItem?.icon ?? "questionmark")
