@@ -44,23 +44,13 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    var accent: Color {
+    var iconColor: Color {
         switch self {
         case .account: return Color.deepTeal
-        case .ai:      return Color(hex: "8B5CF6")
+        case .ai:      return Color.deepTeal
         case .study:   return Color.deepCoral
-        case .privacy: return Color(hex: "3B82F6")
-        case .about:   return Color(hex: "F59E0B")
-        }
-    }
-
-    var gradient: [Color] {
-        switch self {
-        case .account: return [Color.deepTeal, Color.seafoam]
-        case .ai:      return [Color(hex: "8B5CF6"), Color(hex: "C4B5FD")]
-        case .study:   return [Color.deepCoral, Color.softCoral]
-        case .privacy: return [Color(hex: "3B82F6"), Color(hex: "93C5FD")]
-        case .about:   return [Color(hex: "F59E0B"), Color(hex: "FDE68A")]
+        case .privacy: return Color.deepTeal
+        case .about:   return Color.deepCoral
         }
     }
 }
@@ -72,6 +62,14 @@ private struct BentoCard: View {
     let colorScheme: ColorScheme
     var isHero: Bool = false
 
+    private var borderColor: Color {
+        Color.black.opacity(colorScheme == .dark ? 0.5 : 0.35)
+    }
+
+    private var cardFill: Color {
+        colorScheme == .dark ? Color.warmDarkCard : Color.white
+    }
+
     var body: some View {
         if isHero {
             heroContent
@@ -80,7 +78,6 @@ private struct BentoCard: View {
         }
     }
 
-    // Hero card — gradient fill, white text
     private var heroContent: some View {
         VStack(spacing: 16) {
             Image(systemName: section.icon)
@@ -97,40 +94,30 @@ private struct BentoCard: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 24)
+            RoundedRectangle(cornerRadius: 16)
                 .fill(
                     LinearGradient(
-                        colors: section.gradient,
+                        colors: [Color.deepTeal, Color.seafoam],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
         )
         .overlay(
-            // Subtle inner highlight
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(.white.opacity(0.25), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(borderColor, lineWidth: 1)
         )
-        .shadow(color: section.accent.opacity(0.3), radius: 12, x: 0, y: 6)
     }
 
-    // Standard card — tinted background, icon badge, adaptive text
     private var standardContent: some View {
         VStack(spacing: 10) {
-            // Icon on a colored circle
             Circle()
-                .fill(
-                    LinearGradient(
-                        colors: section.gradient,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(section.iconColor.opacity(0.12))
                 .frame(width: 44, height: 44)
                 .overlay(
                     Image(systemName: section.icon)
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(section.iconColor)
                 )
 
             Text(section.title)
@@ -145,24 +132,13 @@ private struct BentoCard: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(colorScheme == .dark
-                      ? Color.warmDarkCard
-                      : Color.white)
+            RoundedRectangle(cornerRadius: 16)
+                .fill(cardFill)
         )
         .overlay(
-            // Subtle tinted top edge
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(
-                    LinearGradient(
-                        colors: [section.accent.opacity(0.4), section.accent.opacity(0.1)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1
-                )
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(borderColor, lineWidth: 1)
         )
-        .shadow(color: section.accent.opacity(0.12), radius: 8, x: 0, y: 4)
     }
 }
 
@@ -176,52 +152,41 @@ struct SettingsView: View {
         themeManager.isDarkMode ? .dark : .light
     }
 
-    // Layout constants
     private let gap: CGFloat = 14
-    private let topRowHeight: CGFloat = 240
-    private let bottomRowHeight: CGFloat = 160
 
     var body: some View {
-        ScrollView {
-            GeometryReader { geo in
-                let w = geo.size.width
-                let leftCol = (w - gap) * 0.58
-                let rightCol = (w - gap) * 0.42
-                let smallCardH = (topRowHeight - gap) / 2
-                let botLeft = (w - gap) * 0.42
-                let botRight = (w - gap) * 0.58
+        GeometryReader { geo in
+            let w = geo.size.width - 64   // 32pt padding each side
+            let h = geo.size.height - 64
+            let topH = (h - gap) * 0.6
+            let botH = (h - gap) * 0.4
+            let smallH = (topH - gap) / 2
+            let leftCol = (w - gap) * 0.58
+            let rightCol = (w - gap) * 0.42
+            let botLeft = (w - gap) * 0.42
+            let botRight = (w - gap) * 0.58
 
-                VStack(spacing: gap) {
-                    // ┌──────────────┬──────────┐
-                    // │              │    AI    │
-                    // │   Account    ├──────────┤
-                    // │              │  Study   │
-                    // └──────────────┴──────────┘
-                    HStack(spacing: gap) {
-                        bentoLink(.account, isHero: true)
-                            .frame(width: leftCol, height: topRowHeight)
+            VStack(spacing: gap) {
+                HStack(spacing: gap) {
+                    bentoLink(.account, isHero: true)
+                        .frame(width: leftCol, height: topH)
 
-                        VStack(spacing: gap) {
-                            bentoLink(.ai)
-                                .frame(height: smallCardH)
-                            bentoLink(.study)
-                                .frame(height: smallCardH)
-                        }
-                        .frame(width: rightCol, height: topRowHeight)
+                    VStack(spacing: gap) {
+                        bentoLink(.ai)
+                            .frame(height: smallH)
+                        bentoLink(.study)
+                            .frame(height: smallH)
                     }
+                    .frame(width: rightCol, height: topH)
+                }
 
-                    // ┌─────────┬───────────────┐
-                    // │ Privacy │     About      │
-                    // └─────────┴───────────────┘
-                    HStack(spacing: gap) {
-                        bentoLink(.privacy)
-                            .frame(width: botLeft, height: bottomRowHeight)
-                        bentoLink(.about)
-                            .frame(width: botRight, height: bottomRowHeight)
-                    }
+                HStack(spacing: gap) {
+                    bentoLink(.privacy)
+                        .frame(width: botLeft, height: botH)
+                    bentoLink(.about)
+                        .frame(width: botRight, height: botH)
                 }
             }
-            .frame(height: topRowHeight + gap + bottomRowHeight)
             .padding(32)
         }
         .background(Color.adaptiveBackground(for: effectiveColorScheme))
