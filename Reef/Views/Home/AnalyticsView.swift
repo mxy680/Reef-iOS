@@ -189,7 +189,7 @@ struct AnalyticsView: View {
                                 ? .white
                                 : Color.adaptiveText(for: colorScheme)
                         )
-                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
