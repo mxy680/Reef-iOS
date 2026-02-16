@@ -83,11 +83,6 @@ struct TutorsView: View {
         )
 
         return VStack(spacing: 12) {
-            Text(tutor.emoji)
-                .font(.system(size: 56))
-                .shadow(color: .black.opacity(0.15), radius: 8)
-                .id(tutor.id + "-emoji")
-
             Text(tutor.name)
                 .font(.dynaPuff(30, weight: .bold))
                 .foregroundColor(.white)
