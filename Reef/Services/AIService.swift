@@ -56,7 +56,7 @@ class AIService {
     static let shared = AIService()
 
     #if DEBUG
-    private let baseURL = "https://edmonton-highlighted-define-nobody.trycloudflare.com"
+    private let baseURL = "https://assistant-evaluate-rss-copying.trycloudflare.com"
     #else
     private let baseURL = "https://api.studyreef.com"
     #endif
@@ -432,8 +432,6 @@ class AIService {
         if voiceSocket == nil {
             connectVoiceSocket()
         }
-        // Ensure reasoning WS is connected to receive TTS response
-        ensureReasoningSocket()
         guard let socket = voiceSocket else {
             print("[VoiceWS] voiceSocket is nil after connect attempt")
             return
@@ -471,17 +469,59 @@ class AIService {
             if let error = error { print("[VoiceWS] voice_end error: \(error)") }
         }
 
-        // 4. Listen for ack (reasoning response comes via reasoning WS, not here)
+        // 4. Listen for ack + reasoning + TTS stream on this socket
+        listenForVoiceResponse(on: socket)
+    }
+
+    /// Listen for ack, reasoning text, and TTS audio on the voice WebSocket.
+    private func listenForVoiceResponse(on socket: URLSessionWebSocketTask) {
         socket.receive { [weak self] result in
+            guard let self = self else { return }
             switch result {
             case .success(let message):
-                if case .string(let text) = message {
-                    print("[VoiceWS] Question ack: \(text.prefix(100))")
+                switch message {
+                case .string(let text):
+                    if let data = text.data(using: .utf8),
+                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let type = json["type"] as? String {
+                        if type == "ack" {
+                            let transcription = json["transcription"] as? String ?? ""
+                            print("[VoiceWS] Question ack: \(transcription.prefix(80))")
+                            // Keep listening for reasoning + TTS
+                            self.listenForVoiceResponse(on: socket)
+                        } else if type == "reasoning" {
+                            let msg = json["message"] as? String ?? ""
+                            print("[VoiceWS] Reasoning: \(msg.prefix(80))")
+                            self.listenForVoiceResponse(on: socket)
+                        } else if type == "tts_start" {
+                            let sampleRate = json["sample_rate"] as? Double ?? 24000
+                            print("[VoiceWS] Audio playback started")
+                            DispatchQueue.main.async {
+                                self.startAudioPlayback(sampleRate: sampleRate)
+                            }
+                            self.listenForVoiceResponse(on: socket)
+                        } else if type == "tts_end" {
+                            print("[VoiceWS] TTS stream ended")
+                            // Done — stop listening, voice WS stays open for next question
+                        } else {
+                            // Unknown type, keep listening
+                            self.listenForVoiceResponse(on: socket)
+                        }
+                    } else {
+                        self.listenForVoiceResponse(on: socket)
+                    }
+                case .data(let data):
+                    DispatchQueue.main.async {
+                        self.playAudioChunk(data)
+                    }
+                    self.listenForVoiceResponse(on: socket)
+                @unknown default:
+                    self.listenForVoiceResponse(on: socket)
                 }
             case .failure(let error):
-                print("[VoiceWS] Failed to receive ack: \(error)")
+                print("[VoiceWS] Voice response error: \(error)")
                 DispatchQueue.main.async {
-                    self?.voiceSocket = nil
+                    self.voiceSocket = nil
                 }
             }
         }
