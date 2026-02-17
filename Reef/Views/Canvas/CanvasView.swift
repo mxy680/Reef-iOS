@@ -138,13 +138,12 @@ struct CanvasView: View {
                     onAIActionSelected: { action in
                         if action == "ask" {
                             if isRecording {
-                                // Stop recording and send
+                                // Stop recording and send as question
                                 isRecording = false
                                 if let audioData = VoiceRecordingService.shared.stopRecording() {
-                                    let sessionId = note?.id.uuidString ?? quiz?.id.uuidString ?? ""
-                                    AIService.shared.sendVoiceMessage(
+                                    AIService.shared.sendVoiceQuestion(
                                         audioData: audioData,
-                                        sessionId: sessionId,
+                                        sessionId: AIService.shared.currentSessionId ?? "",
                                         page: 0
                                     )
                                 }
