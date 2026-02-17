@@ -185,12 +185,15 @@ class AIService {
     // MARK: - Reasoning WebSocket
 
     private var reasoningSocket: URLSessionWebSocketTask?
+    private var reasoningSessionId: String?
     private var audioEngine: AVAudioEngine?
     private var audioPlayer: AVAudioPlayerNode?
+    private var currentTTSSampleRate: Double = 24000
 
     /// Connect to the reasoning WebSocket to receive tutor responses and TTS audio.
     func connectReasoningSocket(sessionId: String) {
         guard reasoningSocket == nil else { return }
+        reasoningSessionId = sessionId
         let wsURL = baseURL
             .replacingOccurrences(of: "https://", with: "wss://")
             .replacingOccurrences(of: "http://", with: "ws://")
@@ -206,10 +209,21 @@ class AIService {
         listenForReasoningMessages()
     }
 
+    /// Ensure reasoning WebSocket is connected, reconnecting if dropped.
+    private func ensureReasoningSocket() {
+        guard let sid = reasoningSessionId else { return }
+        if let existing = reasoningSocket {
+            existing.cancel(with: .normalClosure, reason: nil)
+            reasoningSocket = nil
+        }
+        connectReasoningSocket(sessionId: sid)
+    }
+
     /// Disconnect the reasoning WebSocket.
     func disconnectReasoningSocket() {
         reasoningSocket?.cancel(with: .normalClosure, reason: nil)
         reasoningSocket = nil
+        reasoningSessionId = nil
         stopAudioPlayback()
     }
 
@@ -257,6 +271,7 @@ class AIService {
 
     private func startAudioPlayback(sampleRate: Double) {
         stopAudioPlayback()
+        currentTTSSampleRate = sampleRate
 
         let engine = AVAudioEngine()
         let player = AVAudioPlayerNode()
@@ -291,7 +306,7 @@ class AIService {
 
         guard let format = AVAudioFormat(
             commonFormat: .pcmFormatInt16,
-            sampleRate: 24000,
+            sampleRate: currentTTSSampleRate,
             channels: 1,
             interleaved: true
         ) else { return }
@@ -417,6 +432,8 @@ class AIService {
         if voiceSocket == nil {
             connectVoiceSocket()
         }
+        // Ensure reasoning WS is connected to receive TTS response
+        ensureReasoningSocket()
         guard let socket = voiceSocket else {
             print("[VoiceWS] voiceSocket is nil after connect attempt")
             return

@@ -82,6 +82,13 @@ class VoiceRecordingService: NSObject, AVAudioRecorderDelegate {
         recorder.stop()
         isRecording = false
 
+        // Reset audio session so TTS playback can configure it fresh
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("[VoiceRecording] Failed to deactivate audio session: \(error)")
+        }
+
         defer {
             // Clean up temp file
             if let url = recordingURL {
