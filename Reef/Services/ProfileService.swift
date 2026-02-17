@@ -50,14 +50,9 @@ class ProfileService {
                     ProfileRequest(display_name: name, email: email)
                 )
 
-                let (_, response) = try await session.data(for: request)
-                if let http = response as? HTTPURLResponse, http.statusCode == 200 {
-                    print("DEBUG Profile: Saved to server")
-                } else {
-                    print("DEBUG Profile: Server returned non-200")
-                }
+                let (_, _) = try await session.data(for: request)
             } catch {
-                print("DEBUG Profile: Save failed — \(error.localizedDescription)")
+                // Fire-and-forget — silently handle errors
             }
         }
     }
@@ -91,12 +86,9 @@ class ProfileService {
                 request.httpMethod = "DELETE"
                 request.setValue("Bearer \(userIdentifier)", forHTTPHeaderField: "Authorization")
 
-                let (_, response) = try await session.data(for: request)
-                if let http = response as? HTTPURLResponse {
-                    print("DEBUG Profile: Delete returned \(http.statusCode)")
-                }
+                let (_, _) = try await session.data(for: request)
             } catch {
-                print("DEBUG Profile: Delete failed — \(error.localizedDescription)")
+                // Fire-and-forget — silently handle errors
             }
         }
     }

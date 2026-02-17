@@ -29,8 +29,7 @@ enum KeychainService {
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
         ]
 
-        let status = SecItemAdd(query as CFDictionary, nil)
-        print("DEBUG Keychain: save \(key.rawValue) status: \(status) (0 = success)")
+        SecItemAdd(query as CFDictionary, nil)
     }
 
     static func get(_ key: Key) -> String? {
@@ -48,11 +47,9 @@ enum KeychainService {
         guard status == errSecSuccess,
               let data = result as? Data,
               let value = String(data: data, encoding: .utf8) else {
-            print("DEBUG Keychain: get \(key.rawValue) failed with status: \(status) (-25300 = item not found)")
             return nil
         }
 
-        print("DEBUG Keychain: get \(key.rawValue) succeeded: \(value.prefix(20))...")
         return value
     }
 

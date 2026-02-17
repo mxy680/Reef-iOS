@@ -630,8 +630,6 @@ class CanvasContainerView: UIView {
             at: insertIndex
         )
         saveDocumentState()
-
-        print("Added blank page after page \(currentVisiblePage + 1), now at index \(insertIndex + 1)")
     }
 
     /// Adds a blank page at the end of the document
@@ -644,18 +642,13 @@ class CanvasContainerView: UIView {
             DocumentStructure.Page(type: .blank, originalIndex: nil)
         )
         saveDocumentState()
-
-        print("Added blank page at end, now page \(insertIndex + 1)")
     }
 
     /// Deletes the currently visible page
     /// Returns false if this is the only page (cannot delete)
     @discardableResult
     func deleteCurrentPage() -> Bool {
-        guard pageContainers.count > 1 else {
-            print("Cannot delete the only page in the document")
-            return false
-        }
+        guard pageContainers.count > 1 else { return false }
 
         let deleteIndex = currentVisiblePage
         deletePage(at: deleteIndex)
@@ -664,7 +657,6 @@ class CanvasContainerView: UIView {
         documentStructure?.pages.remove(at: deleteIndex)
         saveDocumentState()
 
-        print("Deleted page \(deleteIndex + 1)")
         return true
     }
 
@@ -672,10 +664,7 @@ class CanvasContainerView: UIView {
     /// Returns false if this is the only page (cannot delete)
     @discardableResult
     func deleteLastPage() -> Bool {
-        guard pageContainers.count > 1 else {
-            print("Cannot delete the only page in the document")
-            return false
-        }
+        guard pageContainers.count > 1 else { return false }
 
         let deleteIndex = pageContainers.count - 1
         deletePage(at: deleteIndex)
@@ -683,7 +672,6 @@ class CanvasContainerView: UIView {
         documentStructure?.pages.remove(at: deleteIndex)
         saveDocumentState()
 
-        print("Deleted last page (was page \(deleteIndex + 1))")
         return true
     }
 
@@ -696,7 +684,6 @@ class CanvasContainerView: UIView {
         }
         container.canvasView.drawing = PKDrawing()
         saveAllDrawings()
-        print("Cleared drawing on page \(currentVisiblePage + 1)")
     }
 
     // MARK: - PDF Export
