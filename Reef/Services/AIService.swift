@@ -237,7 +237,9 @@ class AIService {
                         }
                     }
                 case .data(let data):
-                    self.playAudioChunk(data)
+                    DispatchQueue.main.async {
+                        self.playAudioChunk(data)
+                    }
                 @unknown default:
                     break
                 }
@@ -272,7 +274,7 @@ class AIService {
         engine.connect(player, to: engine.mainMixerNode, format: format)
 
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
             try AVAudioSession.sharedInstance().setActive(true)
             try engine.start()
             player.play()
