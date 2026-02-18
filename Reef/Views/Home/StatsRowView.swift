@@ -13,32 +13,13 @@ struct NeumorphicModifier: ViewModifier {
     let cornerRadius: CGFloat
     let colorScheme: ColorScheme
 
-    private var darkShadow: Color {
-        colorScheme == .dark ? .black.opacity(0.5) : Color(hex: "D1D9E6")
-    }
-    private var lightShadow: Color {
-        colorScheme == .dark ? Color(hex: "2A2228") : .white
-    }
-    private var bgColor: Color {
-        colorScheme == .dark ? Color(hex: "1A1418") : Color(hex: "ECF0F3")
-    }
-
     func body(content: Content) -> some View {
         content
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            // Drop shadows
-            .shadow(color: darkShadow, radius: 15, x: 10, y: 10)
-            .shadow(color: lightShadow, radius: 15, x: -10, y: -10)
-            // Inner shadows
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .inset(by: -50)
-                    .stroke(bgColor, lineWidth: 100)
-                    .shadow(color: darkShadow, radius: 10, x: 6, y: 6)
-                    .shadow(color: lightShadow, radius: 10, x: -6, y: -6)
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                    .allowsHitTesting(false)
-            )
+            .shadow(color: colorScheme == .dark ? .black.opacity(0.5) : Color(hex: "D1D9E6"),
+                    radius: 15, x: 10, y: 10)
+            .shadow(color: colorScheme == .dark ? Color(hex: "2A2228") : .white,
+                    radius: 15, x: -10, y: -10)
     }
 }
 
@@ -54,32 +35,13 @@ struct DashboardCardModifier: ViewModifier {
     let colorScheme: ColorScheme
     var cornerRadius: CGFloat = 18
 
-    private var darkShadow: Color {
-        colorScheme == .dark ? .black.opacity(0.5) : Color(hex: "D1D9E6")
-    }
-    private var lightShadow: Color {
-        colorScheme == .dark ? Color(hex: "2A2228") : .white
-    }
-    private var bgColor: Color {
-        colorScheme == .dark ? Color(hex: "1A1418") : Color(hex: "ECF0F3")
-    }
-
     func body(content: Content) -> some View {
         content
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            // Drop shadows
-            .shadow(color: darkShadow, radius: 8, x: 5, y: 5)
-            .shadow(color: lightShadow, radius: 8, x: -5, y: -5)
-            // Inner shadows
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .inset(by: -50)
-                    .stroke(bgColor, lineWidth: 100)
-                    .shadow(color: darkShadow, radius: 6, x: 3, y: 3)
-                    .shadow(color: lightShadow, radius: 6, x: -3, y: -3)
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                    .allowsHitTesting(false)
-            )
+            .shadow(color: colorScheme == .dark ? .black.opacity(0.5) : Color(hex: "D1D9E6"),
+                    radius: 8, x: 5, y: 5)
+            .shadow(color: colorScheme == .dark ? Color(hex: "2A2228") : .white,
+                    radius: 8, x: -5, y: -5)
     }
 }
 
