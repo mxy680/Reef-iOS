@@ -103,7 +103,7 @@ struct WeeklyActivityView: View {
                 }
             }
             .padding(14)
-            .background(colorScheme == .dark ? Color.warmDarkCard : .white)
+            .background(colorScheme == .dark ? Color.warmDarkCard : .cardBackground)
             .claymorphic(cornerRadius: 28, colorScheme: colorScheme)
         }
     }

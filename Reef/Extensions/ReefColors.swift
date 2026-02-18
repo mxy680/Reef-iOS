@@ -79,16 +79,16 @@ extension Color {
     /// Secondary text
     static let midGray = Color(hex: "7A7A7A")
 
-    /// Page background — warm blush white
-    static let blushWhite = Color(hex: "EDE7E9")
+    /// Page background — clean white
+    static let blushWhite = Color(hex: "FFFFFF")
 
     // MARK: - Card Colors
 
-    /// Card background - pure white
-    static let cardBackground = Color(hex: "FFFFFF")
+    /// Card background — warm blush tint for depth against white
+    static let cardBackground = Color(hex: "EDE7E9")
 
-    /// Thumbnail background — matches blushWhite
-    static let thumbnailBackground = Color(hex: "F9F5F6")
+    /// Thumbnail background — matches card background
+    static let thumbnailBackground = Color(hex: "EDE7E9")
 
     /// Thumbnail border — charcoal retro outline
     static let thumbnailBorder = Color(hex: "2B2B2B")
@@ -157,9 +157,9 @@ extension Color {
         scheme == .dark ? brightTealDark : deepCoral
     }
 
-    /// Adaptive card background - slightly elevated from page background in dark mode
+    /// Adaptive card background — warm tint in light mode, elevated in dark mode
     static func adaptiveCardBackground(for scheme: ColorScheme) -> Color {
-        scheme == .dark ? warmDarkCard : .white
+        scheme == .dark ? warmDarkCard : cardBackground
     }
 
     /// Adaptive secondary text color

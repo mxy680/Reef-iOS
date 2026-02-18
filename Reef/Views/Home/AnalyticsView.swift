@@ -141,7 +141,7 @@ struct AnalyticsView: View {
     }
 
     private var cardBackground: Color {
-        colorScheme == .dark ? Color.warmDarkCard : .white
+        colorScheme == .dark ? Color.warmDarkCard : .cardBackground
     }
 
     var body: some View {

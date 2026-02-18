@@ -215,7 +215,7 @@ struct DashboardView: View {
                 }
             }
             .padding(14)
-            .background(colorScheme == .dark ? Color.warmDarkCard : .white)
+            .background(colorScheme == .dark ? Color.warmDarkCard : .cardBackground)
             .claymorphic(cornerRadius: 28, colorScheme: colorScheme)
         }
     }
@@ -239,7 +239,7 @@ struct DashboardView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(colorScheme == .dark ? Color.warmDarkCard : .white)
+        .background(colorScheme == .dark ? Color.warmDarkCard : .cardBackground)
         .claymorphic(cornerRadius: 28, colorScheme: colorScheme)
     }
 

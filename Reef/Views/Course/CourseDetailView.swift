@@ -200,7 +200,7 @@ struct CourseDetailView: View {
         }
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(colorScheme == .dark ? Color.warmDarkCard : .white)
+        .background(colorScheme == .dark ? Color.warmDarkCard : .cardBackground)
         .dashboardCard(colorScheme: colorScheme)
     }
 
@@ -543,7 +543,7 @@ struct BentoContentCard: View {
     let onTap: () -> Void
 
     private var cardBackground: Color {
-        colorScheme == .dark ? Color.warmDarkCard : .white
+        colorScheme == .dark ? Color.warmDarkCard : .cardBackground
     }
 
     var body: some View {

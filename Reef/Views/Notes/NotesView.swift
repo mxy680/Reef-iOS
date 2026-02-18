@@ -345,7 +345,7 @@ private struct SkeletonCardView: View {
     @State private var shimmerOffset: CGFloat = -1
 
     private var cardBackground: Color {
-        colorScheme == .dark ? Color.warmDarkCard : .white
+        colorScheme == .dark ? Color.warmDarkCard : .cardBackground
     }
 
     var body: some View {
