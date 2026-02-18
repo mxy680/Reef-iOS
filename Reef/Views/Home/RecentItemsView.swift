@@ -61,7 +61,7 @@ struct RecentItemsView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 210)
                 .background(Color.adaptiveCardBackground(for: colorScheme))
-                .dashboardCard(colorScheme: colorScheme, cornerRadius: 16)
+                .claymorphic(tint: .deepCoral, cornerRadius: 28, colorScheme: colorScheme)
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(recentItems.enumerated()), id: \.element.id) { index, item in
@@ -98,7 +98,7 @@ struct RecentItemsView: View {
                 .frame(height: 210)
                 .clipped()
                 .background(Color.adaptiveCardBackground(for: colorScheme))
-                .dashboardCard(colorScheme: colorScheme, cornerRadius: 16)
+                .claymorphic(tint: .deepCoral, cornerRadius: 28, colorScheme: colorScheme)
             }
         }
     }
