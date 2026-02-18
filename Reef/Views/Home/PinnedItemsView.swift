@@ -83,7 +83,7 @@ struct PinnedItemsView: View {
             .frame(height: 210)
             .clipped()
             .background(Color.adaptiveCardBackground(for: colorScheme))
-            .claymorphic(tint: .deepCoral, cornerRadius: 28, colorScheme: colorScheme)
+            .claymorphic(cornerRadius: 28, colorScheme: colorScheme)
         }
     }
 }

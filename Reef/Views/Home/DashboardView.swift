@@ -152,7 +152,7 @@ struct DashboardView: View {
                         SkeletonShimmerView(colorScheme: colorScheme)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .claymorphic(tint: .deepCoral, cornerRadius: 28, colorScheme: colorScheme)
+                    .claymorphic(cornerRadius: 28, colorScheme: colorScheme)
 
                     // Right: 2 stat cards + 1 stat card
                     VStack(spacing: 16) {
@@ -207,7 +207,7 @@ struct DashboardView: View {
                     }
                     .padding(14)
                     .background(colorScheme == .dark ? Color.warmDarkCard : .white)
-                    .claymorphic(tint: .deepTeal, cornerRadius: 28, colorScheme: colorScheme)
+                    .claymorphic(cornerRadius: 28, colorScheme: colorScheme)
                 }
 
                 // === PINNED & RECENT ===
@@ -242,7 +242,7 @@ struct DashboardView: View {
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(colorScheme == .dark ? Color.warmDarkCard : .white)
-        .claymorphic(tint: .deepTeal, cornerRadius: 28, colorScheme: colorScheme)
+        .claymorphic(cornerRadius: 28, colorScheme: colorScheme)
     }
 
     private var skeletonListCard: some View {
@@ -288,7 +288,7 @@ struct DashboardView: View {
             .frame(height: 210)
             .clipped()
             .background(Color.adaptiveCardBackground(for: colorScheme))
-            .claymorphic(tint: .deepCoral, cornerRadius: 28, colorScheme: colorScheme)
+            .claymorphic(cornerRadius: 28, colorScheme: colorScheme)
         }
     }
 }
