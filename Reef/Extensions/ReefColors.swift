@@ -80,7 +80,7 @@ extension Color {
     static let midGray = Color(hex: "7A7A7A")
 
     /// Page background — warm blush white
-    static let blushWhite = Color(hex: "F9F5F6")
+    static let blushWhite = Color(hex: "EDE7E9")
 
     // MARK: - Card Colors
 

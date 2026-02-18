@@ -17,8 +17,8 @@ struct ClaymorphicModifier: ViewModifier {
         content
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             // Soft neutral shadow — no color tint, just depth
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.12 : 0.08), radius: 20, x: 0, y: 8)
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.06 : 0.04), radius: 6, x: 0, y: 2)
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.18 : 0.12), radius: 24, x: 0, y: 10)
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.10 : 0.06), radius: 6, x: 0, y: 3)
     }
 }
 
