@@ -55,11 +55,7 @@ enum AIServiceError: Error, LocalizedError {
 class AIService {
     static let shared = AIService()
 
-    #if DEBUG
-    private let baseURL = "http://172.20.93.199:8000"
-    #else
-    private let baseURL = "https://api.studyreef.com"
-    #endif
+    private let baseURL = ServerConfig.baseURL
     private let session: URLSession
 
 
@@ -249,17 +245,11 @@ class AIService {
                     backoff = 1_000_000_000  // reset on successful connect
                     print("[SSE] Connected for session=\(sessionId.prefix(8))...")
 
-                    var eventType = ""
+                    var parser = SSEParser()
 
                     for try await line in bytes.lines {
-                        if line.hasPrefix(":") || line.isEmpty {
-                            continue  // SSE comment or empty line — skip
-                        } else if line.hasPrefix("event: ") {
-                            eventType = String(line.dropFirst(7))
-                        } else if line.hasPrefix("data: ") {
-                            let data = String(line.dropFirst(6))
-                            await self.handleSSEEvent(type: eventType, data: data)
-                            eventType = ""
+                        if let event = parser.parseLine(line) {
+                            await self.handleSSEEvent(type: event.type, data: event.data)
                         }
                     }
                 } catch {
