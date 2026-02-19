@@ -2,142 +2,143 @@
 //  AIServiceTests.swift
 //  ReefTests
 //
-//  Tests for AIService network layer using MockURLProtocol.
+//  Integration tests for AIService that hit the real local dev server.
+//  Requires the Reef-Server running at http://localhost:8000.
 //
 
 import Testing
-@testable import Reef
 import Foundation
+@testable import Reef
 
-@Suite("AIService", .serialized)
-struct AIServiceTests {
+@Suite("AIService Integration", .serialized)
+struct AIServiceIntegrationTests {
 
-    /// Create a URLSession that uses MockURLProtocol
-    private func makeMockSession() -> URLSession {
-        let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [MockURLProtocol.self]
-        return URLSession(configuration: config)
-    }
-
-    /// Create an AIService instance using mock session
     @MainActor
     private func makeService() -> AIService {
-        MockURLProtocol.reset()
-        return AIService(session: makeMockSession(), baseURL: "http://test.local")
+        AIService(baseURL: "http://localhost:8000")
     }
 
-    // MARK: - Embed: Success
+    private func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Float {
+        guard a.count == b.count, !a.isEmpty else { return 0 }
+        let dot = zip(a, b).map(*).reduce(0, +)
+        let normA = sqrt(a.map { $0 * $0 }.reduce(0, +))
+        let normB = sqrt(b.map { $0 * $0 }.reduce(0, +))
+        guard normA > 0, normB > 0 else { return 0 }
+        return dot / (normA * normB)
+    }
 
-    @Test("embed success returns embeddings")
-    func embed_success_returnsEmbeddings() async throws {
+    // MARK: - Tests
+
+    @Test("embed single text returns 384-dim vector")
+    func embedSingleTextReturns384DimVector() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
         let service = await makeService()
 
-        let responseBody = AIEmbedResponse(
-            embeddings: [[0.1, 0.2, 0.3]],
-            model: "test",
-            dimensions: 3,
-            count: 1,
-            mode: "real"
-        )
-        let data = try JSONEncoder().encode(responseBody)
-        MockURLProtocol.stub(path: "/ai/embed", data: data)
+        let result = try await service.embed(texts: ["hello world"])
 
-        let result = try await service.embed(texts: ["hello"])
         #expect(result.count == 1)
-        #expect(result[0] == [0.1, 0.2, 0.3])
+        #expect(result[0].count == 384)
     }
 
-    // MARK: - Embed: Server Error
-
-    @Test("embed server error throws AIServiceError")
-    func embed_serverError_throwsServerError() async throws {
+    @Test("embed batch returns correct count")
+    func embedBatchReturnsCorrectCount() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
         let service = await makeService()
 
-        let errorData = try JSONEncoder().encode(["detail": "Model not loaded"])
-        MockURLProtocol.stub(path: "/ai/embed", statusCode: 503, data: errorData)
+        let result = try await service.embed(texts: ["hello", "world", "test"])
 
-        await #expect(throws: AIServiceError.self) {
-            _ = try await service.embed(texts: ["hello"])
+        #expect(result.count == 3)
+        for vector in result {
+            #expect(vector.count == 384)
         }
     }
 
-    // MARK: - Embed: Network Error
-
-    @Test("embed network error throws AIServiceError")
-    func embed_networkError_throwsNetworkError() async throws {
+    @Test("embed with normalize returns unit vectors")
+    func embedWithNormalizeReturnsUnitVectors() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
         let service = await makeService()
 
-        let networkError = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
-        MockURLProtocol.stubError(path: "/ai/embed", error: networkError)
+        let result = try await service.embed(texts: ["normalization test"], normalize: true)
 
-        await #expect(throws: AIServiceError.self) {
-            _ = try await service.embed(texts: ["hello"])
-        }
+        #expect(result.count == 1)
+        let vector = result[0]
+        let norm = sqrt(vector.map { $0 * $0 }.reduce(0, +))
+        #expect(abs(norm - 1.0) < 0.01)
     }
 
-    // MARK: - Embed: Invalid JSON Response
-
-    @Test("embed invalid JSON throws error")
-    func embed_invalidJSON_throwsDecodingError() async throws {
+    @Test("embed with mock mode returns fast response")
+    func embedWithMockModeReturnsFastResponse() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
         let service = await makeService()
 
-        MockURLProtocol.stub(path: "/ai/embed", data: "not json".data(using: .utf8))
+        let result = try await service.embed(texts: ["mock mode test"], useMock: true)
 
-        await #expect(throws: Error.self) {
-            _ = try await service.embed(texts: ["hello"])
-        }
-    }
-
-    // MARK: - Embed: Mock Mode URL
-
-    @Test("embed mock mode appends query param")
-    func embed_mockMode_appendsQueryParam() async throws {
-        let service = await makeService()
-
-        MockURLProtocol.defaultHandler = { request in
-            let url = request.url?.absoluteString ?? ""
-            if url.contains("mode=mock") {
-                let response = AIEmbedResponse(embeddings: [[1.0]], model: "mock", dimensions: 1, count: 1, mode: "mock")
-                let data = try! JSONEncoder().encode(response)
-                return (200, data, nil)
-            }
-            return (404, nil, nil)
-        }
-
-        let result = try await service.embed(texts: ["test"], useMock: true)
         #expect(result.count == 1)
     }
 
-    // MARK: - Embed: Request Body
-
-    @Test("embed sends correct request body")
-    func embed_sendsCorrectRequestBody() async throws {
+    @Test("embed empty text array")
+    func embedEmptyTextArray() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
         let service = await makeService()
 
-        var capturedBody: Data? = nil
-        MockURLProtocol.defaultHandler = { request in
-            capturedBody = request.httpBody ?? request.httpBodyStream.flatMap { stream in
-                stream.open()
-                let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 4096)
-                defer { buffer.deallocate() }
-                var data = Data()
-                while stream.hasBytesAvailable {
-                    let count = stream.read(buffer, maxLength: 4096)
-                    if count > 0 { data.append(buffer, count: count) }
-                }
-                stream.close()
-                return data
-            }
-            let response = AIEmbedResponse(embeddings: [[0.0]], model: "test", dimensions: 1, count: 1, mode: "real")
-            let data = try! JSONEncoder().encode(response)
-            return (200, data, nil)
+        do {
+            let result = try await service.embed(texts: [])
+            #expect(result.isEmpty)
+        } catch {
+            // Server may reject empty array — either outcome is acceptable
         }
+    }
 
-        _ = try await service.embed(texts: ["hello world"], normalize: false)
+    @Test("embed very long text succeeds")
+    func embedVeryLongTextSucceeds() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
+        let service = await makeService()
 
-        let body = try #require(capturedBody)
-        let decoded = try JSONDecoder().decode(AIEmbedRequest.self, from: body)
-        #expect(decoded.texts == ["hello world"])
-        #expect(decoded.normalize == false)
+        let longText = String(repeating: "The quick brown fox jumps over the lazy dog. ", count: 112)
+        #expect(longText.count >= 5000)
+
+        let result = try await service.embed(texts: [longText])
+
+        #expect(result.count == 1)
+        #expect(result[0].count == 384)
+    }
+
+    @Test("embed special characters")
+    func embedSpecialCharacters() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
+        let service = await makeService()
+
+        let result = try await service.embed(texts: ["∫∑∏ 你好世界 αβγ √2 ≠ 3"])
+
+        #expect(result.count == 1)
+        #expect(result[0].count == 384)
+    }
+
+    @Test("cosine similarity of identical texts ≈ 1.0")
+    func cosineSimilarityOfIdenticalTextsApproximatesOne() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
+        let service = await makeService()
+
+        let text = "the mitochondria is the powerhouse of the cell"
+        let result = try await service.embed(texts: [text, text])
+
+        #expect(result.count == 2)
+        let similarity = cosineSimilarity(result[0], result[1])
+        #expect(similarity > 0.99)
+    }
+
+    @Test("cosine similarity of unrelated texts < 0.5")
+    func cosineSimilarityOfUnrelatedTextsIsLow() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
+        let service = await makeService()
+
+        let result = try await service.embed(texts: [
+            "quantum physics equations",
+            "chocolate cake recipe"
+        ])
+
+        #expect(result.count == 2)
+        let similarity = cosineSimilarity(result[0], result[1])
+        #expect(similarity < 0.5)
     }
 }

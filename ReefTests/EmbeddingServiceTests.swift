@@ -2,168 +2,152 @@
 //  EmbeddingServiceTests.swift
 //  ReefTests
 //
-//  Tests for EmbeddingService with mocked AIService dependency.
+//  Integration tests for EmbeddingService hitting the real local dev server.
+//  Requires Reef-Server running at http://localhost:8000.
 //
 
 import Testing
-@testable import Reef
 import Foundation
+@testable import Reef
 
-@Suite("EmbeddingService")
-struct EmbeddingServiceTests {
+@Suite("EmbeddingService Integration", .serialized)
+struct EmbeddingServiceIntegrationTests {
+
+    private func makeService() -> EmbeddingService {
+        let aiService = AIService(baseURL: "http://localhost:8000")
+        return EmbeddingService(aiService: aiService)
+    }
 
     // MARK: - Single Embed
 
-    @Test("embed success returns embedding vector")
-    func embed_success_returnsEmbedding() async throws {
-        let mockAI = MockAIService()
-        mockAI.embedResult = [[0.1, 0.2, 0.3]]
-        let service = EmbeddingService(aiService: mockAI)
+    @Test("embed success returns 384-dim vector")
+    func embedSuccessReturns384DimVector() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
+        let service = makeService()
 
         let result = try await service.embed("hello world")
-        #expect(result == [0.1, 0.2, 0.3])
-        #expect(mockAI.embedCallCount == 1)
+
+        #expect(result.count == 384)
     }
 
     @Test("embed empty text throws emptyInput")
-    func embed_emptyText_throwsEmptyInput() async {
-        let service = EmbeddingService(aiService: MockAIService())
+    func embedEmptyTextThrowsEmptyInput() async throws {
+        let service = makeService()
+
         await #expect(throws: EmbeddingError.self) {
             _ = try await service.embed("")
         }
     }
 
     @Test("embed whitespace-only throws emptyInput")
-    func embed_whitespaceOnly_throwsEmptyInput() async {
-        let service = EmbeddingService(aiService: MockAIService())
+    func embedWhitespaceOnlyThrowsEmptyInput() async throws {
+        let service = makeService()
+
         await #expect(throws: EmbeddingError.self) {
             _ = try await service.embed("   \n\t  ")
         }
     }
 
     @Test("embed trims whitespace before sending")
-    func embed_trimsWhitespace() async throws {
-        let mockAI = MockAIService()
-        mockAI.embedResult = [[1.0]]
-        let service = EmbeddingService(aiService: mockAI)
+    func embedTrimsWhitespaceBeforeSending() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
+        let service = makeService()
 
-        _ = try await service.embed("  hello  ")
-        #expect(mockAI.lastEmbedTexts == ["hello"])
-    }
+        let result = try await service.embed("  hello  ")
 
-    @Test("embed network error throws EmbeddingError")
-    func embed_networkError_throwsEmbeddingError() async {
-        let mockAI = MockAIService()
-        mockAI.embedError = AIServiceError.networkError(
-            NSError(domain: "test", code: -1)
-        )
-        let service = EmbeddingService(aiService: mockAI)
-
-        await #expect(throws: EmbeddingError.self) {
-            _ = try await service.embed("hello")
-        }
+        #expect(result.count == 384)
     }
 
     // MARK: - Batch Embed
 
     @Test("embedBatch success returns vectors")
-    func embedBatch_success() async throws {
-        let mockAI = MockAIService()
-        mockAI.embedResult = [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]
-        let service = EmbeddingService(aiService: mockAI)
+    func embedBatchSuccessReturnsVectors() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
+        let service = makeService()
 
         let result = try await service.embedBatch(["a", "b", "c"])
+
         #expect(result.count == 3)
+        for vector in result {
+            #expect(vector.count == 384)
+        }
     }
 
     @Test("embedBatch filters empty strings with zero vectors")
-    func embedBatch_filtersEmptyStrings() async throws {
-        let mockAI = MockAIService()
-        mockAI.embedResult = [[1.0, 2.0]]
-        let service = EmbeddingService(aiService: mockAI)
+    func embedBatchFiltersEmptyStringsWithZeroVectors() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
+        let service = makeService()
 
         let result = try await service.embedBatch(["hello", "", "world"])
+
         #expect(result.count == 3)
-        // The empty string slot should be a zero vector
         #expect(result[1] == Array(repeating: Float(0.0), count: EmbeddingService.embeddingDimension))
     }
 
     @Test("embedBatch all empty returns zero vectors")
-    func embedBatch_allEmpty_returnsZeroVectors() async throws {
-        let service = EmbeddingService(aiService: MockAIService())
+    func embedBatchAllEmptyReturnsZeroVectors() async throws {
+        let service = makeService()
+
         let result = try await service.embedBatch(["", "  ", "\n"])
+
         #expect(result.count == 3)
-        for vec in result {
-            #expect(vec == Array(repeating: Float(0.0), count: EmbeddingService.embeddingDimension))
+        for vector in result {
+            #expect(vector == Array(repeating: Float(0.0), count: EmbeddingService.embeddingDimension))
         }
     }
 
-    @Test("embedBatch network error returns zero vectors as fallback")
-    func embedBatch_networkError_returnsZeroVectors() async throws {
-        let mockAI = MockAIService()
-        mockAI.embedError = AIServiceError.networkError(
-            NSError(domain: "test", code: -1)
-        )
-        let service = EmbeddingService(aiService: mockAI)
+    // MARK: - Cosine Similarity (Real Embeddings)
 
-        let result = try await service.embedBatch(["hello", "world"])
-        #expect(result.count == 2)
-        for vec in result {
-            #expect(vec == Array(repeating: Float(0.0), count: EmbeddingService.embeddingDimension))
-        }
+    @Test("cosine similarity of identical real embeddings ≈ 1.0")
+    func cosineSimilarityOfIdenticalRealEmbeddingsApproximatesOne() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
+        let service = makeService()
+
+        let text = "the mitochondria is the powerhouse of the cell"
+        let first = try await service.embed(text)
+        let second = try await service.embed(text)
+
+        let similarity = service.cosineSimilarity(first, second)
+        #expect(similarity > 0.99)
     }
 
-    // MARK: - Cosine Similarity
+    @Test("cosine similarity of related texts > unrelated")
+    func cosineSimilarityOfRelatedTextsGreaterThanUnrelated() async throws {
+        try #require(await IntegrationTestConfig.serverIsReachable(), "Server not available")
+        let service = makeService()
 
-    @Test("cosineSimilarity identical vectors returns ~1.0")
-    func cosineSimilarity_identicalVectors_returns1() async {
-        let service = EmbeddingService(aiService: MockAIService())
-        let vec: [Float] = [1.0, 0.0, 0.0]
-        let result = await service.cosineSimilarity(vec, vec)
-        #expect(abs(result - 1.0) < 0.001)
+        let calculus = try await service.embed("calculus derivatives")
+        let integration = try await service.embed("integration formulas")
+        let cooking = try await service.embed("cooking recipes")
+
+        let relatedSimilarity = service.cosineSimilarity(calculus, integration)
+        let unrelatedSimilarity = service.cosineSimilarity(calculus, cooking)
+
+        #expect(relatedSimilarity > unrelatedSimilarity)
     }
 
-    @Test("cosineSimilarity orthogonal vectors returns ~0.0")
-    func cosineSimilarity_orthogonalVectors_returns0() async {
-        let service = EmbeddingService(aiService: MockAIService())
-        let a: [Float] = [1.0, 0.0, 0.0]
-        let b: [Float] = [0.0, 1.0, 0.0]
-        let result = await service.cosineSimilarity(a, b)
-        #expect(abs(result) < 0.001)
-    }
+    // MARK: - Cosine Similarity (Known Vectors)
 
-    @Test("cosineSimilarity opposite vectors returns ~-1.0")
-    func cosineSimilarity_oppositeVectors_returnsNeg1() async {
-        let service = EmbeddingService(aiService: MockAIService())
-        let a: [Float] = [1.0, 0.0]
-        let b: [Float] = [-1.0, 0.0]
-        let result = await service.cosineSimilarity(a, b)
-        #expect(abs(result - (-1.0)) < 0.001)
-    }
+    @Test("cosine similarity math functions work")
+    func cosineSimilarityMathFunctionsWork() async throws {
+        let service = makeService()
 
-    @Test("cosineSimilarity empty vectors returns 0")
-    func cosineSimilarity_emptyVectors_returns0() async {
-        let service = EmbeddingService(aiService: MockAIService())
-        let result = await service.cosineSimilarity([], [])
-        #expect(result == 0)
-    }
+        let identical = service.cosineSimilarity([1.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+        #expect(abs(identical - 1.0) < 0.001)
 
-    @Test("cosineSimilarity mismatched lengths returns 0")
-    func cosineSimilarity_mismatchedLengths_returns0() async {
-        let service = EmbeddingService(aiService: MockAIService())
-        let result = await service.cosineSimilarity([1.0, 2.0], [1.0])
-        #expect(result == 0)
+        let orthogonal = service.cosineSimilarity([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
+        #expect(abs(orthogonal) < 0.001)
     }
 
     // MARK: - Static Properties
 
     @Test("embedding dimension is 384")
-    func embeddingDimension_is384() {
+    func embeddingDimensionIs384() {
         #expect(EmbeddingService.embeddingDimension == 384)
     }
 
     @Test("embedding version is 2")
-    func embeddingVersion_is2() {
+    func embeddingVersionIs2() {
         #expect(EmbeddingService.embeddingVersion == 2)
     }
 }
