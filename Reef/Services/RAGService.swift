@@ -53,12 +53,12 @@ actor RAGService {
 
     /// Approximate tokens per character (conservative estimate)
     private let charsPerToken: Double = 4.0
-    private let embeddingService: any EmbeddingServiceProtocol
-    private let vectorStore: any VectorStoreProtocol
+    private let embeddingService: EmbeddingService
+    private let vectorStore: VectorStore
 
     init(
-        embeddingService: any EmbeddingServiceProtocol = EmbeddingService.shared,
-        vectorStore: any VectorStoreProtocol = VectorStore.shared
+        embeddingService: EmbeddingService = EmbeddingService.shared,
+        vectorStore: VectorStore = VectorStore.shared
     ) {
         self.embeddingService = embeddingService
         self.vectorStore = vectorStore

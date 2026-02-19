@@ -51,7 +51,7 @@ enum VectorStoreError: Error, LocalizedError {
 }
 
 /// Actor-based SQLite vector store
-actor VectorStore: VectorStoreProtocol {
+actor VectorStore {
     static let shared = VectorStore()
 
     private var db: OpaquePointer?

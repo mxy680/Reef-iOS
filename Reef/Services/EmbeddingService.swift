@@ -31,7 +31,7 @@ enum EmbeddingError: Error, LocalizedError {
 }
 
 /// Service for generating text embeddings using server-side MiniLM-L6-v2
-actor EmbeddingService: EmbeddingServiceProtocol {
+actor EmbeddingService {
     static let shared = EmbeddingService()
 
     /// Embedding dimension (MiniLM-L6-v2 produces 384-dimensional vectors)
@@ -40,9 +40,9 @@ actor EmbeddingService: EmbeddingServiceProtocol {
     /// Embedding model version - increment when changing models to trigger re-indexing
     static let embeddingVersion = 2  // v1 = NLEmbedding (512d), v2 = MiniLM (384d)
 
-    private let aiService: any AIServiceProtocol
+    private let aiService: AIService
 
-    init(aiService: any AIServiceProtocol = AIService.shared) {
+    init(aiService: AIService = AIService.shared) {
         self.aiService = aiService
     }
 

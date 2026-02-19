@@ -52,7 +52,7 @@ enum AIServiceError: Error, LocalizedError {
 
 /// Service for communicating with the Reef-Server AI endpoints
 @MainActor
-class AIService: AIServiceProtocol {
+class AIService {
     nonisolated static let shared = AIService()
 
     private let baseURL: String
