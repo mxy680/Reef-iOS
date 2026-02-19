@@ -52,18 +52,22 @@ enum AIServiceError: Error, LocalizedError {
 
 /// Service for communicating with the Reef-Server AI endpoints
 @MainActor
-class AIService {
-    static let shared = AIService()
+class AIService: AIServiceProtocol {
+    nonisolated static let shared = AIService()
 
-    private let baseURL = ServerConfig.baseURL
+    private let baseURL: String
     private let session: URLSession
 
-
-    private init() {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 60
-        config.timeoutIntervalForResource = 120
-        self.session = URLSession(configuration: config)
+    nonisolated init(session: URLSession? = nil, baseURL: String = ServerConfig.baseURL) {
+        self.baseURL = baseURL
+        if let session = session {
+            self.session = session
+        } else {
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = 60
+            config.timeoutIntervalForResource = 120
+            self.session = URLSession(configuration: config)
+        }
     }
 
     // MARK: - Embeddings

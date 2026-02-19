@@ -31,7 +31,7 @@ enum EmbeddingError: Error, LocalizedError {
 }
 
 /// Service for generating text embeddings using server-side MiniLM-L6-v2
-actor EmbeddingService {
+actor EmbeddingService: EmbeddingServiceProtocol {
     static let shared = EmbeddingService()
 
     /// Embedding dimension (MiniLM-L6-v2 produces 384-dimensional vectors)
@@ -40,12 +40,16 @@ actor EmbeddingService {
     /// Embedding model version - increment when changing models to trigger re-indexing
     static let embeddingVersion = 2  // v1 = NLEmbedding (512d), v2 = MiniLM (384d)
 
-    private init() {}
+    private let aiService: any AIServiceProtocol
+
+    init(aiService: any AIServiceProtocol = AIService.shared) {
+        self.aiService = aiService
+    }
 
     // MARK: - Public API
 
     /// Check if embedding is available (always true since we use server)
-    func isAvailable() -> Bool {
+    nonisolated func isAvailable() -> Bool {
         return true
     }
 
@@ -59,7 +63,7 @@ actor EmbeddingService {
         }
 
         do {
-            let embeddings = try await AIService.shared.embed(texts: [trimmed])
+            let embeddings = try await aiService.embed(texts: [trimmed])
             guard let embedding = embeddings.first else {
                 throw EmbeddingError.embeddingFailed("No embedding returned from server")
             }
@@ -95,7 +99,7 @@ actor EmbeddingService {
         // Get embeddings from server
         let serverEmbeddings: [[Float]]
         do {
-            serverEmbeddings = try await AIService.shared.embed(texts: nonEmptyTexts)
+            serverEmbeddings = try await aiService.embed(texts: nonEmptyTexts)
         } catch let error as AIServiceError {
             // On network error, return zero vectors
             print("[EmbeddingService] Network error, returning zero vectors: \(error)")
@@ -121,7 +125,7 @@ actor EmbeddingService {
     ///   - a: First vector
     ///   - b: Second vector
     /// - Returns: Cosine similarity score between -1 and 1
-    func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Float {
+    nonisolated func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Float {
         guard a.count == b.count, !a.isEmpty else { return 0 }
 
         var dotProduct: Float = 0

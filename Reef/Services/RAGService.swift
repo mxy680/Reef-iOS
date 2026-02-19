@@ -53,8 +53,16 @@ actor RAGService {
 
     /// Approximate tokens per character (conservative estimate)
     private let charsPerToken: Double = 4.0
+    private let embeddingService: any EmbeddingServiceProtocol
+    private let vectorStore: any VectorStoreProtocol
 
-    private init() {}
+    init(
+        embeddingService: any EmbeddingServiceProtocol = EmbeddingService.shared,
+        vectorStore: any VectorStoreProtocol = VectorStore.shared
+    ) {
+        self.embeddingService = embeddingService
+        self.vectorStore = vectorStore
+    }
 
     // MARK: - Initialization
 
@@ -62,7 +70,7 @@ actor RAGService {
     func initialize() async throws {
         // Initialize vector store (checks embedding version and clears if changed)
         // Embedding service no longer needs initialization - uses server
-        try await VectorStore.shared.initialize()
+        try await vectorStore.initialize()
     }
 
     // MARK: - Document Indexing
@@ -86,7 +94,7 @@ actor RAGService {
         }
 
         // Check if embedding service is available
-        guard await EmbeddingService.shared.isAvailable() else {
+        guard await embeddingService.isAvailable() else {
             print("[RAG] Embedding service not available, skipping indexing")
             return
         }
@@ -107,10 +115,10 @@ actor RAGService {
 
         // Generate embeddings for all chunks
         let chunkTexts = chunks.map { $0.text }
-        let embeddings = try await EmbeddingService.shared.embedBatch(chunkTexts)
+        let embeddings = try await embeddingService.embedBatch(chunkTexts)
 
         // Store in vector database
-        try await VectorStore.shared.index(
+        try await vectorStore.index(
             chunks: chunks,
             embeddings: embeddings,
             courseId: courseId
@@ -135,15 +143,15 @@ actor RAGService {
         maxTokens: Int = 2000
     ) async throws -> RAGContext {
         // Check if embedding service is available
-        guard await EmbeddingService.shared.isAvailable() else {
+        guard await embeddingService.isAvailable() else {
             return RAGContext(formattedPrompt: "", chunkCount: 0, sources: [])
         }
 
         // Embed the query
-        let queryEmbedding = try await EmbeddingService.shared.embed(query)
+        let queryEmbedding = try await embeddingService.embed(query)
 
         // Search for relevant chunks
-        let results = try await VectorStore.shared.search(
+        let results = try await vectorStore.search(
             query: queryEmbedding,
             courseId: courseId,
             topK: topK
@@ -216,13 +224,13 @@ actor RAGService {
 
     /// Remove a document from the index
     func deleteDocument(documentId: UUID) async throws {
-        try await VectorStore.shared.deleteDocument(documentId: documentId)
+        try await vectorStore.deleteDocument(documentId: documentId)
         print("[RAG] Deleted document \(documentId) from index")
     }
 
     /// Remove all documents for a course from the index
     func deleteCourse(courseId: UUID) async throws {
-        try await VectorStore.shared.deleteCourse(courseId: courseId)
+        try await vectorStore.deleteCourse(courseId: courseId)
         print("[RAG] Deleted course \(courseId) from index")
     }
 
@@ -231,7 +239,7 @@ actor RAGService {
     /// Check if a document has been indexed
     func isDocumentIndexed(documentId: UUID) async -> Bool {
         do {
-            let count = try await VectorStore.shared.chunkCount(forDocument: documentId)
+            let count = try await vectorStore.chunkCount(forDocument: documentId)
             return count > 0
         } catch {
             return false
@@ -241,7 +249,7 @@ actor RAGService {
     /// Get the number of indexed chunks for a document
     func chunkCount(forDocument documentId: UUID) async -> Int {
         do {
-            return try await VectorStore.shared.chunkCount(forDocument: documentId)
+            return try await vectorStore.chunkCount(forDocument: documentId)
         } catch {
             return 0
         }

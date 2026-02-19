@@ -51,7 +51,7 @@ enum VectorStoreError: Error, LocalizedError {
 }
 
 /// Actor-based SQLite vector store
-actor VectorStore {
+actor VectorStore: VectorStoreProtocol {
     static let shared = VectorStore()
 
     private var db: OpaquePointer?
@@ -60,15 +60,15 @@ actor VectorStore {
     /// Track whether a version migration occurred (for triggering re-indexing)
     private(set) var didMigrateVersion = false
 
-    private init() {
-        // Store in Application Support/Reef/vectors.sqlite
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let reefDir = appSupport.appendingPathComponent("Reef", isDirectory: true)
-
-        // Create directory if needed
-        try? FileManager.default.createDirectory(at: reefDir, withIntermediateDirectories: true)
-
-        self.dbPath = reefDir.appendingPathComponent("vectors.sqlite")
+    init(dbPath: URL? = nil) {
+        if let dbPath = dbPath {
+            self.dbPath = dbPath
+        } else {
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            let reefDir = appSupport.appendingPathComponent("Reef", isDirectory: true)
+            try? FileManager.default.createDirectory(at: reefDir, withIntermediateDirectories: true)
+            self.dbPath = reefDir.appendingPathComponent("vectors.sqlite")
+        }
     }
 
     // MARK: - Database Setup
