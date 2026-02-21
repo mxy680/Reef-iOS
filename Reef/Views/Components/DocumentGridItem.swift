@@ -32,6 +32,13 @@ protocol DocumentItem: AnyObject {
     var isProcessingForAI: Bool { get }
     var isAIReady: Bool { get }
     var isAssignmentProcessing: Bool { get }
+    var isAssignment: Bool { get }
+    var assignmentStatus: AssignmentStatus { get }
+}
+
+extension DocumentItem {
+    var isAssignment: Bool { false }
+    var assignmentStatus: AssignmentStatus { .none }
 }
 
 // Conform Note to DocumentItem
@@ -75,121 +82,11 @@ struct DocumentGridItem<T: DocumentItem>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Thumbnail area (9:10 aspect ratio)
-            ZStack(alignment: .topTrailing) {
-                ZStack(alignment: .bottom) {
-                    Color.adaptiveCardBackground(for: effectiveColorScheme)
-
-                    if let thumbnail = thumbnail {
-                        Image(uiImage: thumbnail)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .clipped()
-                            .id(thumbnail)
-                            .transition(.opacity)
-                    } else if isLoadingThumbnail {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    } else {
-                        placeholderIcon
-                    }
-                }
-
-                // Processing status indicators - positioned in overlay
-                VStack(alignment: .trailing, spacing: 4) {
-                    // Assignment processing indicator - pulsing blue dot
-                    if document.isAssignmentProcessing {
-                        Circle()
-                            .fill(Color.blue)
-                            .frame(width: 10, height: 10)
-                            .scaleEffect(assignmentPulseScale)
-                            .shadow(color: Color.blue.opacity(0.5), radius: 4)
-                            .onAppear {
-                                withAnimation(
-                                    .easeInOut(duration: 0.8)
-                                    .repeatForever(autoreverses: true)
-                                ) {
-                                    assignmentPulseScale = 1.3
-                                }
-                            }
-                            .onDisappear {
-                                assignmentPulseScale = 1.0
-                            }
-                    }
-                    // AI processing indicator - pulsing yellow dot
-                    else if document.isProcessingForAI {
-                        Circle()
-                            .fill(Color.yellow)
-                            .frame(width: 10, height: 10)
-                            .scaleEffect(extractionPulseScale)
-                            .shadow(color: Color.yellow.opacity(0.5), radius: 4)
-                            .onAppear {
-                                withAnimation(
-                                    .easeInOut(duration: 0.8)
-                                    .repeatForever(autoreverses: true)
-                                ) {
-                                    extractionPulseScale = 1.3
-                                }
-                            }
-                            .onDisappear {
-                                extractionPulseScale = 1.0
-                            }
-                    }
-                }
-                .padding(8)
-            }
-            .frame(maxWidth: .infinity)
-            .aspectRatio(4/3, contentMode: .fit)
-
-            // Separator between thumbnail and footer
+            thumbnailArea
             Rectangle()
                 .fill(Color.black.opacity(effectiveColorScheme == .dark ? 0.5 : 0.35))
                 .frame(height: 1)
-
-            // Name, date, and action icons footer
-            HStack(alignment: .bottom, spacing: 8) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(document.name)
-                        .font(.quicksand(13, weight: .semiBold))
-                        .foregroundColor(effectiveColorScheme == .dark ? .white : Color.charcoal)
-                        .lineLimit(1)
-
-                    Text(document.dateAdded.formatted(date: .abbreviated, time: .omitted))
-                        .font(.quicksand(11, weight: .regular))
-                        .foregroundColor(effectiveColorScheme == .dark ? .white.opacity(0.6) : Color.charcoal.opacity(0.5))
-                }
-
-                Spacer()
-
-                // Action icons
-                HStack(spacing: 2) {
-                    Button {
-                        editedName = document.name
-                        isShowingRenameAlert = true
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(effectiveColorScheme == .dark ? .white.opacity(0.7) : .deepTeal)
-                            .frame(width: 28, height: 28)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        isShowingDeleteConfirmation = true
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(effectiveColorScheme == .dark ? Color.deepCoral.opacity(0.8) : .deepCoral)
-                            .frame(width: 28, height: 28)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(footerColor)
+            footerArea
         }
         .cornerRadius(16)
         .overlay(
@@ -207,7 +104,6 @@ struct DocumentGridItem<T: DocumentItem>: View {
             loadThumbnail()
         }
         .onChange(of: themeManager.isDarkMode) { _, newValue in
-            // Swap to pre-cached variant with crossfade for seamless theme transition
             if let cached = ThumbnailCache.shared.thumbnail(for: document.id, isDarkMode: newValue) {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     thumbnail = cached
@@ -237,6 +133,123 @@ struct DocumentGridItem<T: DocumentItem>: View {
         } message: {
             Text("Are you sure you want to delete \"\(document.name)\"? This action cannot be undone.")
         }
+    }
+
+    private var thumbnailArea: some View {
+        ZStack(alignment: .topTrailing) {
+            ZStack(alignment: .bottom) {
+                Color.adaptiveCardBackground(for: effectiveColorScheme)
+
+                if let thumbnail = thumbnail {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .clipped()
+                        .id(thumbnail)
+                        .transition(.opacity)
+                } else if isLoadingThumbnail {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                } else {
+                    placeholderIcon
+                }
+            }
+
+            statusIndicators
+        }
+        .frame(maxWidth: .infinity)
+        .aspectRatio(4/3, contentMode: .fit)
+    }
+
+    private var statusIndicators: some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            if document.isAssignmentProcessing {
+                Circle()
+                    .fill(Color.blue)
+                    .frame(width: 10, height: 10)
+                    .scaleEffect(assignmentPulseScale)
+                    .shadow(color: Color.blue.opacity(0.5), radius: 4)
+                    .onAppear {
+                        withAnimation(
+                            .easeInOut(duration: 0.8)
+                            .repeatForever(autoreverses: true)
+                        ) {
+                            assignmentPulseScale = 1.3
+                        }
+                    }
+                    .onDisappear {
+                        assignmentPulseScale = 1.0
+                    }
+            } else if document.isAssignment && document.assignmentStatus == .failed {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .foregroundStyle(.red)
+                    .font(.system(size: 14))
+                    .shadow(color: Color.red.opacity(0.4), radius: 3)
+            } else if document.isProcessingForAI {
+                Circle()
+                    .fill(Color.yellow)
+                    .frame(width: 10, height: 10)
+                    .scaleEffect(extractionPulseScale)
+                    .shadow(color: Color.yellow.opacity(0.5), radius: 4)
+                    .onAppear {
+                        withAnimation(
+                            .easeInOut(duration: 0.8)
+                            .repeatForever(autoreverses: true)
+                        ) {
+                            extractionPulseScale = 1.3
+                        }
+                    }
+                    .onDisappear {
+                        extractionPulseScale = 1.0
+                    }
+            }
+        }
+        .padding(8)
+    }
+
+    private var footerArea: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(document.name)
+                    .font(.quicksand(13, weight: .semiBold))
+                    .foregroundColor(effectiveColorScheme == .dark ? .white : Color.charcoal)
+                    .lineLimit(1)
+
+                Text(document.dateAdded.formatted(date: .abbreviated, time: .omitted))
+                    .font(.quicksand(11, weight: .regular))
+                    .foregroundColor(effectiveColorScheme == .dark ? .white.opacity(0.6) : Color.charcoal.opacity(0.5))
+            }
+
+            Spacer()
+
+            HStack(spacing: 2) {
+                Button {
+                    editedName = document.name
+                    isShowingRenameAlert = true
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(effectiveColorScheme == .dark ? .white.opacity(0.7) : .deepTeal)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    isShowingDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(effectiveColorScheme == .dark ? Color.deepCoral.opacity(0.8) : .deepCoral)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(footerColor)
     }
 
     private var placeholderIcon: some View {

@@ -132,7 +132,7 @@ struct DrawingOverlayView: UIViewRepresentable {
 
     private func updateTool(_ canvasView: PKCanvasView) {
         switch selectedTool {
-        case .pen:
+        case .pen, .diagram:
             // Convert SwiftUI Color to UIColor using explicit RGB to avoid color scheme adaptation
             let uiColor = uiColorFromSwiftUIColor(selectedPenColor)
             canvasView.tool = PKInkingTool(.pen, color: uiColor, width: penWidth)
@@ -293,6 +293,7 @@ struct DrawingOverlayView: UIViewRepresentable {
             let allStrokes = canvasView.drawing.strokes
             let previousCount = lastSentStrokeCount[key] ?? 0
             let pageNum = getPageIndex(for: canvasView)
+            let contentMode: String? = currentTool == .diagram ? "diagram" : nil
 
             // Erase detected — send full snapshot of remaining strokes
             // Don't re-detect part (stroke gone); send last known active part
@@ -306,7 +307,8 @@ struct DrawingOverlayView: UIViewRepresentable {
                     strokes: strokeData,
                     eventType: "erase",
                     deletedCount: deletedCount,
-                    partLabel: currentActivePart
+                    partLabel: currentActivePart,
+                    contentMode: contentMode
                 )
                 return
             }
@@ -325,7 +327,8 @@ struct DrawingOverlayView: UIViewRepresentable {
                 sessionId: strokeSessionId,
                 page: pageNum,
                 strokes: strokeData,
-                partLabel: currentActivePart
+                partLabel: currentActivePart,
+                contentMode: contentMode
             )
         }
 

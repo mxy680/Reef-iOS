@@ -32,21 +32,12 @@
 		<string>DynaPuff-SemiBold.ttf</string>
 		<string>DynaPuff-Bold.ttf</string>
 	</array>
+	<key>DEV_SERVER_IP</key>
+	<string>$(DEV_SERVER_IP)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSExceptionDomains</key>
-		<dict>
-			<key>172.20.83.12</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-			</dict>
-			<key>172.20.87.11</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-			</dict>
-		</dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
 	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

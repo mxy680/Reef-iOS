@@ -176,7 +176,7 @@ class AIService {
     }
 
     /// Sends stroke point data for a page to the server for logging.
-    func sendStrokes(sessionId: String, page: Int, strokes: [[[String: Double]]], eventType: String = "draw", deletedCount: Int = 0, partLabel: String? = nil) {
+    func sendStrokes(sessionId: String, page: Int, strokes: [[[String: Double]]], eventType: String = "draw", deletedCount: Int = 0, partLabel: String? = nil, contentMode: String? = nil) {
         var body: [String: Any] = [
             "session_id": sessionId,
             "user_id": KeychainService.get(.userIdentifier) ?? "",
@@ -186,6 +186,7 @@ class AIService {
         ]
         if deletedCount > 0 { body["deleted_count"] = deletedCount }
         if let part = partLabel { body["part_label"] = part }
+        if let mode = contentMode { body["content_mode"] = mode }
         postJSON(path: "/api/strokes", body: body)
     }
 

@@ -48,7 +48,7 @@ enum QuizGenerationError: Error, LocalizedError {
 actor QuizGenerationService {
     static let shared = QuizGenerationService()
 
-    private let baseURL = "https://api.studyreef.com"
+    private let baseURL = ServerConfig.baseURL
     private let session: URLSession
 
     private init() {

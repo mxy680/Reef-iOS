@@ -144,7 +144,7 @@ struct CanvasView: View {
                                     AIService.shared.sendVoiceQuestion(
                                         audioData: audioData,
                                         sessionId: AIService.shared.currentSessionId ?? "",
-                                        page: 0
+                                        page: 1
                                     )
                                 }
                             } else {

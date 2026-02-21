@@ -72,6 +72,8 @@ struct HomeView: View {
     @State private var isCanvasExiting: Bool = false
     @State private var isShowingProfileCompletion = false
     @State private var profileCompletionName = ""
+    @State private var isShowingExtractionError = false
+    @State private var extractionErrorMessage = ""
 
     private var effectiveColorScheme: ColorScheme {
         themeManager.isDarkMode ? .dark : .light
@@ -611,6 +613,11 @@ struct HomeView: View {
         } message: {
             Text("Enter the name for your new course")
         }
+        .alert("Question Extraction Failed", isPresented: $isShowingExtractionError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(extractionErrorMessage)
+        }
         .alert("What's your name?", isPresented: $isShowingProfileCompletion) {
             TextField("Your name", text: $profileCompletionName)
             Button("Save") {
@@ -895,8 +902,9 @@ struct HomeView: View {
             print("Failed to extract questions: \(error)")
             await MainActor.run {
                 guard !note.isDeleted else { return }
-                // Silent fallback - note remains usable as regular document
                 note.assignmentStatus = .failed
+                extractionErrorMessage = "Could not extract questions from this document. It will remain available as a regular note.\n\n\(error.localizedDescription)"
+                isShowingExtractionError = true
             }
         }
     }

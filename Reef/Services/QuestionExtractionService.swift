@@ -91,11 +91,7 @@ enum ExtractionJobStatus: String {
 actor QuestionExtractionService {
     static let shared = QuestionExtractionService()
 
-    #if DEBUG
-    private let baseURL = "http://172.20.87.11:8000"
-    #else
-    private let baseURL = "https://api.studyreef.com"
-    #endif
+    private let baseURL = ServerConfig.baseURL
     private let session: URLSession
     private var activeDataTasks: [UUID: URLSessionDataTask] = [:]
 

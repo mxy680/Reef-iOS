@@ -11,6 +11,7 @@ import SwiftUI
 
 enum CanvasTool: Equatable {
     case pen
+    case diagram
     case highlighter
     case eraser
     case lasso
@@ -22,8 +23,7 @@ extension CanvasTool {
     var hasSecondaryOptions: Bool {
         switch self {
         case .pen, .highlighter, .eraser: return true
-        case .textBox: return false
-        case .lasso, .pan: return false
+        case .diagram, .textBox, .lasso, .pan: return false
         }
     }
 }
@@ -433,6 +433,14 @@ struct CanvasToolbar: View {
                 action: { selectTool(.pen) }
             )
 
+            // Diagram
+            ToolbarButton(
+                icon: "scribble.variable",
+                isSelected: selectedTool == .diagram,
+                colorScheme: colorScheme,
+                action: { selectTool(.diagram) }
+            )
+
             // --- Edit tools ---
 
             // Eraser
@@ -621,7 +629,7 @@ struct CanvasToolbar: View {
                             colorScheme: colorScheme,
                             onClearPage: onClearCurrentPage
                         )
-                    case .textBox, .lasso, .pan:
+                    case .diagram, .textBox, .lasso, .pan:
                         EmptyView()
                     }
                 }
