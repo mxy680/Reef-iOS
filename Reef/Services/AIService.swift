@@ -161,7 +161,7 @@ class AIService: ObservableObject {
     func connectStrokeSession(sessionId: String, documentName: String? = nil, questionNumber: Int? = nil) {
         print("[AIService] connectStrokeSession session=\(sessionId.prefix(8)) doc=\(documentName ?? "nil") q=\(questionNumber ?? -1)")
         currentSessionId = sessionId
-        connectionState = .connecting
+        Task { @MainActor in self.connectionState = .connecting }
         var body: [String: Any] = [
             "session_id": sessionId,
             "user_id": KeychainService.get(.userIdentifier) ?? ""
@@ -176,7 +176,7 @@ class AIService: ObservableObject {
         guard let sid = currentSessionId else { return }
         postJSON(path: "/api/strokes/disconnect", body: ["session_id": sid])
         currentSessionId = nil
-        connectionState = .disconnected
+        Task { @MainActor in self.connectionState = .disconnected }
     }
 
     /// Sends stroke point data for a page to the server for logging.
@@ -282,7 +282,7 @@ class AIService: ObservableObject {
         sseTask?.cancel()
         sseTask = nil
         sseSessionId = nil
-        connectionState = .disconnected
+        Task { @MainActor in self.connectionState = .disconnected }
         stopAudioPlayback()
     }
 
