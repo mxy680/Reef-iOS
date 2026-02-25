@@ -118,6 +118,7 @@ struct CanvasToolbar: View {
     var onAIActionSelected: (String) -> Void = { _ in }
     let onToggleDarkMode: () -> Void
     var isDocumentAIReady: Bool = true
+    var isServerConnected: Bool = true
     var onAddPageAfterCurrent: () -> Void = {}
     var onAddPageToEnd: () -> Void = {}
     var onDeleteCurrentPage: () -> Void = {}
@@ -654,7 +655,7 @@ struct CanvasToolbar: View {
     // MARK: - AI Section
 
     private var aiDisabled: Bool {
-        !isDocumentAIReady || (isAssignmentEnabled && !isAssignmentReady)
+        !isServerConnected || !isDocumentAIReady || (isAssignmentEnabled && !isAssignmentReady)
     }
 
     @ViewBuilder
@@ -665,8 +666,8 @@ struct CanvasToolbar: View {
                 icon: isRecording ? "mic.fill" : "mic.fill",
                 isSelected: isRecording,
                 isDisabled: aiDisabled,
-                showProcessingIndicator: isRecording || (!isDocumentAIReady || isAssignmentProcessing),
-                processingIndicatorColor: isRecording ? .red : (isAssignmentProcessing ? .blue : .yellow),
+                showProcessingIndicator: isRecording || !isServerConnected || !isDocumentAIReady || isAssignmentProcessing,
+                processingIndicatorColor: isRecording ? .red : (!isServerConnected ? .orange : (isAssignmentProcessing ? .blue : .yellow)),
                 colorScheme: colorScheme,
                 action: { onAIActionSelected("ask") }
             )

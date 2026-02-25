@@ -52,7 +52,9 @@ enum AIServiceError: Error, LocalizedError {
 
 /// Service for communicating with the Reef-Server AI endpoints
 @MainActor
-class AIService {
+class AIService: ObservableObject {
+    enum ConnectionState { case disconnected, connecting, connected }
+    @Published private(set) var connectionState: ConnectionState = .disconnected
     nonisolated static let shared = AIService()
 
     private let baseURL: String
@@ -159,6 +161,7 @@ class AIService {
     func connectStrokeSession(sessionId: String, documentName: String? = nil, questionNumber: Int? = nil) {
         print("[AIService] connectStrokeSession session=\(sessionId.prefix(8)) doc=\(documentName ?? "nil") q=\(questionNumber ?? -1)")
         currentSessionId = sessionId
+        connectionState = .connecting
         var body: [String: Any] = [
             "session_id": sessionId,
             "user_id": KeychainService.get(.userIdentifier) ?? ""
@@ -173,6 +176,7 @@ class AIService {
         guard let sid = currentSessionId else { return }
         postJSON(path: "/api/strokes/disconnect", body: ["session_id": sid])
         currentSessionId = nil
+        connectionState = .disconnected
     }
 
     /// Sends stroke point data for a page to the server for logging.
@@ -243,6 +247,7 @@ class AIService {
                           httpResponse.statusCode == 200 else {
                         let code = (response as? HTTPURLResponse)?.statusCode ?? -1
                         print("[SSE] Bad status \(code), retrying in \(backoff / 1_000_000_000)s")
+                        self.connectionState = .connecting
                         try await Task.sleep(nanoseconds: backoff)
                         backoff = min(backoff * 2, maxBackoff)
                         continue
@@ -254,6 +259,9 @@ class AIService {
                     var parser = SSEParser()
 
                     for try await line in bytes.lines {
+                        if line == ": connected" {
+                            self.connectionState = .connected
+                        }
                         if let event = parser.parseLine(line) {
                             await self.handleSSEEvent(type: event.type, data: event.data)
                         }
@@ -261,6 +269,7 @@ class AIService {
                 } catch {
                     if Task.isCancelled { break }
                     print("[SSE] Error: \(error), reconnecting in \(backoff / 1_000_000_000)s")
+                    self?.connectionState = .connecting
                     try? await Task.sleep(nanoseconds: backoff)
                     backoff = min(backoff * 2, maxBackoff)
                 }
@@ -273,6 +282,7 @@ class AIService {
         sseTask?.cancel()
         sseTask = nil
         sseSessionId = nil
+        connectionState = .disconnected
         stopAudioPlayback()
     }
 

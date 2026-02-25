@@ -14,6 +14,7 @@ struct CanvasView: View {
     @Binding var isViewingCanvas: Bool
     var onDismiss: (() -> Void)? = nil
     @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var aiService = AIService.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
@@ -162,6 +163,7 @@ struct CanvasView: View {
                         selectedPenColor = themeManager.isDarkMode ? .white : .black
                     },
                     isDocumentAIReady: isQuizMode || (note?.isAIReady ?? false),
+                    isServerConnected: aiService.connectionState == .connected,
                     onAddPageAfterCurrent: {
                         canvasViewRef?.addPageAfterCurrent()
                     },
