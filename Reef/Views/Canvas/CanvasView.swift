@@ -57,6 +57,9 @@ struct CanvasView: View {
     @State private var exportedFileURL: URL? = nil
     @State private var showExportPreview: Bool = false
 
+    // Debug sidebar
+    @State private var showDebugSidebar: Bool = false
+
     // Assignment mode state
     @State private var viewMode: CanvasViewMode = .document
     @State private var currentQuestionIndex: Int = 0
@@ -213,7 +216,8 @@ struct CanvasView: View {
                     isRulerActive: isRulerActive,
                     onToggleRuler: { isRulerActive.toggle() },
                     textSize: $textSize,
-                    textColor: $textColor
+                    textColor: $textColor,
+                    showDebugSidebar: $showDebugSidebar
                 )
 
                 // Content view with optional AI panel sidebar
@@ -330,6 +334,12 @@ struct CanvasView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .clipped()
+
+                    // Debug sidebar
+                    if showDebugSidebar {
+                        DebugSidebarView(colorScheme: effectiveColorScheme)
+                            .transition(.move(edge: .trailing))
+                    }
                 }
             }
 
@@ -359,6 +369,7 @@ struct CanvasView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: isExporting)
+        .animation(.easeInOut(duration: 0.25), value: showDebugSidebar)
         .sheet(isPresented: $showExportPreview, onDismiss: {
             exportedFileURL = nil
             Task {

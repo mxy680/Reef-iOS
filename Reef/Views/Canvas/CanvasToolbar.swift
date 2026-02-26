@@ -152,6 +152,9 @@ struct CanvasToolbar: View {
     @Binding var textSize: CGFloat
     @Binding var textColor: Color
 
+    // Debug sidebar
+    @Binding var showDebugSidebar: Bool
+
     // Secondary toolbar state (inline tool options)
     @State private var showSecondaryToolbar: Bool = false
     @State private var showBackgroundOptions: Bool = false
@@ -697,6 +700,14 @@ struct CanvasToolbar: View {
 
     private var rightSection: some View {
         HStack(spacing: 0) {
+            // Debug sidebar toggle
+            ToolbarButton(
+                icon: "sidebar.trailing",
+                isSelected: showDebugSidebar,
+                colorScheme: colorScheme,
+                action: { showDebugSidebar.toggle() }
+            )
+
             // Export PDF
             ToolbarButton(
                 icon: "square.and.arrow.up.fill",
@@ -1170,7 +1181,8 @@ private struct ChromeTabShape: Shape {
             currentQuestionIndex: 2,
             totalQuestions: 12,
             textSize: .constant(16),
-            textColor: .constant(.black)
+            textColor: .constant(.black),
+            showDebugSidebar: .constant(false)
         )
         Spacer()
     }
