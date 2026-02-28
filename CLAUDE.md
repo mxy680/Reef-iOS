@@ -169,8 +169,8 @@ QuizzesView → QuizGenerationService.generate(topic, difficulty, numQuestions)
 
 ## Config
 
-- **Debug base URL**: local network IP (changes with WiFi — check `AIService.swift`)
-- **Release base URL**: `https://api.studyreef.com`
+- **Debug base URL**: `https://dev.studyreef.com` (Hetzner host machine port 8001 via Caddy)
+- **Release base URL**: `https://api.studyreef.com` (Hetzner Docker production container)
 - **UIAppFonts**: 9 font files (Quicksand x5, DynaPuff x4)
 - **NSAppTransportSecurity**: allows insecure HTTP for local dev IPs
 - **NSMicrophoneUsageDescription**: voice recording for study sessions
